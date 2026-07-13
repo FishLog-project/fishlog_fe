@@ -1,0 +1,59 @@
+name: 기능 작업
+description: 구현할 기능의 배경, 범위와 완료 조건을 정의합니다.
+title: ""
+labels: []
+assignees: []
+body:
+  - type: textarea
+    id: background
+    attributes:
+      label: 배경
+      description: 이 작업이 필요한 이유와 해결할 문제를 적어주세요.
+      placeholder: 현재 상황과 이 작업이 필요한 이유를 적어주세요.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: 작업 범위
+      description: 이번 이슈에서 구현할 내용을 체크리스트로 적어주세요.
+      value: |
+        - [ ]
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 완료 조건
+      description: 리뷰어가 완료 여부를 확인할 수 있는 조건을 적어주세요.
+      value: |
+        - [ ]
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: 의존성
+      description: 선행 이슈, 외부 API, 디자인 등을 적어주세요.
+      value: |
+        - 없음
+
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: 제외 범위
+      description: 이번 이슈에서 의도적으로 구현하지 않는 내용을 적어주세요.
+      value: |
+        -
+
+  - type: textarea
+    id: references
+    attributes:
+      label: 참고 자료
+      description: Figma, API 문서, 관련 이슈 등의 링크를 적어주세요.
+      value: |
+        - Figma:
+        - 관련 이슈:
