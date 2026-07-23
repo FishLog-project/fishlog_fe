@@ -95,6 +95,23 @@ export const Components = {
     parking: '#00AD76',
     height: 40,
   },
+  /** 인증 화면 입력 요소 (로그인 박스형 / 회원가입 언더라인형) */
+  authInput: {
+    /** 로그인 화면의 박스형 입력 배경 */
+    boxBg: '#F1F1F5',
+    boxRadius: 12,
+    boxHeight: 56,
+    /** placeholder 텍스트 */
+    placeholder: '#767676',
+    /** 입력 텍스트 */
+    text: '#1C1C1C',
+    /** 언더라인 기본(비활성) */
+    underline: '#E1E1E1',
+    /** 언더라인 활성 (= Palette.blue) */
+    underlineActive: '#00A0F0',
+    /** clear(X) 버튼 원형 배경 */
+    clearBg: '#CFD9DD',
+  },
 } as const;
 
 export const Fonts = Platform.select({

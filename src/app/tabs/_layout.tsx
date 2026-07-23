@@ -17,7 +17,7 @@ function tabIcon(active: IoniconName, inactive: IoniconName) {
  * 하단 탭 네비게이터 (Figma TabBar 디자인).
  * 5탭: 홈 · 지도 · 기록 · 랭킹 · 프로필 — 아이콘 전용, 활성 시 브랜드 블루.
  */
-export default function AppTabs() {
+export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
