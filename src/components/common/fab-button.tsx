@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, StyleSheet } from 'react-native';
 
-import { Brand } from '@/constants/theme';
+import { Brand, Derived, Palette } from '@/constants/theme';
 
 type Props = {
   icon: React.ComponentProps<typeof Ionicons>['name'];
@@ -30,7 +30,7 @@ export function FabButton({ icon, active, onPress, size = 52 }: Props) {
       ]}>
       {active && (
         <LinearGradient
-          colors={['#5BC8FF', '#0085DE']}
+          colors={[...Derived.buttonGradient]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[StyleSheet.absoluteFill, { borderRadius: size / 2 }]}
@@ -39,7 +39,7 @@ export function FabButton({ icon, active, onPress, size = 52 }: Props) {
       <Ionicons
         name={icon}
         size={size * 0.44}
-        color={active ? '#FFFFFF' : '#1C1C1C'}
+        color={active ? Palette.font.white : Palette.font.black}
       />
     </Pressable>
   );
@@ -50,12 +50,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    shadowColor: '#004E7C',
+    shadowColor: Derived.shadow,
     shadowOpacity: 0.18,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
     elevation: 5,
   },
-  white: { backgroundColor: '#FFFFFF' },
+  white: { backgroundColor: Palette.font.white },
   pressed: { opacity: 0.9 },
 });

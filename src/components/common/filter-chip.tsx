@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Components } from '@/constants/theme';
+import { Components, Derived, Palette } from '@/constants/theme';
 
 type Variant = 'food' | 'parking';
 
@@ -69,7 +69,7 @@ const styles = StyleSheet.create({
     borderRadius: Components.chip.height / 2,
     paddingHorizontal: 14,
     // 디자인의 은은한 그림자
-    shadowColor: '#004E7C',
+    shadowColor: Derived.shadow,
     shadowOpacity: 0.12,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
@@ -84,5 +84,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800' },
+  pText: { color: Palette.font.white, fontSize: 10, fontWeight: '800' },
 });

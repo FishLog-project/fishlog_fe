@@ -10,11 +10,11 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 SplashScreen.preventAutoHideAsync();
 
 /**
- * 로그인 상태에 따라 라우트를 보호한다.
- * - 비로그인 & (tabs) 안 → 온보딩으로
- * - 로그인   & auth 안   → 홈("/")으로
+ * 세션이 없는데 탭 안에 들어와 있으면 로그인으로 되돌린다.
  *
- * (tabs)는 경로에 드러나지 않는 라우트 그룹이라 홈 주소가 곧 "/"다.
+ * 반대 방향(세션이 있으면 홈으로)은 일부러 넣지 않는다.
+ * 그 규칙이 있으면 저장된 토큰 때문에 진입 화면이 로그인에서 홈으로 튕긴다.
+ * 홈 진입은 로그인/가입 완료에서 명시적으로 이동시킨다.
  */
 function useProtectedRoute(token: string | null, isReady: boolean) {
   const segments = useSegments();
@@ -22,13 +22,10 @@ function useProtectedRoute(token: string | null, isReady: boolean) {
 
   useEffect(() => {
     if (!isReady) return;
-    const inAuthGroup = segments[0] === 'auth';
     const inTabsGroup = segments[0] === '(tabs)';
 
     if (!token && inTabsGroup) {
-      router.replace('/auth/onboarding');
-    } else if (token && inAuthGroup) {
-      router.replace('/');
+      router.replace('/auth/login');
     }
   }, [token, isReady, segments, router]);
 }

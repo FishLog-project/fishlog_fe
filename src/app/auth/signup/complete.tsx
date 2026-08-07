@@ -1,8 +1,9 @@
+import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { PrimaryButton } from '@/components/common';
-import { AuthHeader, useAuth, useSignup } from '@/features/auth';
+import { PrimaryButton, Screen, ScreenHeader } from '@/components/common';
+import { Brand, Derived } from '@/constants/theme';
+import { useAuth, useSignup } from '@/features/auth';
 
 /**
  * 회원가입 5단계 — 가입 완료.
@@ -12,6 +13,7 @@ import { AuthHeader, useAuth, useSignup } from '@/features/auth';
  *    API 확정 후 handleStart에서 authApi.signup({email,password,nickname}) 연동 예정.
  */
 export default function SignupCompleteScreen() {
+  const router = useRouter();
   const { signIn } = useAuth();
   const { email, password, nickname } = useSignup();
 
@@ -21,12 +23,14 @@ export default function SignupCompleteScreen() {
     void password;
     void nickname;
     await signIn('dev-session');
+    router.replace('/home');
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <AuthHeader title="가입 완료" showBack={false} />
-
+    <Screen
+      edges={['top', 'bottom']}
+      header={<ScreenHeader title="가입 완료" />}
+      footer={<PrimaryButton label="시작하기" onPress={handleStart} />}>
       <View style={styles.body}>
         <Text style={styles.heading}>
           가입이 완료되었어요!{'\n'}나만의 물고기 도감, 하나씩 채워봐요
@@ -35,22 +39,17 @@ export default function SignupCompleteScreen() {
         {/* 캐릭터 일러스트 자리 (디자인의 원형 플레이스홀더) */}
         <View style={styles.illustration} />
       </View>
-
-      <View style={styles.footer}>
-        <PrimaryButton label="시작하기" onPress={handleStart} />
-      </View>
-    </SafeAreaView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#FFFFFF' },
-  body: { flex: 1, paddingHorizontal: 20, alignItems: 'center' },
+  body: { flex: 1, alignItems: 'center' },
   heading: {
     alignSelf: 'stretch',
     fontSize: 24,
     fontWeight: '600',
-    color: '#1C1C1C',
+    color: Brand.textStrong,
     lineHeight: 34,
     marginTop: 60,
   },
@@ -58,8 +57,7 @@ const styles = StyleSheet.create({
     width: 240,
     height: 300,
     borderRadius: 150,
-    backgroundColor: '#D9D9D9',
+    backgroundColor: Derived.neutral,
     marginTop: 80,
   },
-  footer: { paddingHorizontal: 20, paddingBottom: 8 },
 });

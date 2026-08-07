@@ -1,15 +1,7 @@
-import {
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { PrimaryButton } from '@/components/common';
-
-import { AuthHeader } from './auth-header';
+import { PrimaryButton, Screen, ScreenHeader } from '@/components/common';
+import { Brand } from '@/constants/theme';
 
 type Props = {
   /** 헤더 타이틀 (기본 "회원가입") */
@@ -29,6 +21,8 @@ type Props = {
 /**
  * 회원가입 스텝 공통 레이아웃.
  * [헤더] + [큰 안내 문구] + [입력 영역] + [하단 고정 버튼] + 키보드 회피.
+ *
+ * 좌우 여백은 Screen이 책임지므로 여기서는 세로 흐름만 정의한다.
  */
 export function StepScreen({
   headerTitle = '회원가입',
@@ -41,39 +35,31 @@ export function StepScreen({
   loading,
 }: Props) {
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <AuthHeader title={headerTitle} showBack={showBack} />
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={styles.body}>
-          <Text style={styles.heading}>{heading}</Text>
-          <View style={styles.inputArea}>{children}</View>
-        </View>
-        <View style={styles.footer}>
-          <PrimaryButton
-            label={buttonLabel}
-            onPress={onNext}
-            disabled={nextDisabled}
-            loading={loading}
-          />
-        </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+    <Screen
+      keyboardAvoiding
+      edges={['top', 'bottom']}
+      header={<ScreenHeader title={headerTitle} showBack={showBack} />}
+      footer={
+        <PrimaryButton
+          label={buttonLabel}
+          onPress={onNext}
+          disabled={nextDisabled}
+          loading={loading}
+        />
+      }>
+      <Text style={styles.heading}>{heading}</Text>
+      <View style={styles.inputArea}>{children}</View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#FFFFFF' },
-  flex: { flex: 1 },
-  body: { flex: 1, paddingHorizontal: 20 },
   heading: {
     fontSize: 24,
     fontWeight: '600',
-    color: '#1C1C1C',
+    color: Brand.textStrong,
     lineHeight: 34,
     marginTop: 72,
   },
   inputArea: { marginTop: 40 },
-  footer: { paddingHorizontal: 20, paddingBottom: 8, paddingTop: 8 },
 });

@@ -1,18 +1,21 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   FabButton,
   FilterChip,
   PrimaryButton,
+  Screen,
   SearchBar,
 } from '@/components/common';
-import { Palette } from '@/constants/theme';
+import { Brand, Layout } from '@/constants/theme';
 
 /**
  * 지도 탭 — 아직 실제 지도는 없지만, 공통 컴포넌트
  * (SearchBar / FilterChip / FabButton / PrimaryButton)를 배치해 둔 화면.
+ *
+ * 지도는 화면 끝까지 채워야 해서 Screen을 edgeToEdge로 쓰고,
+ * 그 위에 얹히는 컨트롤만 Layout.screenPadding을 참조한다.
  */
 export default function MapScreen() {
   const [query, setQuery] = useState('');
@@ -20,7 +23,7 @@ export default function MapScreen() {
   const [locateOn, setLocateOn] = useState(true);
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <Screen edgeToEdge footer={<PrimaryButton label="다음" onPress={() => {}} />}>
       {/* 지도 placeholder 영역 */}
       <View style={styles.mapArea}>
         {/* 상단: 검색 + 필터 칩 */}
@@ -42,7 +45,7 @@ export default function MapScreen() {
           </View>
         </View>
 
-        {/* 우측: FAB 토글 버튼들 */}
+        {/* 지도 위에 떠 있는 FAB — 지도를 가리지 않고 겹쳐야 하므로 오버레이 */}
         <View style={styles.fabColumn}>
           <FabButton icon="scan" active={false} />
           <FabButton icon="grid" active={false} />
@@ -53,25 +56,22 @@ export default function MapScreen() {
           />
         </View>
       </View>
-
-      {/* 하단 액션 */}
-      <View style={styles.bottom}>
-        <PrimaryButton label="다음" onPress={() => {}} />
-      </View>
-    </SafeAreaView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#FFFFFF' },
-  mapArea: { flex: 1, backgroundColor: Palette.light },
-  top: { paddingHorizontal: 20, paddingTop: 12, gap: 12 },
+  mapArea: { flex: 1, backgroundColor: Brand.surfaceSoft },
+  top: {
+    paddingHorizontal: Layout.screenPadding,
+    paddingTop: 12,
+    gap: 12,
+  },
   chips: { flexDirection: 'row', gap: 10 },
   fabColumn: {
     position: 'absolute',
-    right: 20,
+    right: Layout.screenPadding,
     bottom: 24,
     gap: 12,
   },
-  bottom: { paddingHorizontal: 20, paddingVertical: 16 },
 });

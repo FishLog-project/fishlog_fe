@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Brand, Derived } from '@/constants/theme';
 import { authApi, OtpInput, StepScreen, useSignup } from '@/features/auth';
 
 const CODE_LENGTH = 6;
@@ -71,7 +72,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  error: { color: '#E5484D', fontSize: 13 },
-  resend: { color: '#4A7694', fontSize: 13, fontWeight: '500' },
+  error: { color: Derived.error, fontSize: 13 },
+  resend: { color: Brand.textMuted, fontSize: 13, fontWeight: '500' },
   resendDisabled: { opacity: 0.5 },
 });
