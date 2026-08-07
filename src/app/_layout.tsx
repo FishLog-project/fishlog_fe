@@ -2,17 +2,19 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
-import { useColorScheme } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { AuthProvider, useAuth } from '@/features/auth';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 SplashScreen.preventAutoHideAsync();
 
 /**
  * 로그인 상태에 따라 라우트를 보호한다.
- * - 비로그인 & tabs 안  → 온보딩으로
- * - 로그인   & auth 안  → 홈으로
+ * - 비로그인 & (tabs) 안 → 온보딩으로
+ * - 로그인   & auth 안   → 홈("/")으로
+ *
+ * (tabs)는 경로에 드러나지 않는 라우트 그룹이라 홈 주소가 곧 "/"다.
  */
 function useProtectedRoute(token: string | null, isReady: boolean) {
   const segments = useSegments();
@@ -21,12 +23,12 @@ function useProtectedRoute(token: string | null, isReady: boolean) {
   useEffect(() => {
     if (!isReady) return;
     const inAuthGroup = segments[0] === 'auth';
-    const inTabsGroup = segments[0] === 'tabs';
+    const inTabsGroup = segments[0] === '(tabs)';
 
     if (!token && inTabsGroup) {
       router.replace('/auth/onboarding');
     } else if (token && inAuthGroup) {
-      router.replace('/tabs');
+      router.replace('/');
     }
   }, [token, isReady, segments, router]);
 }

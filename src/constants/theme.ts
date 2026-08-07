@@ -1,30 +1,12 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * Fishlog 디자인 토큰.
+ * 앱은 app.json의 `userInterfaceStyle: "light"`로 라이트 모드 고정이라
+ * 라이트/다크 쌍이 아닌 단일 팔레트로 관리한다.
  */
 
 import '@/global.css';
 
 import { Platform } from 'react-native';
-
-export const Colors = {
-  light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
-  },
-  dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
-  },
-} as const;
-
-export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
 /**
  * Fishlog 공식 컬러 팔레트.
@@ -111,6 +93,17 @@ export const Components = {
     underlineActive: '#00A0F0',
     /** clear(X) 버튼 원형 배경 */
     clearBg: '#CFD9DD',
+  },
+  /** 로딩·빈 화면·오류를 표시하는 ScreenState 카드 */
+  state: {
+    surface: '#FFFFFF',
+    border: '#E3EAF0',
+    /** 빈 화면 심볼 배경 */
+    soft: '#E8F7FF',
+    error: '#C93B3B',
+    /** 오류 심볼 배경 */
+    errorSoft: '#FDECEC',
+    radius: 20,
   },
 } as const;
 
