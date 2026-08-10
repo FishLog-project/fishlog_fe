@@ -1,7 +1,14 @@
 /**
  * Fishlog API 클라이언트.
- * baseURL + JSON 직렬화 + 에러 정규화를 담당하는 얇은 fetch 래퍼.
- * (토큰이 필요한 요청은 추후 Authorization 헤더를 붙이도록 확장)
+ * baseURL + JSON 직렬화 + 응답 봉투 해제 + 에러 정규화를 담당하는 얇은 fetch 래퍼.
+ *
+ * 서버는 모든 응답을 아래 봉투로 감싼다.
+ *   { "success": true,  "code": 200, "message": "...", "data": <실제 값> }
+ *   { "success": false, "code": 401, "message": "이메일 또는 비밀번호가 올바르지 않습니다.", "data": null }
+ *
+ * Swagger의 응답 스키마는 이 봉투가 아니라 `data` 안쪽만 기술하고 있으므로
+ * (예: /api/users/me → { userId, email, nickname })
+ * 여기서 봉투를 벗겨 `data`만 돌려준다. 호출부가 매번 `.data`를 파고들지 않게 하기 위함이다.
  */
 
 export const API_BASE_URL = 'https://api.fishlog.xyz';
@@ -28,8 +35,10 @@ type RequestOptions = {
 };
 
 /**
- * 공통 요청 함수. 응답 본문이 비어있으면(204/빈 200) undefined를 반환한다.
- * 2xx가 아니면 ApiError를 throw 한다.
+ * 공통 요청 함수.
+ *
+ * 2xx가 아니거나 봉투의 success가 false면 ApiError를 throw 한다.
+ * (HTTP는 200인데 success:false로 내려오는 경우까지 잡기 위해 둘 다 본다)
  */
 export async function apiRequest<T = unknown>(
   path: string,
@@ -47,16 +56,24 @@ export async function apiRequest<T = unknown>(
   });
 
   const text = await res.text();
-  const data = text ? safeJsonParse(text) : undefined;
+  const parsed = text ? safeJsonParse(text) : undefined;
+  const enveloped = isEnvelope(parsed);
 
-  if (!res.ok) {
+  if (!res.ok || (enveloped && parsed.success === false)) {
     const message =
-      (isRecord(data) && typeof data.message === 'string' && data.message) ||
+      (isRecord(parsed) && typeof parsed.message === 'string' && parsed.message) ||
       `요청에 실패했어요 (${res.status})`;
-    throw new ApiError(res.status, message, data);
+    throw new ApiError(res.status, message, parsed);
   }
 
-  return data as T;
+  // 봉투면 data만, 아니면(혹시 서버가 봉투 없이 주면) 본문 그대로.
+  return (enveloped ? parsed.data : parsed) as T;
+}
+
+type Envelope = { success: boolean; code?: number; message?: string; data?: unknown };
+
+function isEnvelope(v: unknown): v is Envelope {
+  return isRecord(v) && typeof v.success === 'boolean' && 'data' in v;
 }
 
 function safeJsonParse(text: string): unknown {

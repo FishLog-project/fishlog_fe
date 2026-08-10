@@ -2,14 +2,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Screen } from '@/components/common';
-import { Brand } from '@/constants/theme';
+import { Brand, Typography } from '@/constants/theme';
 
 type Props = {
   title: string;
   icon: React.ComponentProps<typeof Ionicons>['name'];
 };
 
-/** 아직 구현 전인 탭 화면용 공통 플레이스홀더. */
+/**
+ * ⚠️ 임시 컴포넌트 — 실제 화면이 들어오면 삭제한다.
+ *
+ * 아직 구현 전인 탭(기록·랭킹·프로필)의 자리를 채우기만 하는 용도다.
+ * 각 탭이 실제 화면으로 교체되면 이 파일과 남은 사용처를 함께 지운다.
+ */
 export function PlaceholderScreen({ title, icon }: Props) {
   return (
     <Screen>
@@ -24,6 +29,6 @@ export function PlaceholderScreen({ title, icon }: Props) {
 
 const styles = StyleSheet.create({
   body: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
-  title: { fontSize: 20, fontWeight: '700', color: Brand.primaryDark },
-  sub: { fontSize: 14, color: Brand.textMuted },
+  title: { ...Typography.sectionTitle, fontSize: 20, color: Brand.primaryDark },
+  sub: { ...Typography.caption, fontWeight: '400', color: Brand.textMuted },
 });

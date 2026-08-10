@@ -9,7 +9,9 @@ export default function SignupEmailScreen() {
   const router = useRouter();
   const { email, setEmail } = useSignup();
 
-  const valid = EMAIL_RE.test(email.trim());
+  // 이메일에 공백은 어떤 위치에도 유효하지 않으므로 저장 시점에 바로 털어낸다.
+  // (검증만 trim하고 원본을 저장하면 verify 단계가 공백 붙은 값을 서버로 보낸다)
+  const valid = EMAIL_RE.test(email);
 
   return (
     <StepScreen
@@ -18,7 +20,7 @@ export default function SignupEmailScreen() {
       onNext={() => router.push('/auth/signup/verify')}>
       <UnderlineInput
         value={email}
-        onChangeText={setEmail}
+        onChangeText={(v) => setEmail(v.trim())}
         placeholder="email@email.com"
         keyboardType="email-address"
         autoCapitalize="none"

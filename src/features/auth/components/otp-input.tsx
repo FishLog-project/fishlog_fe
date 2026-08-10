@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { Components } from '@/constants/theme';
+import { Components, Typography } from '@/constants/theme';
 
 type Props = {
   value: string;
@@ -26,7 +26,11 @@ export function OtpInput({ value, onChangeText, length = 6 }: Props) {
   };
 
   return (
-    <Pressable style={styles.wrap} onPress={() => inputRef.current?.focus()}>
+    <Pressable
+      style={styles.wrap}
+      onPress={() => inputRef.current?.focus()}
+      // 셀은 순전히 표시용이다. 스크린리더에는 아래 TextInput 하나만 노출한다.
+      accessible={false}>
       {cells.map((_, i) => {
         const char = value[i] ?? '';
         const isCursor = focused && i === value.length;
@@ -34,6 +38,8 @@ export function OtpInput({ value, onChangeText, length = 6 }: Props) {
         return (
           <View
             key={i}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
             style={[
               styles.cell,
               {
@@ -60,6 +66,8 @@ export function OtpInput({ value, onChangeText, length = 6 }: Props) {
         textContentType="oneTimeCode"
         autoFocus
         caretHidden
+        accessibilityLabel={`인증번호 ${length}자리`}
+        accessibilityHint="이메일로 받은 인증번호를 입력하세요"
       />
     </Pressable>
   );
@@ -74,6 +82,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  digit: { fontSize: 22, fontWeight: '500', color: Components.authInput.text },
+  digit: { ...Typography.inputLarge, fontSize: 22, color: Components.authInput.text },
   hidden: { position: 'absolute', opacity: 0, width: 1, height: 1 },
 });

@@ -3,28 +3,37 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { PrimaryButton, Screen } from '@/components/common';
-import { Brand, Components, Derived } from '@/constants/theme';
-import { useAuth } from '@/features/auth';
+import { Brand, Components, Spacing, Typography } from '@/constants/theme';
+import { authApi, useAuth } from '@/features/auth';
 
 /** 로그인 화면 — 이메일/비밀번호 입력 후 진입. 하단에 비밀번호 찾기 / 회원가입. */
 export default function LoginScreen() {
   const router = useRouter();
-  const { signIn } = useAuth();
+  const { signIn, continueAsGuest } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const canSubmit = email.trim().length > 0 && password.length > 0;
 
   const handleLogin = async () => {
-    // TODO: 로그인 API 확정 후 authApi.login(email, password) 연동.
-    // 현재는 서버 수정 중이라 임시 세션으로 앱에 진입시킨다.
-    await signIn('dev-session');
+    setSubmitting(true);
+    setError(null);
+    const res = await authApi.login(email, password);
+    setSubmitting(false);
+    if (!res.ok) {
+      setError(res.message);
+      return;
+    }
+    await signIn(res.tokens);
     router.replace('/home');
   };
 
-  // 로그인 없이 둘러보기 — 게스트 세션으로 앱(홈)에 진입.
+  // 로그인 없이 둘러보기 — 토큰이 아니라 게스트 플래그로 진입한다.
+  // ('guest'를 토큰 자리에 넣으면 로그인 사용자와 구분이 안 된다)
   const handleGuest = async () => {
-    await signIn('guest');
+    await continueAsGuest();
     router.replace('/home');
   };
 
@@ -53,10 +62,19 @@ export default function LoginScreen() {
           secureTextEntry
           textContentType="password"
         />
-        <PrimaryButton label="다음" onPress={handleLogin} disabled={!canSubmit} />
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+
+        <PrimaryButton
+          label="다음"
+          onPress={handleLogin}
+          disabled={!canSubmit}
+          loading={submitting}
+        />
 
         <View style={styles.links}>
-          <Pressable hitSlop={8} onPress={() => {}}>
+          <Pressable
+            hitSlop={8}
+            onPress={() => router.push('/auth/password/email')}>
             <Text style={styles.link}>비밀번호 찾기</Text>
           </Pressable>
           <View style={styles.divider} />
@@ -75,19 +93,20 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   logo: {
+    ...Typography.brand,
     fontSize: 37,
-    fontWeight: '500',
+    lineHeight: 44,
     color: Brand.primary,
     textAlign: 'center',
     marginTop: 120,
   },
-  form: { marginTop: 'auto', marginBottom: '20%', gap: 12 },
+  form: { marginTop: 'auto', marginBottom: Spacing.six, gap: 12 },
   input: {
+    ...Typography.input,
     height: Components.authInput.boxHeight,
     borderRadius: Components.authInput.boxRadius,
     backgroundColor: Components.authInput.boxBg,
     paddingHorizontal: Components.authInput.boxPaddingX,
-    fontSize: 16,
     color: Components.authInput.text,
   },
   links: {
@@ -97,11 +116,12 @@ const styles = StyleSheet.create({
     gap: 20,
     marginTop: 8,
   },
-  link: { fontSize: 14, fontWeight: '500', color: Components.authInput.placeholder },
-  divider: { width: 1, height: 12, backgroundColor: Derived.neutral },
+  error: { ...Typography.footnote, color: Brand.textError, textAlign: 'center' },
+  link: { ...Typography.caption, color: Components.authInput.placeholder },
+  divider: { width: 1, height: 12, backgroundColor: Brand.divider },
   guest: { alignSelf: 'center', marginTop: 20, paddingVertical: 4 },
   guestText: {
-    fontSize: 14,
+    ...Typography.caption,
     fontWeight: '600',
     color: Brand.primary,
     textDecorationLine: 'underline',

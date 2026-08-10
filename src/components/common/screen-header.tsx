@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Brand, Fonts, Layout, Typography } from '@/constants/theme';
+import { Brand, Layout, Typography } from '@/constants/theme';
 
 type ScreenHeaderProps = {
   title?: string;
@@ -79,11 +79,9 @@ const styles = StyleSheet.create({
     color: Brand.textStrong,
   },
   brand: {
+    ...Typography.brand,
     flex: 1,
     textAlign: 'center',
-    fontFamily: Fonts.semiBold,
-    fontWeight: '600',
-    fontSize: 28,
     color: Brand.primary,
   },
 });

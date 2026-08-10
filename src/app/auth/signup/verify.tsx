@@ -1,8 +1,8 @@
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Brand, Derived } from '@/constants/theme';
+import { Brand, Typography } from '@/constants/theme';
 import { authApi, OtpInput, StepScreen, useSignup } from '@/features/auth';
 
 const CODE_LENGTH = 6;
@@ -17,21 +17,27 @@ export default function SignupVerifyScreen() {
   const { email } = useSignup();
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
+  // 진입과 동시에 발송이 시작되므로 초기값이 곧 "전송 중"이다.
+  // (effect 본문에서 setSending(true)를 부르면 set-state-in-effect에 걸린다)
+  const [sending, setSending] = useState(true);
   const [verifying, setVerifying] = useState(false);
 
-  const requestCode = useCallback(async () => {
+  // 진입 시 자동 발송
+  useEffect(() => {
+    authApi.sendEmailCode(email).then((res) => {
+      setSending(false);
+      if (!res.ok) setError(res.message);
+    });
+  }, [email]);
+
+  /** 재전송 버튼 — 사용자 액션이라 effect 밖에서 상태를 바꾼다. */
+  const requestCode = async () => {
     setSending(true);
     setError(null);
     const res = await authApi.sendEmailCode(email);
     setSending(false);
     if (!res.ok) setError(res.message);
-  }, [email]);
-
-  // 진입 시 자동 발송
-  useEffect(() => {
-    requestCode();
-  }, [requestCode]);
+  };
 
   const handleVerify = async () => {
     setVerifying(true);
@@ -72,7 +78,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  error: { color: Derived.error, fontSize: 13 },
-  resend: { color: Brand.textMuted, fontSize: 13, fontWeight: '500' },
+  error: { ...Typography.footnote, color: Brand.textError },
+  resend: { ...Typography.footnote, fontWeight: '500', color: Brand.textMuted },
   resendDisabled: { opacity: 0.5 },
 });

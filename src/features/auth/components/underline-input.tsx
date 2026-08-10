@@ -8,7 +8,7 @@ import {
   type TextInputProps,
 } from 'react-native';
 
-import { Components, Palette } from '@/constants/theme';
+import { Brand, Components, Typography } from '@/constants/theme';
 
 type Props = {
   value: string;
@@ -61,7 +61,7 @@ export const UnderlineInput = forwardRef<TextInput, Props>(function UnderlineInp
           hitSlop={10}
           onPress={() => (onClear ? onClear() : onChangeText(''))}
           style={styles.clear}>
-          <Ionicons name="close" size={14} color={Palette.font.white} />
+          <Ionicons name="close" size={14} color={Brand.onPrimary} />
         </Pressable>
       )}
     </View>
@@ -78,8 +78,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    fontSize: 18,
-    fontWeight: '400',
+    ...Typography.inputLarge,
     color: Components.authInput.text,
     padding: 0,
   },

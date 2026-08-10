@@ -7,7 +7,7 @@ import {
   type PressableProps,
 } from 'react-native';
 
-import { Components } from '@/constants/theme';
+import { Components, Typography } from '@/constants/theme';
 
 type Props = {
   label: string;
@@ -65,7 +65,6 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.85 },
   label: {
     color: Components.button.label,
-    fontSize: 16,
-    fontWeight: '600',
+    ...Typography.button,
   },
 });

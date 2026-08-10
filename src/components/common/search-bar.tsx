@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 
-import { Components } from '@/constants/theme';
+import { Components, Typography } from '@/constants/theme';
 
 type Props = {
   value?: string;
@@ -16,7 +16,8 @@ type Props = {
 export function SearchBar({
   value,
   onChangeText,
-  placeholder = '검색 전',
+  // Figma의 "검색 전"은 상태 이름이지 사용자에게 보여줄 문구가 아니다.
+  placeholder = '장소를 검색해 보세요',
   ...rest
 }: Props) {
   return (
@@ -46,8 +47,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    fontSize: 16,
-    fontWeight: '500',
+    ...Typography.input,
     color: Components.searchBar.active,
     padding: 0,
   },

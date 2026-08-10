@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { PrimaryButton, Screen, ScreenHeader } from '@/components/common';
-import { Brand } from '@/constants/theme';
+import { Brand, Typography } from '@/constants/theme';
 
 type Props = {
   /** 헤더 타이틀 (기본 "회원가입") */
@@ -55,10 +55,8 @@ export function StepScreen({
 
 const styles = StyleSheet.create({
   heading: {
-    fontSize: 24,
-    fontWeight: '600',
+    ...Typography.heading,
     color: Brand.textStrong,
-    lineHeight: 34,
     marginTop: 72,
   },
   inputArea: { marginTop: 40 },

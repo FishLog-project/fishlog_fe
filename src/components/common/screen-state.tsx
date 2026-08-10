@@ -1,6 +1,6 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Brand, Components } from '@/constants/theme';
+import { Brand, Components, Typography } from '@/constants/theme';
 
 type ScreenStateProps = {
   variant: 'loading' | 'empty' | 'error';
@@ -83,24 +83,21 @@ const styles = StyleSheet.create({
   errorSymbol: {
     backgroundColor: Components.state.errorSoft,
   },
-  symbolText: {
-    color: Brand.primary,
-    fontSize: 18,
-    fontWeight: '800',
-  },
+  symbolText: { ...Typography.badge, fontSize: 18, color: Brand.primary },
   errorSymbolText: {
     color: Components.state.error,
   },
   title: {
-    color: Brand.textStrong,
+    ...Typography.cardTitle,
     fontSize: 17,
-    fontWeight: '800',
+    color: Brand.textStrong,
     textAlign: 'center',
   },
   description: {
+    ...Typography.caption,
+    fontWeight: '400',
     maxWidth: 340,
     color: Brand.textMuted,
-    fontSize: 14,
     lineHeight: 20,
     textAlign: 'center',
   },
@@ -116,9 +113,5 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.7,
   },
-  buttonText: {
-    color: Components.button.label,
-    fontSize: 15,
-    fontWeight: '700',
-  },
+  buttonText: { ...Typography.button, fontSize: 15, color: Components.button.label },
 });

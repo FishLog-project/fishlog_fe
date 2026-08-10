@@ -47,10 +47,11 @@ export default function MapScreen() {
 
         {/* 지도 위에 떠 있는 FAB — 지도를 가리지 않고 겹쳐야 하므로 오버레이 */}
         <View style={styles.fabColumn}>
-          <FabButton icon="scan" active={false} />
-          <FabButton icon="grid" active={false} />
+          <FabButton icon="scan" label="스캔" active={false} />
+          <FabButton icon="grid" label="목록 보기" active={false} />
           <FabButton
             icon="locate"
+            label="현재 위치"
             active={locateOn}
             onPress={() => setLocateOn((v) => !v)}
           />
