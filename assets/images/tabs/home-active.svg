@@ -1,0 +1,12 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="&#237;&#153;&#136;">
+<rect width="36" height="36" fill="white"/>
+<path id="Exclude" d="M15.8021 6.66709C17.1241 5.75032 18.8766 5.75027 20.1985 6.66709L29.3489 13.0138C30.6227 13.8973 31.2442 15.4575 30.9261 16.9747L28.929 26.4991C28.5544 28.2854 26.9788 29.5645 25.1536 29.5645H10.847C9.02187 29.5645 7.4462 28.2854 7.07159 26.4991L5.07452 16.9747C4.75635 15.4574 5.37775 13.8973 6.65167 13.0138L15.8021 6.66709ZM18.0003 19.2862C16.5802 19.2862 15.4291 20.4375 15.429 21.8575V25.7149C15.429 26.4249 16.0043 26.9999 16.7142 27.0001H19.2855C19.9955 27.0001 20.5716 26.425 20.5716 25.7149V21.8575C20.5715 20.4375 19.4203 19.2863 18.0003 19.2862Z" fill="url(#paint0_linear_0_35)"/>
+</g>
+<defs>
+<linearGradient id="paint0_linear_0_35" x1="4.99995" y1="4.5" x2="31" y2="31.5" gradientUnits="userSpaceOnUse">
+<stop stop-color="#5BC8FF"/>
+<stop offset="1" stop-color="#0085DE"/>
+</linearGradient>
+</defs>
+</svg>
