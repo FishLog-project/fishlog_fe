@@ -1,25 +1,32 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useMemo } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Screen, ScreenHeader } from '@/components/common';
+import { Screen, ScreenHeader, ScreenState } from '@/components/common';
 import { Brand, Components, Typography } from '@/constants/theme';
+import { createFixtureFishLogDataSource } from '@/features/home/home-data';
+import { useHomeViewModel } from '@/features/home/use-home-view-model';
 
-/** 도감 진행도 더미 데이터 — API 연동 시 이 상수만 교체한다 */
-const DEX_PROGRESS = { collected: 34, total: 150 };
-
-/** 추천 스팟 더미 데이터 (디자인의 "지역/스팟명" 3개) */
-const SPOTS = [
-  { rank: 1, name: '지역/스팟명', distance: '00km', fish: '광어, 멸치, 개복치' },
-  { rank: 2, name: '지역/스팟명', distance: '00km', fish: '광어, 멸치, 개복치' },
-  { rank: 3, name: '지역/스팟명', distance: '00km', fish: '광어, 멸치, 개복치' },
-];
+/** 히어로 타이틀 자리에 상태별로 넣는 대체 문구 */
+const HERO_FALLBACK = {
+  loading: '오늘의 바다를 읽는 중…',
+  empty: '오늘은 추천 어종이 없어요',
+  error: '추천 어종을 불러오지 못했어요',
+} as const;
 
 export default function HomeScreen() {
-  // 막대 폭은 숫자에서 유도한다. 고정값을 쓰면 "34/150"인데 62%가 차 있는 식으로 어긋난다.
-  const dexPercent = Math.round(
-    (DEX_PROGRESS.collected / DEX_PROGRESS.total) * 100,
-  );
+  // 렌더마다 새로 만들면 useSection 의존성이 흔들려 무한 재요청이 된다.
+  // 빈/오류 화면을 확인하려면 인자를 'empty' | 'partial-error'로 바꾼다.
+  const dataSource = useMemo(() => createFixtureFishLogDataSource(), []);
+  const { viewModel, retryCollectionProgress, retryRecommendedSpots } =
+    useHomeViewModel(dataSource);
+  const { featuredSpecies, collectionProgress, recommendedSpots } = viewModel;
+
+  const heroTitle =
+    featuredSpecies.status === 'ready'
+      ? featuredSpecies.data.title
+      : HERO_FALLBACK[featuredSpecies.status];
 
   return (
     <Screen scroll header={<ScreenHeader title="Fishlog" variant="brand" />}>
@@ -39,24 +46,45 @@ export default function HomeScreen() {
           contentFit="fill"
         />
         <Text style={styles.heroLabel}>오늘의 추천 어종</Text>
-        <Text style={styles.heroTitle}>광어 잡기 좋은 날!</Text>
+        <Text style={styles.heroTitle}>{heroTitle}</Text>
       </View>
 
       {/* 통계 카드 2개 */}
       <View style={styles.statRow}>
         <StatCard title="도감 진행도">
-          <View style={styles.progressNumWrap}>
-            <Text style={styles.progressNum}>{DEX_PROGRESS.collected}</Text>
-            <Text style={styles.progressDenom}>/{DEX_PROGRESS.total}종</Text>
-          </View>
-          <View style={styles.progressTrack}>
-            <LinearGradient
-              colors={[...Components.progress.fill]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={[styles.progressFill, { width: `${dexPercent}%` }]}
-            />
-          </View>
+          {collectionProgress.status === 'ready' ? (
+            <>
+              <View style={styles.progressNumWrap}>
+                <Text style={styles.progressNum}>
+                  {collectionProgress.data.collected}
+                </Text>
+                <Text style={styles.progressDenom}>
+                  /{collectionProgress.data.total}종
+                </Text>
+              </View>
+              <View style={styles.progressTrack}>
+                <LinearGradient
+                  colors={[...Components.progress.fill]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={[
+                    styles.progressFill,
+                    { width: `${collectionProgress.data.progressPercent}%` },
+                  ]}
+                />
+              </View>
+            </>
+          ) : collectionProgress.status === 'loading' ? (
+            <ActivityIndicator style={styles.statBody} color={Brand.primary} />
+          ) : (
+            <Pressable
+              style={styles.statBody}
+              accessibilityRole="button"
+              accessibilityLabel="도감 진행도 다시 불러오기"
+              onPress={retryCollectionProgress}>
+              <Text style={styles.statRetry}>불러오지 못했어요 · 다시 시도</Text>
+            </Pressable>
+          )}
         </StatCard>
 
         <StatCard title="물고기 인증하기">
@@ -80,30 +108,47 @@ export default function HomeScreen() {
         />
       </View>
 
-      <View style={styles.spotList}>
-        {SPOTS.map((s) => (
-          <Pressable
-            key={s.rank}
-            style={styles.spotRow}
-            accessibilityRole="button"
-            accessibilityLabel={`${s.rank}위 ${s.name}, ${s.distance}, ${s.fish}`}>
-            <RankPin rank={s.rank} />
-            <View style={styles.spotText}>
-              <Text style={styles.spotName}>{s.name}</Text>
-              <Text style={styles.spotInfo}>
-                {s.distance}
-                <Text style={styles.spotInfoDivider}>{'  I  '}</Text>
-                {s.fish}
-              </Text>
-            </View>
-            <Image
-              source={require('@/assets/images/home/chevron-28.svg')}
-              style={styles.spotChevron}
-              contentFit="contain"
-            />
-          </Pressable>
-        ))}
-      </View>
+      {recommendedSpots.status === 'ready' ? (
+        <View style={styles.spotList}>
+          {recommendedSpots.data.map((s) => (
+            <Pressable
+              key={s.id}
+              style={styles.spotRow}
+              accessibilityRole="button"
+              accessibilityLabel={`${s.rank}위 ${s.name}, ${s.distance}, ${s.species}`}>
+              <RankPin rank={s.rank} />
+              <View style={styles.spotText}>
+                <Text style={styles.spotName}>{s.name}</Text>
+                <Text style={styles.spotInfo}>
+                  {s.distance}
+                  <Text style={styles.spotInfoDivider}>{'  I  '}</Text>
+                  {s.species}
+                </Text>
+              </View>
+              <Image
+                source={require('@/assets/images/home/chevron-28.svg')}
+                style={styles.spotChevron}
+                contentFit="contain"
+              />
+            </Pressable>
+          ))}
+        </View>
+      ) : (
+        <ScreenState
+          variant={recommendedSpots.status}
+          title={
+            recommendedSpots.status === 'empty' ? '추천할 스팟이 아직 없어요' : undefined
+          }
+          description={
+            recommendedSpots.status === 'empty'
+              ? '주변 낚시 스팟 정보가 준비되면 여기서 보여드릴게요.'
+              : undefined
+          }
+          onRetry={
+            recommendedSpots.status === 'error' ? retryRecommendedSpots : undefined
+          }
+        />
+      )}
     </Screen>
   );
 }
@@ -204,6 +249,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   progressFill: { height: '100%', borderRadius: BAR.radius },
+
+  /** 로딩·오류일 때 카드 본문 자리를 채우는 중앙 정렬 영역 */
+  statBody: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  statRetry: { ...Typography.itemMeta, color: Brand.textMuted, textAlign: 'center' },
 
   scanWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   scanImage: { width: 73.733, height: 56 },
