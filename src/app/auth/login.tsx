@@ -1,12 +1,21 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { PrimaryButton, Screen } from '@/components/common';
-import { Brand, Components, Spacing, Typography } from '@/constants/theme';
+import { FormError, PrimaryButton, Screen, TextField } from '@/components/common';
+import { Brand, Components, Typography } from '@/constants/theme';
 import { authApi, useAuth } from '@/features/auth';
 
-/** 로그인 화면 — 이메일/비밀번호 입력 후 진입. 하단에 비밀번호 찾기 / 회원가입. */
+const LOGIN = Components.authLogin;
+
+/**
+ * 로그인 화면 (Figma 634:2544).
+ * 로고 + 이메일/비밀번호 + "다음", 그 아래 비밀번호 찾기 / 회원가입.
+ * 하단에는 로그인 없이 둘러보는 외곽선 버튼이 따로 붙는다.
+ *
+ * 세로 간격은 전부 부모 컨테이너의 gap이다. 간격이 다른 구간마다 묶음을
+ * 하나씩 두고, 자식은 자기 여백을 갖지 않는다.
+ */
 export default function LoginScreen() {
   const router = useRouter();
   const { signIn, continueAsGuest } = useAuth();
@@ -38,92 +47,87 @@ export default function LoginScreen() {
   };
 
   return (
-    <Screen keyboardAvoiding edges={['top', 'bottom']}>
-      <Text style={styles.logo}>Fishlog</Text>
-
-      <View style={styles.form}>
-        <TextInput
-          style={styles.input}
-          value={email}
-          onChangeText={setEmail}
-          placeholder="이메일"
-          placeholderTextColor={Components.authInput.placeholder}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-          textContentType="emailAddress"
-        />
-        <TextInput
-          style={styles.input}
-          value={password}
-          onChangeText={setPassword}
-          placeholder="비밀번호"
-          placeholderTextColor={Components.authInput.placeholder}
-          secureTextEntry
-          textContentType="password"
-        />
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-
+    <Screen
+      keyboardAvoiding
+      edges={['top', 'bottom']}
+      footer={
         <PrimaryButton
-          label="다음"
-          onPress={handleLogin}
-          disabled={!canSubmit}
-          loading={submitting}
+          label="로그인 없이 둘러보기"
+          variant="outline"
+          onPress={handleGuest}
         />
+      }>
+      <View style={styles.body}>
+        <Text style={styles.logo} accessibilityRole="header">
+          Fishlog
+        </Text>
 
-        <View style={styles.links}>
-          <Pressable
-            hitSlop={8}
-            onPress={() => router.push('/auth/password/email')}>
-            <Text style={styles.link}>비밀번호 찾기</Text>
-          </Pressable>
-          <View style={styles.divider} />
-          <Pressable hitSlop={8} onPress={() => router.push('/auth/signup/email')}>
-            <Text style={styles.link}>회원가입</Text>
-          </Pressable>
+        <View style={styles.form}>
+          <View style={styles.fields}>
+            <TextField
+              value={email}
+              onChangeText={setEmail}
+              placeholder="이메일"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              textContentType="emailAddress"
+            />
+            <TextField
+              value={password}
+              onChangeText={setPassword}
+              placeholder="비밀번호"
+              secureTextEntry
+              textContentType="password"
+              returnKeyType="done"
+              onSubmitEditing={() => canSubmit && handleLogin()}
+            />
+          </View>
+
+          {/*
+            오류가 없으면 FormError가 아무것도 그리지 않는다. 레이아웃 노드가
+            생기지 않으므로 이 묶음의 gap도 사라지고, 입력과 버튼 사이는
+            바깥 form의 gap(28) 그대로 남는다.
+          */}
+          <View style={styles.submit}>
+            <FormError message={error} />
+            <PrimaryButton
+              label="다음"
+              onPress={handleLogin}
+              disabled={!canSubmit}
+              loading={submitting}
+            />
+          </View>
+
+          <View style={styles.links}>
+            <Pressable hitSlop={8} onPress={() => router.push('/auth/password/email')}>
+              <Text style={styles.link}>비밀번호 찾기</Text>
+            </Pressable>
+            <View style={styles.divider} />
+            <Pressable hitSlop={8} onPress={() => router.push('/auth/signup/email')}>
+              <Text style={styles.link}>회원가입</Text>
+            </Pressable>
+          </View>
         </View>
-
-        <Pressable hitSlop={8} onPress={handleGuest} style={styles.guest}>
-          <Text style={styles.guestText}>로그인 없이 둘러보기</Text>
-        </Pressable>
       </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  logo: {
-    ...Typography.brand,
-    fontSize: 37,
-    lineHeight: 44,
-    color: Brand.primary,
-    textAlign: 'center',
-    marginTop: 120,
-  },
-  form: { marginTop: 'auto', marginBottom: Spacing.six, gap: 12 },
-  input: {
-    ...Typography.input,
-    height: Components.authInput.boxHeight,
-    borderRadius: Components.authInput.boxRadius,
-    backgroundColor: Components.authInput.boxBg,
-    paddingHorizontal: Components.authInput.boxPaddingX,
-    color: Components.authInput.text,
-  },
+  /** 로고 ~ 입력 묶음 (Figma y151 → y325) */
+  body: { flex: 1, paddingTop: LOGIN.logoTop, gap: LOGIN.formTop },
+  logo: { ...Typography.brandAuth, color: Brand.primary, textAlign: 'center' },
+  /** 입력 묶음 ~ 버튼 ~ 링크 */
+  form: { gap: LOGIN.blockGap },
+  fields: { gap: LOGIN.fieldGap },
+  submit: { gap: LOGIN.errorGap },
   links: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 20,
-    marginTop: 8,
+    gap: LOGIN.linksGap,
   },
-  error: { ...Typography.footnote, color: Brand.textError, textAlign: 'center' },
-  link: { ...Typography.caption, color: Components.authInput.placeholder },
-  divider: { width: 1, height: 12, backgroundColor: Brand.divider },
-  guest: { alignSelf: 'center', marginTop: 20, paddingVertical: 4 },
-  guestText: {
-    ...Typography.caption,
-    fontWeight: '600',
-    color: Brand.primary,
-    textDecorationLine: 'underline',
-  },
+  link: { ...Typography.caption, color: Brand.textWeak },
+  divider: { width: 1, height: LOGIN.dividerHeight, backgroundColor: Brand.divider },
 });

@@ -2,9 +2,11 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { PrimaryButton, Screen, ScreenHeader } from '@/components/common';
-import { Brand, Typography } from '@/constants/theme';
+import { FormError, PrimaryButton, Screen, ScreenHeader } from '@/components/common';
+import { Brand, Components, Layout, Typography } from '@/constants/theme';
 import { authApi, useAuth, useSignup } from '@/features/auth';
+
+const DONE = Components.signupComplete;
 
 /**
  * 회원가입 5단계 — 가입 완료.
@@ -12,6 +14,9 @@ import { authApi, useAuth, useSignup } from '@/features/auth';
  *
  * 가입을 이 시점에 하는 이유: 앞 단계는 입력 수집일 뿐이고 이메일 인증까지 끝난 뒤라야
  * 서버가 계정을 만들어 준다. (인증만 하고 이탈하면 계정은 생기지 않는다)
+ *
+ * ⚠️ 이 화면만 Figma 시안이 없다. 앞 스텝들과 같은 여백·타이포를 따라가되,
+ * 캐릭터 일러스트는 자리만 잡아 두었다.
  */
 export default function SignupCompleteScreen() {
   const router = useRouter();
@@ -48,47 +53,36 @@ export default function SignupCompleteScreen() {
   return (
     <Screen
       edges={['top', 'bottom']}
+      contentPadding={Layout.stepPadding}
       header={<ScreenHeader title="가입 완료" />}
-      footer={
-        <PrimaryButton
-          label="시작하기"
-          onPress={handleStart}
-          loading={submitting}
-        />
-      }>
+      footer={<PrimaryButton label="시작하기" onPress={handleStart} loading={submitting} />}>
       <View style={styles.body}>
         <Text style={styles.heading}>
           가입이 완료되었어요!{'\n'}나만의 물고기 도감, 하나씩 채워봐요
         </Text>
 
-        {/* 캐릭터 일러스트 자리 (디자인의 원형 플레이스홀더) */}
-        <View style={styles.illustration} />
-
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        <View style={styles.figure}>
+          {/* 캐릭터 일러스트 자리 */}
+          <View style={styles.illustration} />
+          <FormError message={error} />
+        </View>
       </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  body: { flex: 1, alignItems: 'center' },
-  heading: {
-    ...Typography.heading,
-    alignSelf: 'stretch',
-    color: Brand.textStrong,
-    marginTop: 60,
+  body: {
+    flex: 1,
+    paddingTop: Components.authStep.headingTop,
+    gap: DONE.figureGap,
   },
+  heading: { ...Typography.heading, color: Brand.textStrong },
+  figure: { alignItems: 'center', gap: DONE.messageGap },
   illustration: {
-    width: 240,
-    height: 300,
-    borderRadius: 150,
+    width: DONE.illustration.width,
+    height: DONE.illustration.height,
+    borderRadius: DONE.illustration.radius,
     backgroundColor: Brand.divider,
-    marginTop: 80,
-  },
-  error: {
-    ...Typography.footnote,
-    color: Brand.textError,
-    textAlign: 'center',
-    marginTop: 16,
   },
 });

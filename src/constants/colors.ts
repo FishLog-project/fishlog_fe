@@ -71,6 +71,8 @@ export const Derived = {
   shadow: '#004E7C',
   /** 입력 오류 문구 */
   error: '#E5484D',
+  /** 모달 뒤를 덮는 막 (알파가 필요해 rgba 표기) */
+  scrim: 'rgba(0, 0, 0, 0.4)',
   /** 진행바 트랙 테두리 (Figma 74:1764) */
   progressTrackBorder: '#69CDFF',
   /** 통계 카드 안쪽 그림자 (알파가 필요해 이 항목만 rgba 표기) */
@@ -119,6 +121,8 @@ export const Brand = {
   divider: Derived.neutral,
   /** 떠 있는 요소(칩/FAB)의 그림자 */
   shadow: Derived.shadow,
+  /** 모달이 떠 있을 때 뒤를 덮는 막 */
+  scrim: Derived.scrim,
 
   // 그라데이션 — 쓰는 쪽에서 [...Brand.xxx] 로 펼쳐 넣는다
   /** 히어로 카드 배경 */

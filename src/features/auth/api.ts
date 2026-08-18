@@ -242,6 +242,33 @@ export async function getMyProfile(token: string | null): Promise<MyProfile | nu
   }
 }
 
+export type ChangePasswordResult = Ok | Fail<'wrong_password'>;
+
+/**
+ * 비밀번호 변경. PATCH /api/users/me/password
+ *
+ * 새 비밀번호 형식(영문+숫자 8자 이상)은 호출 전에 앱이 이미 검사한다.
+ * 그래서 여기 400은 사실상 "현재 비밀번호가 틀렸다"는 뜻이다.
+ */
+export async function changePassword(
+  token: string | null,
+  currentPassword: string,
+  newPassword: string,
+): Promise<ChangePasswordResult> {
+  try {
+    await apiRequest('/api/users/me/password', {
+      method: 'PATCH',
+      token,
+      body: { currentPassword, newPassword },
+    });
+    return { ok: true };
+  } catch (e) {
+    return toFail(e, {
+      400: { reason: 'wrong_password', message: '현재 비밀번호가 올바르지 않아요.' },
+    });
+  }
+}
+
 export type WithdrawResult = Ok | Fail<'wrong_password'>;
 
 /** 회원탈퇴. DELETE /api/users/me */

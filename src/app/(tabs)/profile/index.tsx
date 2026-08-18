@@ -1,24 +1,25 @@
+import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import {
-  Alert,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Screen, ScreenHeader } from '@/components/common';
-import { Brand, Components } from '@/constants/theme';
+import { Screen, ScreenHeader, SettingsListItem } from '@/components/common';
+import { Brand, Components, Layout, Typography } from '@/constants/theme';
 import { authApi, useAuth } from '@/features/auth';
 
+const PROFILE = Components.profile;
+const CARD = PROFILE.quickCard;
+
 /**
- * ⚠️ 임시 화면 — 마이페이지 디자인이 나오기 전까지 개발 편의를 위해 둔다.
+ * 마이페이지 (Figma 634:3019).
  *
- * 디자인이 확정되면 이 파일은 통째로 교체된다. 여기 있는 레이아웃/문구는
- * 디자인 근거가 없는 임시값이므로 다른 화면의 참고 대상으로 삼지 말 것.
+ * 프로필 요약 → 바로가기 카드 3개 → "기타"·"설정" 목록 순으로 쌓는다.
+ * 게스트는 계정이 없으므로 비밀번호 변경·계정 탈퇴를 감춘다.
+ *
+ * 세로 간격은 전부 부모 컨테이너의 gap이다. 간격이 다른 구간마다 묶음을
+ * 하나씩 두고, 자식은 자기 여백을 갖지 않는다.
  */
 export default function ProfileScreen() {
   const router = useRouter();
@@ -44,159 +45,151 @@ export default function ProfileScreen() {
     router.replace('/auth/login');
   };
 
-  const handleWithdraw = () => {
-    // 회원탈퇴는 비밀번호 확인이 필요하다(DELETE /api/users/me).
-    Alert.prompt(
-      '회원탈퇴',
-      '계정과 기록이 모두 삭제돼요. 확인을 위해 비밀번호를 입력해 주세요.',
-      [
-        { text: '취소', style: 'cancel' },
-        {
-          text: '탈퇴',
-          style: 'destructive',
-          onPress: (password?: string) => confirmWithdraw(password ?? ''),
-        },
-      ],
-      'secure-text',
-    );
-  };
-
-  const confirmWithdraw = async (password: string) => {
-    if (!password) return;
-    setBusy(true);
-    const res = await authApi.withdraw(token, password);
-    if (!res.ok) {
-      setBusy(false);
-      Alert.alert('회원탈퇴 실패', res.message);
-      return;
-    }
-    await signOut();
-    setBusy(false);
-    router.replace('/auth/login');
-  };
-
   return (
-    <Screen scroll header={<ScreenHeader title="마이페이지" />}>
-      <View style={styles.notice}>
-        <Text style={styles.noticeText}>
-          디자인 준비 중인 임시 화면이에요. 개발용 동작만 넣어 두었어요.
-        </Text>
+    <Screen
+      scroll
+      contentPadding={Layout.profilePadding}
+      header={<ScreenHeader title="마이페이지" />}>
+      <View style={styles.body}>
+        <View style={styles.top}>
+          <View style={styles.identity}>
+            {/* 프로필 사진은 아직 서버에 없다 (GET /api/users/me는 닉네임·이메일만 준다) */}
+            <View style={styles.avatar}>
+              <Ionicons name="person" size={Components.icon.avatar} color={Brand.inactive} />
+            </View>
+            <View style={styles.names}>
+              <Text style={styles.name} numberOfLines={1}>
+                {isGuest ? '게스트' : (profile?.nickname ?? '—')}
+              </Text>
+              <Text style={styles.email} numberOfLines={1}>
+                {isGuest ? '로그인하면 기록을 저장할 수 있어요' : (profile?.email ?? '—')}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.quickRow}>
+            <QuickCard
+              icon={require('@/assets/images/profile/book-card.svg')}
+              label="내 도감"
+              onPress={() => router.push('/log')}
+            />
+            <QuickCard
+              icon={require('@/assets/images/profile/rank-card.svg')}
+              label="내 랭킹"
+              onPress={() => router.push('/ranking')}
+            />
+            {/* 저장 목록 화면은 아직 없다. 라우트가 생기면 onPress를 연결한다 */}
+            <QuickCard
+              icon={require('@/assets/images/profile/saved-card.svg')}
+              label="저장 목록"
+            />
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>기타</Text>
+          <View>
+            <SettingsListItem label="낚시 인증 기록 조회" onPress={() => router.push('/log')} />
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>설정</Text>
+          <View>
+            {/*
+              로그인한 사용자는 현재 비밀번호로 바로 바꾼다.
+              비밀번호를 잊은 경우는 로그인 화면의 "비밀번호 찾기"가 담당한다.
+            */}
+            {!isGuest ? (
+              <SettingsListItem
+                label="비밀번호 재설정"
+                onPress={() => router.push('/settings/password')}
+              />
+            ) : null}
+            <SettingsListItem label="로그아웃" disabled={busy} onPress={handleSignOut} />
+            {!isGuest && token ? (
+              <SettingsListItem
+                label="계정 탈퇴"
+                disabled={busy}
+                onPress={() => router.push('/settings/withdraw')}
+              />
+            ) : null}
+          </View>
+        </View>
       </View>
-
-      <View style={styles.card}>
-        <Row label="상태" value={isGuest ? '게스트' : token ? '로그인됨' : '비로그인'} />
-        <Row label="닉네임" value={profile?.nickname ?? '—'} />
-        <Row label="이메일" value={profile?.email ?? '—'} />
-      </View>
-
-      <Pressable
-        style={styles.action}
-        disabled={busy}
-        accessibilityRole="button"
-        onPress={handleSignOut}>
-        <Text style={styles.actionText}>로그아웃</Text>
-      </Pressable>
-
-      {/* 게스트는 지울 계정이 없다. 안드로이드는 아래 인라인 입력을 쓴다 */}
-      {Platform.OS === 'ios' && !isGuest && token ? (
-        <Pressable
-          style={styles.action}
-          disabled={busy}
-          accessibilityRole="button"
-          onPress={handleWithdraw}>
-          <Text style={[styles.actionText, styles.danger]}>회원탈퇴</Text>
-        </Pressable>
-      ) : null}
-
-      {/* Alert.prompt는 iOS 전용이라 안드로이드에서는 인라인 입력으로 대체한다 */}
-      <AndroidWithdraw
-        visible={Platform.OS !== 'ios' && !isGuest && !!token}
-        busy={busy}
-        onSubmit={confirmWithdraw}
-      />
     </Screen>
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.row}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={styles.rowValue}>{value}</Text>
-    </View>
-  );
-}
-
-/**
- * Alert.prompt가 없는 플랫폼(안드로이드)용 탈퇴 입력.
- * 임시 화면이므로 모달 없이 그대로 펼쳐 둔다.
- */
-function AndroidWithdraw({
-  visible,
-  busy,
-  onSubmit,
+/** 바로가기 카드 한 장 — 아이콘 + 라벨 (Figma 634:3040). */
+function QuickCard({
+  icon,
+  label,
+  onPress,
 }: {
-  visible: boolean;
-  busy: boolean;
-  onSubmit: (password: string) => void;
+  icon: number;
+  label: string;
+  onPress?: () => void;
 }) {
-  const [password, setPassword] = useState('');
-  if (!visible) return null;
-
   return (
-    <View style={styles.androidBox}>
-      <Text style={styles.androidLabel}>회원탈퇴 (비밀번호 확인)</Text>
-      <TextInput
-        style={styles.androidInput}
-        value={password}
-        onChangeText={setPassword}
-        placeholder="비밀번호"
-        placeholderTextColor={Components.authInput.placeholder}
-        secureTextEntry
-        autoCapitalize="none"
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      disabled={!onPress}
+      onPress={onPress}
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}>
+      <LinearGradient
+        colors={[...Brand.cardSurface]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
       />
-      <Pressable
-        disabled={busy || password.length === 0}
-        accessibilityRole="button"
-        onPress={() => onSubmit(password)}>
-        <Text style={[styles.actionText, styles.danger]}>탈퇴하기</Text>
-      </Pressable>
-    </View>
+      <Image source={icon} style={styles.cardIcon} contentFit="contain" />
+      <Text style={styles.cardLabel}>{label}</Text>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  notice: {
+  /**
+   * 헤더 아래 아바타까지 28, 이후 섹션 사이 28.
+   * (시안은 "기타"→"설정"만 24지만, 섹션 리듬을 하나로 두는 편이 유지하기 쉽다)
+   */
+  body: { paddingTop: PROFILE.avatarTop, gap: PROFILE.sectionGap },
+  /** 프로필 묶음 ~ 바로가기 카드 */
+  top: { gap: PROFILE.quickGap },
+  identity: { alignItems: 'center', gap: PROFILE.nameGap },
+  names: { alignItems: 'center', gap: PROFILE.emailGap },
+
+  avatar: {
+    width: PROFILE.avatarSize,
+    height: PROFILE.avatarSize,
+    borderRadius: PROFILE.avatarSize / 2,
     backgroundColor: Brand.surfaceSoft,
-    borderRadius: 12,
-    padding: 12,
-    marginTop: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  noticeText: { fontSize: 13, color: Brand.textMuted },
+  name: { ...Typography.profileName, color: Brand.textHeading },
+  email: { ...Typography.profileEmail, color: Brand.textMuted },
+
+  /** 카드 3장이 본문 폭(326)을 90 + 28 + 90 + 28 + 90으로 나눠 쓴다 */
+  quickRow: { flexDirection: 'row', justifyContent: 'space-between' },
   card: {
-    marginTop: 16,
-    borderRadius: 12,
-    backgroundColor: Brand.surfaceSoft,
-    paddingHorizontal: 16,
+    width: CARD.size,
+    height: CARD.size,
+    borderRadius: CARD.radius,
+    overflow: 'hidden',
+    alignItems: 'center',
+    paddingTop: CARD.paddingTop,
+    gap: CARD.gap,
+    // Figma의 inset shadow. RN 0.76+ 새 아키텍처에서 지원한다.
+    boxShadow: `inset 0px 0px 7.271px ${CARD.innerGlow}`,
   },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-  },
-  rowLabel: { fontSize: 14, color: Brand.textMuted },
-  rowValue: { fontSize: 14, fontWeight: '600', color: Brand.textStrong },
-  action: { paddingVertical: 18 },
-  actionText: { fontSize: 16, fontWeight: '600', color: Brand.textStrong },
-  danger: { color: Brand.textError },
-  androidBox: { marginTop: 8, gap: 12 },
-  androidLabel: { fontSize: 14, color: Brand.textMuted },
-  androidInput: {
-    height: Components.authInput.boxHeight,
-    borderRadius: Components.authInput.boxRadius,
-    backgroundColor: Components.authInput.boxBg,
-    paddingHorizontal: Components.authInput.boxPaddingX,
-    fontSize: 16,
-    color: Components.authInput.text,
-  },
+  cardPressed: { opacity: 0.8 },
+  cardIcon: { width: CARD.iconSize, height: CARD.iconSize },
+  cardLabel: { ...Typography.quickLabel, color: CARD.label },
+
+  /** 구분 라벨 ~ 목록 */
+  section: { gap: PROFILE.listGap },
+  sectionLabel: { ...Typography.sectionLabel, color: Brand.textWeak },
 });
