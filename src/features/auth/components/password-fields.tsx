@@ -11,7 +11,7 @@ import { UnderlineInput } from './underline-input';
  * 길이만 검사하면 서버에서 400으로 튕기고, 사용자는 마지막 단계에 가서야
  * 알게 된다. 같은 규칙을 앱에서도 들고 있어야 하는 이유다.
  */
-export const PASSWORD_RE = /^(?=.*[A-Za-z])(?=.*d).{8,}$/;
+export const PASSWORD_RE = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
 export const PASSWORD_MIN_LENGTH = 8;
 
 type Check = {
@@ -58,8 +58,8 @@ type Props = {
 /**
  * 비밀번호 입력 + 재입력 한 쌍 (회원가입 3단계 / 비밀번호 찾기 3단계 공용).
  *
- * 일치 여부 문구는 여기서 그리지 않는다. 화면이 checkPassword로 문구를 받아
- * StepScreen의 message(버튼 위 고정 자리)로 올린다 — 키보드에 가리지 않게.
+ * 일치 여부 문구는 여기서 그리지 않는다. 사용하는 화면이 checkPassword로
+ * 문구를 받아 입력 묶음 바로 아래에 배치한다.
  */
 export function PasswordFields({
   password,
@@ -80,6 +80,7 @@ export function PasswordFields({
         onChangeText={onPasswordChange}
         placeholder={placeholder}
         secureTextEntry
+        passwordToggle
         autoCapitalize="none"
         autoCorrect={false}
         textContentType="newPassword"
@@ -93,6 +94,7 @@ export function PasswordFields({
           onChangeText={onConfirmChange}
           placeholder={confirmPlaceholder}
           secureTextEntry
+          passwordToggle
           autoCapitalize="none"
           autoCorrect={false}
           textContentType="newPassword"

@@ -15,6 +15,8 @@ type Props = {
   onChangeText: (v: string) => void;
   placeholder?: string;
   onClear?: () => void;
+  /** 비밀번호 표시/숨김 눈 아이콘을 노출한다. */
+  passwordToggle?: boolean;
   /**
    * 포커스를 잃었을 때. 검증 문구를 이 시점에 띄우는 화면이 있다
    * (타이핑 도중에 띄우면 다 치기도 전에 빨간 글씨가 뜬다).
@@ -41,10 +43,20 @@ type Props = {
  * 포커스·입력됨: 파란 언더라인 + Medium 텍스트 + 우측 clear(X) 버튼
  */
 export const UnderlineInput = forwardRef<TextInput, Props>(function UnderlineInput(
-  { value, onChangeText, placeholder, onClear, onBlur, ...rest },
+  {
+    value,
+    onChangeText,
+    placeholder,
+    onClear,
+    onBlur,
+    passwordToggle = false,
+    secureTextEntry,
+    ...rest
+  },
   ref,
 ) {
   const [focused, setFocused] = useState(false);
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const filled = value.length > 0;
   const active = focused || filled;
 
@@ -70,9 +82,23 @@ export const UnderlineInput = forwardRef<TextInput, Props>(function UnderlineInp
         }}
         placeholder={placeholder}
         placeholderTextColor={Components.authInput.underlinePlaceholder}
+        secureTextEntry={secureTextEntry && !passwordVisible}
         {...rest}
       />
-      {filled && (
+      {passwordToggle ? (
+        <Pressable
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={passwordVisible ? '비밀번호 숨기기' : '비밀번호 보기'}
+          onPress={() => setPasswordVisible((visible) => !visible)}
+          style={styles.passwordToggle}>
+          <Ionicons
+            name={passwordVisible ? 'eye-off-outline' : 'eye-outline'}
+            size={24}
+            color={Brand.textWeak}
+          />
+        </Pressable>
+      ) : filled ? (
         <Pressable
           hitSlop={10}
           accessibilityRole="button"
@@ -81,7 +107,7 @@ export const UnderlineInput = forwardRef<TextInput, Props>(function UnderlineInp
           style={styles.clear}>
           <Ionicons name="close" size={Components.icon.clear} color={Brand.onPrimary} />
         </Pressable>
-      )}
+      ) : null}
     </View>
   );
 });
@@ -110,6 +136,12 @@ const styles = StyleSheet.create({
     height: Components.authInput.clearSize,
     borderRadius: Components.authInput.clearSize / 2,
     backgroundColor: Components.authInput.clearBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  passwordToggle: {
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },

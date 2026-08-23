@@ -38,9 +38,10 @@ function RootNavigator() {
 
   // 폰트 로드 실패는 앱을 막지 않는다. 시스템 폰트로 폴백되더라도 화면은 떠야 한다.
   const [fontsLoaded, fontError] = useFonts(FontAssets);
+  const fontsReady = fontsLoaded || !!fontError;
 
   // SecureStore·폰트 로드 전엔 네이티브 스플래시 유지
-  if (!isReady || (!fontsLoaded && !fontError)) return null;
+  if (!isReady || !fontsReady) return null;
 
   return (
     <>

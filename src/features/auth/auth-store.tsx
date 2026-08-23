@@ -69,11 +69,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signIn = useCallback(async (next: AuthTokens) => {
-    await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(next));
-    // 게스트로 둘러보다 로그인하면 게스트 상태는 끝난다.
-    await SecureStore.deleteItemAsync(GUEST_KEY);
+    // 보호 라우트가 홈 진입을 비로그인으로 오인하지 않도록 메모리 세션을 먼저 갱신한다.
     setTokens(next);
-    setIsGuest(false);
+
+    try {
+      await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(next));
+      // 게스트로 둘러보다 로그인하면 게스트 상태는 끝난다.
+      await SecureStore.deleteItemAsync(GUEST_KEY);
+      setIsGuest(false);
+    } catch (error) {
+      // 저장 실패 시 메모리 상태도 원래대로 되돌려 세션 상태가 엇갈리지 않게 한다.
+      setTokens(null);
+      throw error;
+    }
   }, []);
 
   const continueAsGuest = useCallback(async () => {

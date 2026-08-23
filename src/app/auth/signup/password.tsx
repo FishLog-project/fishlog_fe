@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 
 import { FormError } from '@/components/common';
 import { checkPassword, PasswordFields, StepScreen, useSignup } from '@/features/auth';
@@ -21,16 +22,22 @@ export default function SignupPasswordScreen() {
     <StepScreen
       heading="사용할 비밀번호를 입력해 주세요"
       nextDisabled={!valid}
-      message={<FormError message={message} />}
       onNext={goNext}>
-      <PasswordFields
-        password={password}
-        onPasswordChange={setPassword}
-        confirm={confirm}
-        onConfirmChange={setConfirm}
-        onSubmit={goNext}
-        autoFocus
-      />
+      <View style={styles.fieldsWithError}>
+        <PasswordFields
+          password={password}
+          onPasswordChange={setPassword}
+          confirm={confirm}
+          onConfirmChange={setConfirm}
+          onSubmit={goNext}
+          autoFocus
+        />
+        <FormError message={message} />
+      </View>
     </StepScreen>
   );
 }
+
+const styles = StyleSheet.create({
+  fieldsWithError: { gap: 12 },
+});

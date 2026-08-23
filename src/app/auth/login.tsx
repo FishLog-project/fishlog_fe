@@ -49,6 +49,7 @@ export default function LoginScreen() {
   return (
     <Screen
       keyboardAvoiding
+      footerAvoidsKeyboard={false}
       edges={['top', 'bottom']}
       footer={
         <PrimaryButton

@@ -5,9 +5,15 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Screen, ScreenHeader, SettingsListItem } from '@/components/common';
+import {
+  AppDialog,
+  FormError,
+  Screen,
+  ScreenHeader,
+  SettingsListItem,
+} from '@/components/common';
 import { Brand, Components, Layout, Typography } from '@/constants/theme';
-import { authApi, useAuth } from '@/features/auth';
+import { authApi, UnderlineInput, useAuth } from '@/features/auth';
 
 const PROFILE = Components.profile;
 const CARD = PROFILE.quickCard;
@@ -26,6 +32,9 @@ export default function ProfileScreen() {
   const { token, isGuest, signOut } = useAuth();
   const [profile, setProfile] = useState<authApi.MyProfile | null>(null);
   const [busy, setBusy] = useState(false);
+  const [dialog, setDialog] = useState<'logout' | 'withdraw' | null>(null);
+  const [withdrawPassword, setWithdrawPassword] = useState('');
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -42,15 +51,42 @@ export default function ProfileScreen() {
     setBusy(true);
     await signOut();
     setBusy(false);
+    setDialog(null);
+    router.replace('/auth/login');
+  };
+
+  const closeDialog = () => {
+    if (busy) return;
+    setDialog(null);
+    setWithdrawPassword('');
+    setWithdrawError(null);
+  };
+
+  const handleWithdraw = async () => {
+    if (!token || !withdrawPassword || busy) return;
+    setBusy(true);
+    setWithdrawError(null);
+
+    const res = await authApi.withdraw(token, withdrawPassword);
+    if (!res.ok) {
+      setBusy(false);
+      setWithdrawError(res.message);
+      return;
+    }
+
+    await signOut();
+    setBusy(false);
+    setDialog(null);
     router.replace('/auth/login');
   };
 
   return (
-    <Screen
-      scroll
-      contentPadding={Layout.profilePadding}
-      header={<ScreenHeader title="마이페이지" />}>
-      <View style={styles.body}>
+    <>
+      <Screen
+        scroll
+        contentPadding={Layout.profilePadding}
+        header={<ScreenHeader title="마이페이지" />}>
+        <View style={styles.body}>
         <View style={styles.top}>
           <View style={styles.identity}>
             {/* 프로필 사진은 아직 서버에 없다 (GET /api/users/me는 닉네임·이메일만 준다) */}
@@ -106,18 +142,63 @@ export default function ProfileScreen() {
                 onPress={() => router.push('/settings/password')}
               />
             ) : null}
-            <SettingsListItem label="로그아웃" disabled={busy} onPress={handleSignOut} />
+            <SettingsListItem
+              label="로그아웃"
+              disabled={busy}
+              onPress={() => setDialog('logout')}
+            />
             {!isGuest && token ? (
               <SettingsListItem
                 label="계정 탈퇴"
                 disabled={busy}
-                onPress={() => router.push('/settings/withdraw')}
+                onPress={() => setDialog('withdraw')}
               />
             ) : null}
           </View>
         </View>
-      </View>
-    </Screen>
+        </View>
+      </Screen>
+
+      <AppDialog
+        visible={dialog === 'logout'}
+        title="로그아웃하시겠어요?"
+        message="로그인 화면으로 이동합니다."
+        buttonLabel="로그아웃"
+        loading={busy}
+        onConfirm={handleSignOut}
+        onCancel={closeDialog}
+      />
+
+      <AppDialog
+        visible={dialog === 'withdraw'}
+        title="정말 탈퇴하시겠어요?"
+        message={'탈퇴하면 도감·낚시 기록·저장 목록이 모두 삭제되고\n되돌릴 수 없어요.'}
+        buttonLabel="탈퇴하기"
+        confirmDisabled={withdrawPassword.length === 0}
+        loading={busy}
+        onConfirm={handleWithdraw}
+        onCancel={closeDialog}>
+        <View style={styles.withdrawFields}>
+          <UnderlineInput
+            value={withdrawPassword}
+            onChangeText={(value) => {
+              setWithdrawPassword(value);
+              if (withdrawError) setWithdrawError(null);
+            }}
+            placeholder="현재 비밀번호"
+            secureTextEntry
+            passwordToggle
+            autoCapitalize="none"
+            autoCorrect={false}
+            textContentType="password"
+            returnKeyType="done"
+            onSubmitEditing={handleWithdraw}
+            accessibilityLabel="현재 비밀번호"
+          />
+          <FormError message={withdrawError} />
+        </View>
+      </AppDialog>
+    </>
   );
 }
 
@@ -192,4 +273,5 @@ const styles = StyleSheet.create({
   /** 구분 라벨 ~ 목록 */
   section: { gap: PROFILE.listGap },
   sectionLabel: { ...Typography.sectionLabel, color: Brand.textWeak },
+  withdrawFields: { gap: 12 },
 });

@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { FormError } from '@/components/common';
+import { AppDialog, FormError } from '@/components/common';
 import { Components } from '@/constants/theme';
 import {
   authApi,
@@ -52,56 +52,55 @@ export default function ChangePasswordScreen() {
     setDone(true);
   };
 
-  if (done) {
-    return (
+  return (
+    <>
       <StepScreen
         headerTitle="비밀번호 변경"
-        showBack={false}
-        heading="비밀번호를 변경했어요"
-        buttonLabel="확인"
-        onNext={() => router.back()}>
-        {null}
+        heading={'새로 사용할 비밀번호를\n입력해 주세요'}
+        buttonLabel="변경하기"
+        nextDisabled={!canSubmit}
+        loading={submitting}
+        message={<FormError message={error ?? message} />}
+        onNext={handleSubmit}>
+        <View style={styles.fields}>
+          <UnderlineInput
+            value={current}
+            onChangeText={(v) => {
+              setCurrent(v);
+              if (error) setError(null);
+            }}
+            placeholder="현재 비밀번호"
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+            textContentType="password"
+            autoFocus
+            returnKeyType="next"
+            accessibilityLabel="현재 비밀번호"
+          />
+
+          <PasswordFields
+            password={password}
+            onPasswordChange={setPassword}
+            confirm={confirm}
+            onConfirmChange={setConfirm}
+            placeholder="새 비밀번호 (영문+숫자 8자 이상)"
+            confirmPlaceholder="새 비밀번호 확인"
+            onSubmit={handleSubmit}
+          />
+        </View>
       </StepScreen>
-    );
-  }
 
-  return (
-    <StepScreen
-      headerTitle="비밀번호 변경"
-      heading={'새로 사용할 비밀번호를\n입력해 주세요'}
-      buttonLabel="변경하기"
-      nextDisabled={!canSubmit}
-      loading={submitting}
-      message={<FormError message={error ?? message} />}
-      onNext={handleSubmit}>
-      <View style={styles.fields}>
-        <UnderlineInput
-          value={current}
-          onChangeText={(v) => {
-            setCurrent(v);
-            if (error) setError(null);
-          }}
-          placeholder="현재 비밀번호"
-          secureTextEntry
-          autoCapitalize="none"
-          autoCorrect={false}
-          textContentType="password"
-          autoFocus
-          returnKeyType="next"
-          accessibilityLabel="현재 비밀번호"
-        />
-
-        <PasswordFields
-          password={password}
-          onPasswordChange={setPassword}
-          confirm={confirm}
-          onConfirmChange={setConfirm}
-          placeholder="새 비밀번호 (영문+숫자 8자 이상)"
-          confirmPlaceholder="새 비밀번호 확인"
-          onSubmit={handleSubmit}
-        />
-      </View>
-    </StepScreen>
+      <AppDialog
+        visible={done}
+        title="비밀번호 변경 완료"
+        message="비밀번호를 변경했어요."
+        onConfirm={() => {
+          setDone(false);
+          router.back();
+        }}
+      />
+    </>
   );
 }
 

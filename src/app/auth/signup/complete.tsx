@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -21,7 +22,7 @@ const DONE = Components.signupComplete;
 export default function SignupCompleteScreen() {
   const router = useRouter();
   const { signIn } = useAuth();
-  const { email, password, nickname, reset } = useSignup();
+  const { email, password, nickname } = useSignup();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,34 +37,53 @@ export default function SignupCompleteScreen() {
       return;
     }
 
-    // 가입 직후 같은 자격으로 로그인해 토큰을 받는다.
-    const logged = await authApi.login(email, password);
-    setSubmitting(false);
-    if (!logged.ok) {
-      // 계정은 만들어졌으므로 로그인 화면으로 보내 다시 시도하게 한다.
-      setError('가입은 완료됐어요. 로그인 화면에서 다시 시도해 주세요.');
-      return;
+    // 가입 응답에 토큰이 없을 때만 같은 자격으로 로그인해 토큰을 받는다.
+    let tokens = created.tokens;
+    if (!tokens) {
+      const logged = await authApi.login(email, password);
+      if (!logged.ok) {
+        setSubmitting(false);
+        // 계정은 만들어졌으므로 로그인 화면으로 보내 다시 시도하게 한다.
+        setError('가입은 완료됐어요. 로그인 화면에서 다시 시도해 주세요.');
+        return;
+      }
+      tokens = logged.tokens;
     }
 
-    await signIn(logged.tokens);
-    reset();
-    router.replace('/home');
+    try {
+      // SecureStore에 토큰 저장이 끝난 뒤에만 보호된 메인 화면으로 이동한다.
+      await signIn(tokens);
+      router.replace('/(tabs)/home');
+    } catch {
+      setSubmitting(false);
+      setError('로그인 정보를 저장하지 못했어요. 다시 시도해 주세요.');
+    }
   };
 
   return (
     <Screen
       edges={['top', 'bottom']}
       contentPadding={Layout.stepPadding}
-      header={<ScreenHeader title="가입 완료" />}
+      header={<ScreenHeader title="가입 완료" showBack={false} />}
       footer={<PrimaryButton label="시작하기" onPress={handleStart} loading={submitting} />}>
       <View style={styles.body}>
-        <Text style={styles.heading}>
-          가입이 완료되었어요!{'\n'}나만의 물고기 도감, 하나씩 채워봐요
-        </Text>
+        <View style={styles.heading}>
+          <Text style={styles.headingLine}>가입이 완료되었어요!</Text>
+          <Text
+            style={styles.headingLine}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}>
+            나만의 물고기 도감, 하나씩 채워봐요
+          </Text>
+        </View>
 
         <View style={styles.figure}>
-          {/* 캐릭터 일러스트 자리 */}
-          <View style={styles.illustration} />
+          <Image
+            style={styles.illustration}
+            source={require('@/assets/images/signup-complete-placeholder.png')}
+            contentFit="contain"
+          />
           <FormError message={error} />
         </View>
       </View>
@@ -74,15 +94,18 @@ export default function SignupCompleteScreen() {
 const styles = StyleSheet.create({
   body: {
     flex: 1,
-    paddingTop: Components.authStep.headingTop,
-    gap: DONE.figureGap,
+    paddingTop: 88,
   },
-  heading: { ...Typography.heading, color: Brand.textStrong },
-  figure: { alignItems: 'center', gap: DONE.messageGap },
+  heading: { alignItems: 'flex-start' },
+  headingLine: { ...Typography.heading, color: Brand.textStrong },
+  figure: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: DONE.messageGap,
+  },
   illustration: {
-    width: DONE.illustration.width,
-    height: DONE.illustration.height,
-    borderRadius: DONE.illustration.radius,
-    backgroundColor: Brand.divider,
+    width: 192,
+    height: 245,
   },
 });

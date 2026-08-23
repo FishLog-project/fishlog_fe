@@ -80,22 +80,24 @@ export async function verifyEmailCode(
 // ─────────────────────────────────────────────────────────────
 
 export type SignupInput = { email: string; password: string; nickname: string };
-export type SignupResult = Ok | Fail<'duplicated'>;
+
+/** 로그인·회원가입·재발급이 돌려주는 토큰 쌍 */
+export type AuthTokens = { accessToken: string; refreshToken: string | null };
+
+export type SignupResult = (Ok & { tokens: AuthTokens | null }) | Fail<'duplicated'>;
 
 /** 회원가입. POST /api/auth/signup (이메일 인증 완료 후 호출) */
 export async function signup(input: SignupInput): Promise<SignupResult> {
   try {
-    await apiRequest('/api/auth/signup', { method: 'POST', body: input });
-    return { ok: true };
+    const data = await apiRequest('/api/auth/signup', { method: 'POST', body: input });
+    // 서버가 회원가입 응답에서 바로 토큰을 주는 경우에는 재로그인 없이 사용한다.
+    return { ok: true, tokens: toTokens(data) };
   } catch (e) {
     return toFail(e, {
       409: { reason: 'duplicated', message: '이미 사용 중인 이메일 또는 닉네임이에요.' },
     });
   }
 }
-
-/** 로그인·재발급이 돌려주는 토큰 쌍 */
-export type AuthTokens = { accessToken: string; refreshToken: string | null };
 
 /**
  * 서버가 주는 토큰 응답을 앱 타입으로 정규화한다.

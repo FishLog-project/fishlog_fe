@@ -1,5 +1,5 @@
-import { useEffect, useState, type ReactNode } from 'react';
-import { Keyboard, StyleSheet, Text, View } from 'react-native';
+import { type ReactNode } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { PrimaryButton, Screen, ScreenHeader } from '@/components/common';
 import { Brand, Components, Layout, Typography } from '@/constants/theme';
@@ -29,6 +29,8 @@ type Props = {
   message?: ReactNode;
   /** 버튼 아래에 덧붙는 요소 (인증번호 재전송 링크 등) */
   footerExtra?: ReactNode;
+  headingBlockHeight?: number;
+  hideFooterWhenKeyboard?: boolean;
 };
 
 /**
@@ -52,12 +54,13 @@ export function StepScreen({
   loading,
   message,
   footerExtra,
+  headingBlockHeight,
+  hideFooterWhenKeyboard = true,
 }: Props) {
-  const typing = useKeyboardVisible();
-
   return (
     <Screen
       keyboardAvoiding
+      hideFooterWhenKeyboard={hideFooterWhenKeyboard}
       edges={['top', 'bottom']}
       contentPadding={Layout.stepPadding}
       header={<ScreenHeader title={headerTitle} showBack={showBack} />}
@@ -66,16 +69,16 @@ export function StepScreen({
         // 레이아웃 노드가 생기지 않으므로 gap도 따라서 사라진다.
         <View style={styles.footer}>
           {message}
+          {footerExtra}
           <PrimaryButton
             label={buttonLabel}
             onPress={onNext}
             disabled={nextDisabled}
             loading={loading}
           />
-          {footerExtra}
         </View>
       }>
-      <View style={[styles.body, typing && styles.bodyTyping]}>
+      <View style={styles.body}>
         {/*
           안내 문구 블록의 높이를 잡아 둔다. 디자인에서 입력의 y좌표는 문구가
           한 줄이든 두 줄이든 같아서, 문구 길이에 따라 입력이 따라 움직이면
@@ -84,7 +87,11 @@ export function StepScreen({
           키보드가 올라오면 이 블록을 줄인다. 시안의 여백은 키보드가 없는
           프레임 기준이라, 그대로 두면 오류 문구까지 화면 밖으로 밀린다.
         */}
-        <View style={[styles.headingBlock, typing && styles.headingBlockTyping]}>
+        <View
+          style={[
+            styles.headingBlock,
+            headingBlockHeight !== undefined && { minHeight: headingBlockHeight },
+          ]}>
           <Text style={styles.heading}>{heading}</Text>
         </View>
         {children}
@@ -93,34 +100,9 @@ export function StepScreen({
   );
 }
 
-/**
- * 키보드가 떠 있는지.
- *
- * reanimated의 useAnimatedKeyboard를 쓰지 않는다. Screen이 키보드 회피에
- * 이미 그 훅을 쓰고 있는데, 한 화면에서 두 번 호출하면 한쪽이 0을 받는다.
- */
-function useKeyboardVisible() {
-  // 이미 키보드가 떠 있는 채로 이 화면에 들어올 수 있다 (앞 스텝에서 바로 넘어온 경우).
-  // 그때는 keyboardDidShow가 다시 오지 않으므로 현재 상태를 초기값으로 읽는다.
-  const [visible, setVisible] = useState(() => Keyboard.isVisible());
-
-  useEffect(() => {
-    const show = Keyboard.addListener('keyboardDidShow', () => setVisible(true));
-    const hide = Keyboard.addListener('keyboardDidHide', () => setVisible(false));
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, []);
-
-  return visible;
-}
-
 const styles = StyleSheet.create({
   body: { flex: 1, paddingTop: STEP.headingTop },
-  bodyTyping: { paddingTop: STEP.headingTopTyping },
   headingBlock: { minHeight: STEP.headingBlock },
-  headingBlockTyping: { minHeight: STEP.headingBlockTyping },
   heading: { ...Typography.heading, color: Brand.textStrong },
   footer: { gap: STEP.footerGap },
 });

@@ -9,3 +9,4 @@ export { SearchBar } from './search-bar';
 export { FilterChip } from './filter-chip';
 export { FabButton } from './fab-button';
 export { ScreenState } from './screen-state';
+export { AppDialog } from './app-dialog';

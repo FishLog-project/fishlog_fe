@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Keyboard, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, {
   useAnimatedKeyboard,
   useAnimatedStyle,
@@ -27,6 +27,10 @@ type ScreenProps = {
   edgeToEdge?: boolean;
   /** 키보드가 올라올 때 본문을 밀어 올린다 (입력이 있는 화면) */
   keyboardAvoiding?: boolean;
+  /** false면 키보드가 떠도 하단 footer를 화면 위로 끌어올리지 않는다. */
+  footerAvoidsKeyboard?: boolean;
+  /** 키보드가 열린 동안 footer를 숨겨 입력 영역을 확보한다. */
+  hideFooterWhenKeyboard?: boolean;
   /**
    * 본문 좌우 여백을 화면군 전용 값으로 바꾼다 (Layout.stepPadding 등).
    * 하단 footer는 이 값과 무관하게 항상 Layout.screenPadding을 쓴다 —
@@ -51,6 +55,8 @@ export function Screen({
   scroll = false,
   edgeToEdge = false,
   keyboardAvoiding = false,
+  footerAvoidsKeyboard = true,
+  hideFooterWhenKeyboard = false,
   contentPadding,
   edges = ['top'],
   background = Brand.background,
@@ -58,6 +64,17 @@ export function Screen({
   const padding = edgeToEdge ? 0 : (contentPadding ?? Layout.screenPadding);
   const insets = useSafeAreaInsets();
   const keyboard = useAnimatedKeyboard();
+  const [keyboardVisible, setKeyboardVisible] = useState(() => Keyboard.isVisible());
+
+  useEffect(() => {
+    if (!hideFooterWhenKeyboard) return;
+    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, [hideFooterWhenKeyboard]);
 
   /**
    * 키보드 회피를 KeyboardAvoidingView가 아니라 실제 키보드 인셋으로 처리한다.
@@ -72,7 +89,7 @@ export function Screen({
    * safe-area 하단 여백은 SafeAreaView가 이미 넣으므로 그만큼 빼고 더한다.
    */
   const keyboardStyle = useAnimatedStyle(() => ({
-    paddingBottom: keyboardAvoiding
+    paddingBottom: keyboardAvoiding && footerAvoidsKeyboard
       ? Math.max(keyboard.height.value - insets.bottom, 0)
       : 0,
   }));
@@ -100,7 +117,9 @@ export function Screen({
       <Animated.View style={[styles.fill, keyboardStyle]}>
         {header}
         {body}
-        {footer ? <View style={styles.footer}>{footer}</View> : null}
+        {footer && !(hideFooterWhenKeyboard && keyboardVisible) ? (
+          <View style={styles.footer}>{footer}</View>
+        ) : null}
       </Animated.View>
     </SafeAreaView>
   );

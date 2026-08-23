@@ -7,6 +7,7 @@ import { Brand, Components, Spacing, Typography } from '@/constants/theme';
 import { authApi, OtpInput, StepScreen, useSignup } from '@/features/auth';
 
 const CODE_LENGTH = Components.otp.length;
+const RESEND_COOLDOWN_MS = 30_000;
 
 /**
  * 회원가입 2단계 — 이메일 인증번호 입력 (Figma 634:2658).
@@ -26,22 +27,44 @@ export default function SignupVerifyScreen() {
   const [notice, setNotice] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [resendAvailableAt, setResendAvailableAt] = useState(
+    () => Date.now() + RESEND_COOLDOWN_MS,
+  );
+  const [remainingSeconds, setRemainingSeconds] = useState(30);
 
   // 이메일 없이 이 화면에 닿았다면(딥링크 등) 발송된 인증번호도 없다.
   useEffect(() => {
     if (!email) router.replace('/auth/signup/email');
   }, [email, router]);
 
+  // 앱이 백그라운드에 있는 동안에도 실제 경과 시간을 반영하도록 종료 시각을 기준으로 센다.
+  useEffect(() => {
+    const updateRemaining = () => {
+      setRemainingSeconds(
+        Math.max(0, Math.ceil((resendAvailableAt - Date.now()) / 1000)),
+      );
+    };
+
+    updateRemaining();
+    const timer = setInterval(updateRemaining, 250);
+    return () => clearInterval(timer);
+  }, [resendAvailableAt]);
+
   /** 재전송 — 사용자가 명시적으로 눌렀을 때만 메일이 나간다. */
   const requestCode = async () => {
+    if (sending || remainingSeconds > 0) return;
     setSending(true);
     setError(null);
     setNotice(null);
     setCode('');
     const res = await authApi.sendEmailCode(email);
     setSending(false);
-    if (res.ok) setNotice('인증번호를 다시 보냈어요.');
-    else setError(res.message);
+    if (res.ok) {
+      setNotice('인증번호를 다시 보냈어요.');
+      setResendAvailableAt(Date.now() + RESEND_COOLDOWN_MS);
+    } else {
+      setError(res.message);
+    }
   };
 
   // 틀린 번호를 고치기 시작하면 빨간 문구는 바로 걷는다.
@@ -66,31 +89,41 @@ export default function SignupVerifyScreen() {
       nextDisabled={code.length < CODE_LENGTH}
       loading={verifying}
       onNext={handleVerify}
-      message={
-        error ? (
-          <FormError message={error} />
-        ) : notice ? (
-          <Text style={styles.notice} accessibilityLiveRegion="polite">
-            {notice}
-          </Text>
-        ) : null
-      }
+      headingBlockHeight={96}
       footerExtra={
         <Pressable
           accessibilityRole="button"
           hitSlop={8}
-          disabled={sending}
+          disabled={sending || remainingSeconds > 0}
           onPress={requestCode}
           style={styles.resend}>
-          <Text style={[styles.resendText, sending && styles.resendOff]}>
-            {sending ? '전송 중…' : '인증번호 다시 받기'}
+          <Text
+            style={[
+              styles.resendText,
+              (sending || remainingSeconds > 0) && styles.resendOff,
+              remainingSeconds > 0 && styles.countdownText,
+            ]}>
+            {sending
+              ? '전송 중…'
+              : remainingSeconds > 0
+                ? `00:${String(remainingSeconds).padStart(2, '0')}초 후에 재전송 가능`
+                : '인증번호 다시 받기'}
           </Text>
         </Pressable>
       }>
       {/* 이메일 재확인 ~ 인증번호 입력 간격은 부모가 gap으로 준다 */}
       <View style={styles.fields}>
         <ReadonlyField value={email} icon="mail-outline" label="이메일" />
-        <OtpInput value={code} onChangeText={handleCodeChange} length={CODE_LENGTH} />
+        <View style={styles.otpBlock}>
+          <OtpInput value={code} onChangeText={handleCodeChange} length={CODE_LENGTH} />
+          {error ? (
+            <FormError message={error} />
+          ) : notice ? (
+            <Text style={styles.notice} accessibilityLiveRegion="polite">
+              {notice}
+            </Text>
+          ) : null}
+        </View>
       </View>
     </StepScreen>
   );
@@ -98,6 +131,7 @@ export default function SignupVerifyScreen() {
 
 const styles = StyleSheet.create({
   fields: { gap: Components.authStep.fieldGap },
+  otpBlock: { gap: 12 },
   notice: { ...Typography.footnote, color: Brand.textMuted },
   // 버튼과의 간격은 StepScreen의 footer gap이 잡는다
   resend: { alignSelf: 'center', paddingVertical: Spacing.one },
@@ -106,5 +140,6 @@ const styles = StyleSheet.create({
     color: Brand.textWeak,
     textDecorationLine: 'underline',
   },
+  countdownText: { textDecorationLine: 'none' },
   resendOff: { opacity: 0.5 },
 });
