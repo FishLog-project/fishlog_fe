@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 
 import { FormError } from '@/components/common';
 import { authApi, StepScreen, UnderlineInput, useSignup } from '@/features/auth';
@@ -66,22 +67,26 @@ export default function SignupEmailScreen() {
       heading="사용할 이메일을 입력해 주세요"
       nextDisabled={!valid}
       loading={sending}
-      message={<FormError message={error ?? formatError} />}
       onNext={goNext}>
-      <UnderlineInput
-        value={email}
-        onChangeText={handleChange}
-        onBlur={() => setTouched(true)}
-        placeholder="이메일 주소"
-        keyboardType="email-address"
-        autoCapitalize="none"
-        autoCorrect={false}
-        textContentType="emailAddress"
-        autoFocus
-        returnKeyType="next"
-        onSubmitEditing={goNext}
-        accessibilityLabel="이메일 주소"
-      />
+      <View style={styles.inputWithError}>
+        <UnderlineInput
+          value={email}
+          onChangeText={handleChange}
+          onBlur={() => setTouched(true)}
+          placeholder="이메일 주소"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          textContentType="emailAddress"
+          autoFocus
+          returnKeyType="next"
+          onSubmitEditing={goNext}
+          accessibilityLabel="이메일 주소"
+        />
+        <FormError message={error ?? formatError} />
+      </View>
     </StepScreen>
   );
 }
+
+const styles = StyleSheet.create({ inputWithError: { gap: 12 } });

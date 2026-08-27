@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { FormError } from '@/components/common';
 import { Brand, Typography } from '@/constants/theme';
 import { authApi, OtpInput, StepScreen, usePasswordReset } from '@/features/auth';
 
@@ -51,10 +52,16 @@ export default function PasswordVerifyScreen() {
       nextDisabled={code.length < CODE_LENGTH}
       loading={verifying}
       onNext={handleVerify}>
-      <OtpInput value={code} onChangeText={setCode} length={CODE_LENGTH} />
-
-      <View style={styles.meta}>
-        {error ? <Text style={styles.error}>{error}</Text> : <View />}
+      <View style={styles.otpBlock}>
+        <OtpInput
+          value={code}
+          onChangeText={(value) => {
+            setCode(value);
+            if (error) setError(null);
+          }}
+          length={CODE_LENGTH}
+        />
+        <FormError message={error} />
         <Pressable hitSlop={8} disabled={sending} onPress={handleResend}>
           <Text style={[styles.resend, sending && styles.resendDisabled]}>
             {sending ? '전송 중…' : '인증번호 재전송'}
@@ -66,13 +73,7 @@ export default function PasswordVerifyScreen() {
 }
 
 const styles = StyleSheet.create({
-  meta: {
-    marginTop: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  error: { ...Typography.footnote, color: Brand.textError, flex: 1 },
+  otpBlock: { gap: 12 },
   resend: { ...Typography.footnote, fontWeight: '500', color: Brand.textMuted },
   resendDisabled: { opacity: 0.5 },
 });

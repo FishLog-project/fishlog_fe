@@ -10,3 +10,6 @@ export { FilterChip } from './filter-chip';
 export { FabButton } from './fab-button';
 export { ScreenState } from './screen-state';
 export { AppDialog } from './app-dialog';
+ export { Avatar } from './avatar';
+ export { SectionTitle } from './section-title';
+ export { SegmentControl } from './segment-control';

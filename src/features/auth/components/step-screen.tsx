@@ -1,5 +1,5 @@
-import { type ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Keyboard, StyleSheet, Text, View } from 'react-native';
 
 import { PrimaryButton, Screen, ScreenHeader } from '@/components/common';
 import { Brand, Components, Layout, Typography } from '@/constants/theme';
@@ -19,18 +19,12 @@ type Props = {
   onNext: () => void;
   nextDisabled?: boolean;
   loading?: boolean;
-  /**
-   * 버튼 바로 위에 붙는 오류·안내 문구.
-   *
-   * 입력 영역이 아니라 하단 고정 영역에 둔다. 스크롤 안에 두면 키보드가
-   * 올라왔을 때 화면 밖으로 밀려서, 정작 버튼을 누른 사람이 왜 안 넘어가는지
-   * 모르게 된다.
-   */
-  message?: ReactNode;
   /** 버튼 아래에 덧붙는 요소 (인증번호 재전송 링크 등) */
   footerExtra?: ReactNode;
   headingBlockHeight?: number;
   hideFooterWhenKeyboard?: boolean;
+  /** 키보드가 열리면 타이틀·입력 묶음을 과하지 않게 위로 당긴다. */
+  compactWhenKeyboard?: boolean;
 };
 
 /**
@@ -52,11 +46,13 @@ export function StepScreen({
   onNext,
   nextDisabled,
   loading,
-  message,
   footerExtra,
   headingBlockHeight,
   hideFooterWhenKeyboard = true,
+  compactWhenKeyboard = false,
 }: Props) {
+  const keyboardVisible = useKeyboardVisible(compactWhenKeyboard);
+
   return (
     <Screen
       keyboardAvoiding
@@ -65,10 +61,7 @@ export function StepScreen({
       contentPadding={Layout.stepPadding}
       header={<ScreenHeader title={headerTitle} showBack={showBack} />}
       footer={
-        // 문구가 없을 때 <FormError/>는 아무것도 그리지 않는다.
-        // 레이아웃 노드가 생기지 않으므로 gap도 따라서 사라진다.
         <View style={styles.footer}>
-          {message}
           {footerExtra}
           <PrimaryButton
             label={buttonLabel}
@@ -78,7 +71,7 @@ export function StepScreen({
           />
         </View>
       }>
-      <View style={styles.body}>
+      <View style={[styles.body, keyboardVisible && styles.bodyWithKeyboard]}>
         {/*
           안내 문구 블록의 높이를 잡아 둔다. 디자인에서 입력의 y좌표는 문구가
           한 줄이든 두 줄이든 같아서, 문구 길이에 따라 입력이 따라 움직이면
@@ -91,6 +84,7 @@ export function StepScreen({
           style={[
             styles.headingBlock,
             headingBlockHeight !== undefined && { minHeight: headingBlockHeight },
+            keyboardVisible && styles.headingBlockWithKeyboard,
           ]}>
           <Text style={styles.heading}>{heading}</Text>
         </View>
@@ -100,9 +94,26 @@ export function StepScreen({
   );
 }
 
+function useKeyboardVisible(enabled: boolean) {
+  const [visible, setVisible] = useState(() => Keyboard.isVisible());
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setVisible(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setVisible(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  return enabled && visible;
+}
+
 const styles = StyleSheet.create({
   body: { flex: 1, paddingTop: STEP.headingTop },
+  bodyWithKeyboard: { paddingTop: STEP.headingTopTyping },
   headingBlock: { minHeight: STEP.headingBlock },
+  headingBlockWithKeyboard: { minHeight: STEP.headingBlockTyping },
   heading: { ...Typography.heading, color: Brand.textStrong },
   footer: { gap: STEP.footerGap },
 });

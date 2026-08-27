@@ -126,7 +126,8 @@ export const Components = {
     headingTop: 132,
     /** 안내 문구 블록 높이 — 문구가 몇 줄이든 입력은 y340에서 시작한다 */
     headingBlock: 108,
-    headingTopTyping: 24,
+    /** 입력이 2개 이상인 화면에서 키보드가 열렸을 때만 쓰는 완만한 상단 여백 */
+    headingTopTyping: 80,
     headingBlockTyping: 80,
     /** 입력 사이 (비밀번호 / 비밀번호 확인, 이메일 / 인증번호) */
     fieldGap: 32,
@@ -225,6 +226,84 @@ export const Components = {
     contentGap: 12,
     pinSize: 40,
     chevronSize: 28,
+  },
+  /**
+   * 둥근 프로필 이미지 (Common/Avatar).
+   * 크기는 쓰는 쪽이 정하고, 사진이 없을 때의 대체 표시만 여기서 맞춘다.
+   */
+  avatar: {
+    fallbackBg: Palette.bluegray[100],
+    fallbackIcon: Palette.line.disabled,
+    /** 지름 대비 대체 아이콘 비율 */
+    fallbackIconRatio: 0.55,
+  },
+  /**
+   * 두 칸짜리 세그먼트 컨트롤 (Figma Ranking/SegmentControl 323:1020).
+   * 트랙 안에서 선택된 칸만 흰 알약으로 떠오른다.
+   */
+  segment: {
+    height: 48,
+    radius: 8,
+    /** 트랙과 알약 사이 여백 */
+    padding: 6,
+    track: Palette.bluegray[100],
+    thumb: Palette.font.white,
+    thumbRadius: 5,
+    thumbShadow: Derived.segmentShadow,
+    thumbShadowBlur: 4.5,
+    labelActive: Palette.font.black,
+    labelIdle: Palette.bluegray[200],
+  },
+  /** 랭킹 화면 (Figma 634:2270 / 634:2305) */
+  ranking: {
+    /**
+     * 세그먼트는 화면 여백(20)에 맞추고 본문은 4만큼 더 안으로 들어간다.
+     * 두 값을 따로 두지 않고 섹션 컨테이너에만 이 여백을 준다.
+     */
+    contentInset: 4,
+    /** 세그먼트 ~ 첫 섹션 */
+    segmentGap: 20,
+    /** 섹션과 섹션 사이 */
+    sectionGap: 28,
+    /** 섹션 제목 ~ 내용 */
+    titleGap: 16,
+    /** 순위 행 사이 */
+    rowGap: 20,
+    /** 순위 뱃지(메달/숫자) 자리 ~ 행 내용 */
+    badgeGap: 20,
+    badge: {
+      width: 30,
+      height: 42,
+    },
+    /**
+     * 메달 이미지는 한 장에 두 개가 가로로 붙은 스프라이트다.
+     * 슬롯 안에서 한 칸만 보이도록 잘라 쓴다 (Figma 323:794 / 323:785 / 323:787).
+     */
+    medal: {
+      /** 스프라이트 한 장에 든 메달 개수 */
+      frames: 2,
+      /** 슬롯 안에서 메달이 차지하는 크기 */
+      size: 28.5,
+      clipHeight: 37.5,
+      /** 정사각 스프라이트에서 메달이 아래로 치우쳐 있어 위로 끌어올린다 */
+      offsetYRatio: -0.17,
+    },
+    row: {
+      avatarSize: 40,
+      /** 프로필 사진 ~ 닉네임 */
+      nameGap: 12,
+    },
+    /** "나의 순위" 카드 */
+    myCard: {
+      height: 84,
+      radius: 16,
+      paddingY: 16,
+      paddingX: 24,
+      /** 순위 숫자 ~ 프로필 묶음 */
+      gap: 24,
+      avatarSize: 52,
+      nameGap: 12,
+    },
   },
   /** 로딩·빈 화면·오류를 표시하는 ScreenState 카드 */
   state: {

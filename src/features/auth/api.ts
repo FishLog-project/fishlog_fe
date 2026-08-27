@@ -5,36 +5,11 @@
  * 모든 함수는 성공/실패를 예외가 아니라 결과 객체로 돌려준다.
  * 화면이 상태코드를 몰라도 되게 하려는 것이고, 문구도 여기서 확정한다.
  */
-import { ApiError, apiRequest } from '@/lib/api/client';
+import { apiRequest } from '@/lib/api/client';
+import { type Fail, type Ok, toFail } from '@/lib/api/result';
+import { File } from 'expo-file-system';
 
-export type Ok = { ok: true };
-export type Fail<R extends string = 'unknown'> = {
-  ok: false;
-  reason: R | 'unknown';
-  message: string;
-};
-
-const NETWORK_FAIL = {
-  ok: false as const,
-  reason: 'unknown' as const,
-  message: '네트워크 오류가 발생했어요.',
-};
-
-/**
- * 공통 에러 변환기.
- * `map`에 없는 상태코드는 서버 메시지를 그대로 보여준다 (서버가 한국어로 내려준다).
- */
-function toFail<R extends string>(
-  e: unknown,
-  map: Partial<Record<number, { reason: R; message: string }>>,
-): Fail<R> {
-  if (e instanceof ApiError) {
-    const hit = map[e.status];
-    if (hit) return { ok: false, reason: hit.reason, message: hit.message };
-    return { ok: false, reason: 'unknown', message: e.message };
-  }
-  return NETWORK_FAIL;
-}
+export type { Fail, Ok } from '@/lib/api/result';
 
 // ─────────────────────────────────────────────────────────────
 // 이메일 인증 (회원가입용)
@@ -233,7 +208,12 @@ export async function resetPassword(
 // 내 계정 (로그인 후)
 // ─────────────────────────────────────────────────────────────
 
-export type MyProfile = { userId: number; email: string; nickname: string };
+export type MyProfile = {
+  userId: number;
+  email: string;
+  nickname: string;
+  profileImageUrl: string | null;
+};
 
 /** 내 프로필 조회. GET /api/users/me */
 export async function getMyProfile(token: string | null): Promise<MyProfile | null> {
@@ -241,6 +221,49 @@ export async function getMyProfile(token: string | null): Promise<MyProfile | nu
     return await apiRequest<MyProfile>('/api/users/me', { token });
   } catch {
     return null;
+  }
+}
+
+export type ProfileImageFile = {
+  uri: string;
+  name: string;
+  mimeType: string;
+};
+
+export type UploadProfileImageResult =
+  | (Ok & { profileImageUrl: string })
+  | Fail<'invalid_file'>;
+
+/** 프로필 이미지 업로드/변경. POST /api/users/me/profile-image (최대 5MB 이미지) */
+export async function uploadProfileImage(
+  token: string | null,
+  file: ProfileImageFile,
+): Promise<UploadProfileImageResult> {
+  const imageFile = new File(file.uri);
+  const form = new FormData();
+  form.append('image', imageFile, file.name);
+
+  try {
+    const data = await apiRequest<{ profileImageUrl?: unknown }>(
+      '/api/users/me/profile-image',
+      { method: 'POST', token, body: form },
+    );
+    if (typeof data?.profileImageUrl !== 'string') {
+      return {
+        ok: false,
+        reason: 'invalid_file',
+        message: '업로드된 이미지 주소를 확인하지 못했어요.',
+      };
+    }
+    return { ok: true, profileImageUrl: data.profileImageUrl };
+  } catch (e) {
+    console.error('[profile-image] upload failed', {
+      error: e,
+      uri: file.uri,
+      name: file.name,
+      mimeType: file.mimeType,
+    });
+    return toFail<'invalid_file'>(e);
   }
 }
 

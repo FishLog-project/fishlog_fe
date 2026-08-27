@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 
 import { FormError } from '@/components/common';
 import { StepScreen, UnderlineInput, useSignup } from '@/features/auth';
@@ -38,21 +39,25 @@ export default function SignupNicknameScreen() {
     <StepScreen
       heading={'거의 다 왔어요!\n사용할 닉네임을 입력해 주세요'}
       nextDisabled={!valid}
-      message={<FormError message={message} />}
       onNext={goNext}>
-      <UnderlineInput
-        value={nickname}
-        onChangeText={setNickname}
-        onBlur={() => setTouched(true)}
-        placeholder={`닉네임 (${MIN_LENGTH}~${MAX_LENGTH}자)`}
-        autoCapitalize="none"
-        autoCorrect={false}
-        maxLength={MAX_LENGTH}
-        autoFocus
-        returnKeyType="done"
-        onSubmitEditing={goNext}
-        accessibilityLabel="닉네임"
-      />
+      <View style={styles.inputWithError}>
+        <UnderlineInput
+          value={nickname}
+          onChangeText={setNickname}
+          onBlur={() => setTouched(true)}
+          placeholder={`닉네임 (${MIN_LENGTH}~${MAX_LENGTH}자)`}
+          autoCapitalize="none"
+          autoCorrect={false}
+          maxLength={MAX_LENGTH}
+          autoFocus
+          returnKeyType="done"
+          onSubmitEditing={goNext}
+          accessibilityLabel="닉네임"
+        />
+        <FormError message={message} />
+      </View>
     </StepScreen>
   );
 }
+
+const styles = StyleSheet.create({ inputWithError: { gap: 12 } });

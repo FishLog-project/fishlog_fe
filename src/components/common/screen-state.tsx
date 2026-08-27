@@ -6,6 +6,8 @@ type ScreenStateProps = {
   variant: 'loading' | 'empty' | 'error';
   /** error 변형에서만 노출되는 재시도 핸들러 */
   onRetry?: () => void;
+  actionLabel?: string;
+  onAction?: () => void;
 };
 
 const copy = {
@@ -15,7 +17,7 @@ const copy = {
   },
   empty: {
     title: '아직 표시할 기록이 없어요',
-    description: '첫 낚시 기록을 남기면 이곳에서 확인할 수 있어요.',
+    description: '',
   },
   error: {
     title: '정보를 불러오지 못했어요',
@@ -27,8 +29,10 @@ const copy = {
  * Common/ScreenState — 로딩·빈 화면·오류를 한 벌로 처리하는 카드.
  * 목록/상세 화면이 데이터를 못 채울 때 본문 자리에 그대로 끼워 넣는다.
  */
-export function ScreenState({ variant, onRetry }: ScreenStateProps) {
+export function ScreenState({ variant, onRetry, actionLabel, onAction }: ScreenStateProps) {
   const state = copy[variant];
+  const buttonLabel = variant === 'error' && onRetry ? '다시 시도' : actionLabel;
+  const handlePress = variant === 'error' && onRetry ? onRetry : onAction;
 
   return (
     <View style={styles.card}>
@@ -46,14 +50,19 @@ export function ScreenState({ variant, onRetry }: ScreenStateProps) {
         </View>
       )}
       <Text style={styles.title}>{state.title}</Text>
-      <Text style={styles.description}>{state.description}</Text>
-      {variant === 'error' && onRetry && (
+      {state.description ? <Text style={styles.description}>{state.description}</Text> : null}
+      {buttonLabel && handlePress && (
         <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="다시 시도"
-          onPress={onRetry}
-          style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
-          <Text style={styles.buttonText}>다시 시도</Text>
+          accessibilityRole={variant === 'error' ? 'button' : 'link'}
+          accessibilityLabel={buttonLabel}
+          onPress={handlePress}
+          style={({ pressed }) => [
+            variant === 'error' ? styles.button : styles.link,
+            pressed && styles.pressed,
+          ]}>
+          <Text style={variant === 'error' ? styles.buttonText : styles.linkText}>
+            {buttonLabel}
+          </Text>
         </Pressable>
       )}
     </View>
@@ -114,4 +123,15 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   buttonText: { ...Typography.button, fontSize: 15, color: Components.button.label },
+  link: {
+    marginTop: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  linkText: {
+    ...Typography.button,
+    fontSize: 15,
+    color: Brand.primary,
+    textDecorationLine: 'underline',
+  },
 });

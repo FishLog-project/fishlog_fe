@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 
 import { FormError } from '@/components/common';
 import {
@@ -50,17 +51,28 @@ export default function PasswordResetScreen() {
       buttonLabel="변경하기"
       nextDisabled={!valid}
       loading={submitting}
-      message={<FormError message={error ?? message} />}
+      compactWhenKeyboard
       onNext={handleSubmit}>
-      <PasswordFields
-        password={password}
-        onPasswordChange={setPassword}
-        confirm={confirm}
-        onConfirmChange={setConfirm}
-        placeholder="새 비밀번호 (8자 이상)"
-        onSubmit={handleSubmit}
-        autoFocus
-      />
+      <View style={styles.fieldsWithError}>
+        <PasswordFields
+          password={password}
+          onPasswordChange={(value) => {
+            setPassword(value);
+            if (error) setError(null);
+          }}
+          confirm={confirm}
+          onConfirmChange={(value) => {
+            setConfirm(value);
+            if (error) setError(null);
+          }}
+          placeholder="새 비밀번호 (8자 이상)"
+          onSubmit={handleSubmit}
+          autoFocus
+        />
+        <FormError message={error ?? message} />
+      </View>
     </StepScreen>
   );
 }
+
+const styles = StyleSheet.create({ fieldsWithError: { gap: 12 } });

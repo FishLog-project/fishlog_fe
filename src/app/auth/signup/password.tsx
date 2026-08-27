@@ -22,6 +22,7 @@ export default function SignupPasswordScreen() {
     <StepScreen
       heading="사용할 비밀번호를 입력해 주세요"
       nextDisabled={!valid}
+      compactWhenKeyboard
       onNext={goNext}>
       <View style={styles.fieldsWithError}>
         <PasswordFields

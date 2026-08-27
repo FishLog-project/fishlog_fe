@@ -45,7 +45,6 @@ export default function WithdrawScreen() {
       buttonLabel="탈퇴하기"
       nextDisabled={password.length === 0}
       loading={submitting}
-      message={<FormError message={error} />}
       onNext={handleSubmit}>
       <View style={styles.fields}>
         <Text style={styles.body}>
@@ -53,22 +52,26 @@ export default function WithdrawScreen() {
           {'\n'}확인을 위해 현재 비밀번호를 입력해 주세요.
         </Text>
 
-        <UnderlineInput
-          value={password}
-          onChangeText={(v) => {
-            setPassword(v);
-            if (error) setError(null);
-          }}
-          placeholder="현재 비밀번호"
-          secureTextEntry
-          autoCapitalize="none"
-          autoCorrect={false}
-          textContentType="password"
-          autoFocus
-          returnKeyType="done"
-          onSubmitEditing={handleSubmit}
-          accessibilityLabel="현재 비밀번호"
-        />
+        <View style={styles.inputWithError}>
+          <UnderlineInput
+            value={password}
+            onChangeText={(v) => {
+              setPassword(v);
+              if (error) setError(null);
+            }}
+            placeholder="현재 비밀번호"
+            secureTextEntry
+            passwordToggle
+            autoCapitalize="none"
+            autoCorrect={false}
+            textContentType="password"
+            autoFocus
+            returnKeyType="done"
+            onSubmitEditing={handleSubmit}
+            accessibilityLabel="현재 비밀번호"
+          />
+          <FormError message={error} />
+        </View>
       </View>
     </StepScreen>
   );
@@ -77,5 +80,6 @@ export default function WithdrawScreen() {
 const styles = StyleSheet.create({
   /** 안내문 ~ 입력 간격은 부모가 gap으로 준다 */
   fields: { gap: Components.authStep.fieldGap },
+  inputWithError: { gap: 12 },
   body: { ...Typography.body, color: Brand.textMuted },
 });

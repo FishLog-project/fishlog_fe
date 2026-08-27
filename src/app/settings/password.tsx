@@ -60,34 +60,44 @@ export default function ChangePasswordScreen() {
         buttonLabel="변경하기"
         nextDisabled={!canSubmit}
         loading={submitting}
-        message={<FormError message={error ?? message} />}
+        compactWhenKeyboard
         onNext={handleSubmit}>
-        <View style={styles.fields}>
-          <UnderlineInput
-            value={current}
-            onChangeText={(v) => {
-              setCurrent(v);
-              if (error) setError(null);
-            }}
-            placeholder="현재 비밀번호"
-            secureTextEntry
-            autoCapitalize="none"
-            autoCorrect={false}
-            textContentType="password"
-            autoFocus
-            returnKeyType="next"
-            accessibilityLabel="현재 비밀번호"
-          />
+        <View style={styles.fieldsWithError}>
+          <View style={styles.fields}>
+            <UnderlineInput
+              value={current}
+              onChangeText={(v) => {
+                setCurrent(v);
+                if (error) setError(null);
+              }}
+              placeholder="현재 비밀번호"
+              secureTextEntry
+              passwordToggle
+              autoCapitalize="none"
+              autoCorrect={false}
+              textContentType="password"
+              autoFocus
+              returnKeyType="next"
+              accessibilityLabel="현재 비밀번호"
+            />
 
-          <PasswordFields
-            password={password}
-            onPasswordChange={setPassword}
-            confirm={confirm}
-            onConfirmChange={setConfirm}
-            placeholder="새 비밀번호 (영문+숫자 8자 이상)"
-            confirmPlaceholder="새 비밀번호 확인"
-            onSubmit={handleSubmit}
-          />
+            <PasswordFields
+              password={password}
+              onPasswordChange={(value) => {
+                setPassword(value);
+                if (error) setError(null);
+              }}
+              confirm={confirm}
+              onConfirmChange={(value) => {
+                setConfirm(value);
+                if (error) setError(null);
+              }}
+              placeholder="새 비밀번호 (영문+숫자 8자 이상)"
+              confirmPlaceholder="새 비밀번호 확인"
+              onSubmit={handleSubmit}
+            />
+          </View>
+          <FormError message={error ?? message} />
         </View>
       </StepScreen>
 
@@ -107,4 +117,5 @@ export default function ChangePasswordScreen() {
 const styles = StyleSheet.create({
   /** 현재 비밀번호 ~ 새 비밀번호 묶음 간격은 부모가 gap으로 준다 */
   fields: { gap: Components.authStep.fieldGap },
+  fieldsWithError: { gap: 12 },
 });

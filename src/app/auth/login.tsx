@@ -64,41 +64,42 @@ export default function LoginScreen() {
         </Text>
 
         <View style={styles.form}>
-          <View style={styles.fields}>
-            <TextField
-              value={email}
-              onChangeText={setEmail}
-              placeholder="이메일"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              textContentType="emailAddress"
-            />
-            <TextField
-              value={password}
-              onChangeText={setPassword}
-              placeholder="비밀번호"
-              secureTextEntry
-              textContentType="password"
-              returnKeyType="done"
-              onSubmitEditing={() => canSubmit && handleLogin()}
-            />
+          <View style={styles.fieldsWithError}>
+            <View style={styles.fields}>
+              <TextField
+                value={email}
+                onChangeText={(value) => {
+                  setEmail(value);
+                  if (error) setError(null);
+                }}
+                placeholder="이메일"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                textContentType="emailAddress"
+              />
+              <TextField
+                value={password}
+                onChangeText={(value) => {
+                  setPassword(value);
+                  if (error) setError(null);
+                }}
+                placeholder="비밀번호"
+                secureTextEntry
+                textContentType="password"
+                returnKeyType="done"
+                onSubmitEditing={() => canSubmit && handleLogin()}
+              />
+            </View>
+            <FormError message={error} />
           </View>
 
-          {/*
-            오류가 없으면 FormError가 아무것도 그리지 않는다. 레이아웃 노드가
-            생기지 않으므로 이 묶음의 gap도 사라지고, 입력과 버튼 사이는
-            바깥 form의 gap(28) 그대로 남는다.
-          */}
-          <View style={styles.submit}>
-            <FormError message={error} />
-            <PrimaryButton
-              label="다음"
-              onPress={handleLogin}
-              disabled={!canSubmit}
-              loading={submitting}
-            />
-          </View>
+          <PrimaryButton
+            label="다음"
+            onPress={handleLogin}
+            disabled={!canSubmit}
+            loading={submitting}
+          />
 
           <View style={styles.links}>
             <Pressable hitSlop={8} onPress={() => router.push('/auth/password/email')}>
@@ -122,7 +123,7 @@ const styles = StyleSheet.create({
   /** 입력 묶음 ~ 버튼 ~ 링크 */
   form: { gap: LOGIN.blockGap },
   fields: { gap: LOGIN.fieldGap },
-  submit: { gap: LOGIN.errorGap },
+  fieldsWithError: { gap: LOGIN.errorGap },
   links: {
     flexDirection: 'row',
     alignItems: 'center',

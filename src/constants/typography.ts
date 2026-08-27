@@ -216,6 +216,38 @@ export const Typography = {
     fontWeight: '400',
     fontSize: 13,
   },
+  /** 세그먼트 컨트롤의 선택된 칸 라벨 (Figma 323:1046) */
+  segmentLabel: {
+    fontFamily: Fonts.semiBold,
+    fontWeight: '600',
+    fontSize: 14,
+    lineHeight: 28,
+    letterSpacing: -0.28,
+  },
+  /** 세그먼트 컨트롤의 선택되지 않은 칸 라벨 — 한 단계 얇다 (Figma 323:1049) */
+  segmentLabelIdle: {
+    fontFamily: Fonts.medium,
+    fontWeight: '500',
+    fontSize: 14,
+    lineHeight: 28,
+    letterSpacing: -0.28,
+  },
+  /** 랭킹 4위 이하의 순위 숫자 (Figma 323:884) */
+  rankNumber: {
+    fontFamily: Fonts.semiBold,
+    fontWeight: '600',
+    fontSize: 18,
+    lineHeight: 28,
+    letterSpacing: -0.45,
+  },
+  /** 카드 안의 보조 수치 — "12/50종 (22%)" (Figma 634:2292) */
+  cardMeta: {
+    fontFamily: Fonts.medium,
+    fontWeight: '500',
+    fontSize: 13,
+    lineHeight: 20,
+    letterSpacing: -0.325,
+  },
   /** 인증번호 한 자리 숫자 (Figma 634:2726) */
   otpDigit: {
     fontFamily: Fonts.medium,

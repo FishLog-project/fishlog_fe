@@ -51,21 +51,25 @@ export function AppDialog({
             </View>
             {children}
           </View>
-          <View style={styles.actions}>
-            <PrimaryButton
-              label={buttonLabel}
-              onPress={onConfirm}
-              disabled={confirmDisabled}
-              loading={loading}
-            />
+          <View style={[styles.actions, onCancel && styles.actionsRow]}>
             {onCancel ? (
-              <PrimaryButton
-                label={cancelLabel}
-                variant="outline"
-                onPress={onCancel}
-                disabled={loading}
-              />
+              <View style={styles.actionButton}>
+                <PrimaryButton
+                  label={cancelLabel}
+                  variant="outline"
+                  onPress={onCancel}
+                  disabled={loading}
+                />
+              </View>
             ) : null}
+            <View style={onCancel && styles.actionButton}>
+              <PrimaryButton
+                label={buttonLabel}
+                onPress={onConfirm}
+                disabled={confirmDisabled}
+                loading={loading}
+              />
+            </View>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -92,6 +96,8 @@ const styles = StyleSheet.create({
   content: { gap: Components.dialog.gap },
   copy: { alignItems: 'center', gap: Components.dialog.tightGap },
   actions: { gap: Components.dialog.tightGap },
+  actionsRow: { flexDirection: 'row' },
+  actionButton: { flex: 1 },
   title: { ...Typography.sectionTitle, color: Brand.textStrong, textAlign: 'center' },
   message: { ...Typography.itemMeta, color: Brand.textMuted, textAlign: 'center' },
 });

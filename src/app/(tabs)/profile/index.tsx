@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
   AppDialog,
@@ -17,6 +18,7 @@ import { authApi, UnderlineInput, useAuth } from '@/features/auth';
 
 const PROFILE = Components.profile;
 const CARD = PROFILE.quickCard;
+const MAX_PROFILE_IMAGE_BYTES = 5 * 1024 * 1024;
 
 /**
  * 마이페이지 (Figma 634:3019).
@@ -35,6 +37,9 @@ export default function ProfileScreen() {
   const [dialog, setDialog] = useState<'logout' | 'withdraw' | null>(null);
   const [withdrawPassword, setWithdrawPassword] = useState('');
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -80,6 +85,47 @@ export default function ProfileScreen() {
     router.replace('/auth/login');
   };
 
+  const handleProfileImage = async () => {
+    if (!token || uploadingImage) return;
+
+    const picked = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (picked.canceled) return;
+
+    const asset = picked.assets[0];
+    if (asset.fileSize !== undefined && asset.fileSize > MAX_PROFILE_IMAGE_BYTES) {
+      setUploadError('5MB 이하의 이미지를 선택해 주세요.');
+      return;
+    }
+
+    const mimeType = asset.mimeType ?? 'image/jpeg';
+    const extension = mimeType.split('/')[1] || 'jpg';
+
+    setUploadingImage(true);
+    setImagePreview(asset.uri);
+    const result = await authApi.uploadProfileImage(token, {
+      uri: asset.uri,
+      name: asset.fileName ?? `profile.${extension}`,
+      mimeType,
+    });
+    setUploadingImage(false);
+
+    if (!result.ok) {
+      setImagePreview(null);
+      setUploadError(result.message);
+      return;
+    }
+
+    setProfile((current) =>
+      current ? { ...current, profileImageUrl: result.profileImageUrl } : current,
+    );
+    setImagePreview(null);
+  };
+
   return (
     <>
       <Screen
@@ -89,14 +135,63 @@ export default function ProfileScreen() {
         <View style={styles.body}>
         <View style={styles.top}>
           <View style={styles.identity}>
-            {/* 프로필 사진은 아직 서버에 없다 (GET /api/users/me는 닉네임·이메일만 준다) */}
-            <View style={styles.avatar}>
-              <Ionicons name="person" size={Components.icon.avatar} color={Brand.inactive} />
+            <View style={styles.avatarWrap}>
+              <View style={styles.avatar}>
+                {imagePreview ?? profile?.profileImageUrl ? (
+                  <Image
+                    source={{ uri: imagePreview ?? profile?.profileImageUrl ?? '' }}
+                    style={StyleSheet.absoluteFill}
+                    contentFit="cover"
+                    transition={150}
+                  />
+                ) : (
+                  <Ionicons
+                    name="person"
+                    size={Components.icon.avatar}
+                    color={Brand.inactive}
+                  />
+                )}
+              </View>
+              {!isGuest && token ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="프로필 이미지 변경"
+                  disabled={uploadingImage}
+                  onPress={handleProfileImage}
+                  style={({ pressed }) => [
+                    styles.cameraButton,
+                    pressed && styles.cameraButtonPressed,
+                  ]}>
+                  <Image
+                    source={require('@/assets/images/profile/camera-button-40.svg')}
+                    style={StyleSheet.absoluteFill}
+                    contentFit="contain"
+                  />
+                  {uploadingImage ? (
+                    <ActivityIndicator size="small" color={Brand.onPrimary} />
+                  ) : (
+                    <Image
+                      source={require('@/assets/images/profile/camera-20.svg')}
+                      style={styles.cameraIcon}
+                      contentFit="contain"
+                    />
+                  )}
+                </Pressable>
+              ) : null}
             </View>
             <View style={styles.names}>
-              <Text style={styles.name} numberOfLines={1}>
-                {isGuest ? '게스트' : (profile?.nickname ?? '—')}
-              </Text>
+              <View style={styles.nameRow}>
+                <Text style={styles.name} numberOfLines={1}>
+                  {isGuest ? '게스트' : (profile?.nickname ?? '—')}
+                </Text>
+                {!isGuest ? (
+                  <Image
+                    source={require('@/assets/images/profile/pencil-16.svg')}
+                    style={styles.pencilIcon}
+                    contentFit="contain"
+                  />
+                ) : null}
+              </View>
               <Text style={styles.email} numberOfLines={1}>
                 {isGuest ? '로그인하면 기록을 저장할 수 있어요' : (profile?.email ?? '—')}
               </Text>
@@ -158,6 +253,13 @@ export default function ProfileScreen() {
         </View>
         </View>
       </Screen>
+
+      <AppDialog
+        visible={uploadError !== null}
+        title="이미지를 업로드하지 못했어요"
+        message={uploadError ?? undefined}
+        onConfirm={() => setUploadError(null)}
+      />
 
       <AppDialog
         visible={dialog === 'logout'}
@@ -242,6 +344,10 @@ const styles = StyleSheet.create({
   identity: { alignItems: 'center', gap: PROFILE.nameGap },
   names: { alignItems: 'center', gap: PROFILE.emailGap },
 
+  avatarWrap: {
+    width: PROFILE.avatarSize,
+    height: PROFILE.avatarSize,
+  },
   avatar: {
     width: PROFILE.avatarSize,
     height: PROFILE.avatarSize,
@@ -249,8 +355,22 @@ const styles = StyleSheet.create({
     backgroundColor: Brand.surfaceSoft,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
+  cameraButton: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cameraButtonPressed: { opacity: 0.8 },
+  cameraIcon: { width: 20, height: 20 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: '100%' },
   name: { ...Typography.profileName, color: Brand.textHeading },
+  pencilIcon: { width: 16, height: 16 },
   email: { ...Typography.profileEmail, color: Brand.textMuted },
 
   /** 카드 3장이 본문 폭(326)을 90 + 28 + 90 + 28 + 90으로 나눠 쓴다 */
