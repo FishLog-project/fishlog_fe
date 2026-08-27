@@ -1,18 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
-
 import type {
   CollectionProgress,
   FishLogDataSource,
   FishSpecies,
   FishingSpot,
 } from '@/features/home/home-data';
+import { useSection, type SectionState } from '@/lib/use-section';
 
 /** 홈의 각 섹션이 독립적으로 갖는 로딩·빈·오류·준비 상태 */
-export type HomeSectionState<T> =
-  | { status: 'loading' }
-  | { status: 'empty' }
-  | { status: 'error' }
-  | { status: 'ready'; data: T };
+export type HomeSectionState<T> = SectionState<T>;
 
 export interface FeaturedSlideViewModel {
   speciesId: string;
@@ -41,50 +36,6 @@ export interface HomeViewModel {
   featuredSpecies: HomeSectionState<readonly FeaturedSlideViewModel[]>;
   collectionProgress: HomeSectionState<CollectionProgressViewModel>;
   recommendedSpots: HomeSectionState<readonly RecommendedSpotViewModel[]>;
-}
-
-type DataSourceLoader<T> = (dataSource: FishLogDataSource) => Promise<T>;
-type SectionMapper<T, ViewData> = (value: T) => ViewData | null;
-
-/**
- * 섹션 하나의 로드→매핑→상태 전이를 담당한다.
- *
- * loading 상태가 곧 "로드 시작" 신호다. 초기값이 loading이라 마운트 시 한 번 로드하고,
- * 재시도(refresh)는 loading으로 되돌리기만 하면 아래 effect가 다시 돈다.
- */
-function useSection<T, ViewData>(
-  dataSource: FishLogDataSource,
-  load: DataSourceLoader<T>,
-  map: SectionMapper<T, ViewData>,
-) {
-  const [state, setState] = useState<HomeSectionState<ViewData>>({ status: 'loading' });
-
-  const refresh = useCallback(() => setState({ status: 'loading' }), []);
-
-  useEffect(() => {
-    if (state.status !== 'loading') return;
-
-    // 언마운트되면 늦게 도착한 응답을 버린다
-    let stale = false;
-
-    load(dataSource)
-      .then((value) => {
-        if (stale) return;
-        const viewData = map(value);
-        setState(
-          viewData === null ? { status: 'empty' } : { status: 'ready', data: viewData },
-        );
-      })
-      .catch(() => {
-        if (!stale) setState({ status: 'error' });
-      });
-
-    return () => {
-      stale = true;
-    };
-  }, [state.status, dataSource, load, map]);
-
-  return [state, refresh] as const;
 }
 
 // 로더·매퍼는 모듈 레벨 상수라 참조가 안정적이다.
