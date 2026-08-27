@@ -79,6 +79,22 @@ export const Derived = {
   progressTrackBorder: '#69CDFF',
   /** 통계 카드 안쪽 그림자 (알파가 필요해 이 항목만 rgba 표기) */
   cardInnerGlow: 'rgba(153, 221, 255, 0.73)',
+
+  // 도감 수조 (Figma 도감2안 103:173)
+  /** 수조 윗면 테두리 띠 */
+  tankRim: '#B3E3F8',
+  /** 수조 안쪽 상단에 드리우는 그림자 */
+  tankShade: '#A6C7DD',
+  /** 도감 완성도 카드 배경 */
+  dexSummary: '#D7F1FC',
+  /** 완성도 막대 채움 */
+  dexBarGradient: ['#EEF9FF', '#84D6FF'] as const,
+  /** 어종 카드 안쪽 그림 칸 배경 */
+  dexTileGradient: ['#F5FCFF', '#BCE9FF'] as const,
+  /** 어종 카드 안쪽 그림 칸 테두리 */
+  dexTileBorder: '#B1DFFF',
+  /** 어종 카드 그림자 (알파 필요) */
+  dexCardShadow: 'rgba(0, 94, 170, 0.69)',
 } as const;
 
 /**

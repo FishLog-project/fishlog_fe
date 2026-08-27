@@ -157,6 +157,22 @@ export const Typography = {
     lineHeight: 28,
     letterSpacing: -0.4,
   },
+  /** 카드 안 작은 설명 — 도감 "도감 완성도" (Figma 103:195) */
+  cardCaption: {
+    fontFamily: Fonts.medium,
+    fontWeight: '500',
+    fontSize: 13,
+    lineHeight: 24,
+    letterSpacing: -0.26,
+  },
+  /** 막대·배지 안에 얹는 가장 작은 수치 — 도감 완성도 "99%" (Figma 103:224) */
+  microLabel: {
+    fontFamily: Fonts.bold,
+    fontWeight: '700',
+    fontSize: 10,
+    lineHeight: 16,
+    letterSpacing: -0.2,
+  },
   /** 순위 배지 숫자 — 스팟 핀 안의 1·2·3 (Figma 72:1218) */
   badge: {
     fontFamily: Fonts.extraBold,

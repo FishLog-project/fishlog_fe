@@ -326,6 +326,53 @@ export const Components = {
     actionIconSize: 24,
     markerLabelGap: 2,
   },
+  /**
+   * 도감 화면 (Figma 도감2안 103:173).
+   * 화면 전체가 "수조" 은유다 — 뚜껑(에셋) + 테두리 띠 + 안쪽 물색 배경.
+   */
+  dex: {
+    /** 수조 윗면 테두리 띠 높이 (Figma 186 → 192) */
+    rimHeight: 6,
+    rim: Derived.tankRim,
+    /** 수조 안쪽 물색 */
+    water: Palette.blue[100],
+    shade: Derived.tankShade,
+
+    /** 완성도 카드 */
+    summaryBg: Derived.dexSummary,
+    summaryHeight: 73,
+    summaryRadius: 12,
+
+    /** 완성도 막대 — 트랙이 진한 남색이고 채움이 밝다 (홈 진행바와 반대) */
+    barHeight: 22,
+    barRadius: 17,
+    barTrack: Palette.bluegray[300],
+    /** 트랙 안쪽에서 채움이 물러나는 여백 (Figma 249→252) */
+    barInset: 3,
+    barFill: Derived.dexBarGradient,
+    /** 트랙을 물색 카드에서 떼어 놓는 흰 테두리 */
+    barBorder: Palette.line.white,
+
+    /** 어종 카드 */
+    cardHeight: 142,
+    cardRadius: 10,
+    cardBg: Palette.bluegray[100],
+    cardShadow: Derived.dexCardShadow,
+    /** 카드 안쪽 그림 칸 (정사각). 카드 좌우에서 tileInset만큼 물러난다 */
+    tileSize: 88,
+    tileInset: 10,
+    tileRadius: 4,
+    tileBorder: Derived.dexTileBorder,
+    tileFill: Derived.dexTileGradient,
+    /** 그림 칸 안 어종 일러스트 */
+    artWidth: 59,
+    artHeight: 55,
+    /** 미획득 카드의 그림 칸 배경 (Figma에 없는 상태 — 중립 회색으로 둔다) */
+    lockedTile: Palette.line.regular,
+
+    columnGap: 12,
+    rowGap: 16,
+  },
   /** 로딩·빈 화면·오류를 표시하는 ScreenState 카드 */
   state: {
     surface: Palette.font.white,

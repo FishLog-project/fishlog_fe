@@ -31,8 +31,9 @@ const TABS = [
     inactive: require('@/assets/images/tabs/map-inactive.svg'),
   },
   {
-    name: 'log',
-    label: '기록',
+    // 아이콘 에셋 파일명만 log-*.svg로 남아 있다 (Figma TabBar 72:1503은 ph:book-fill = 도감)
+    name: 'dex',
+    label: '도감',
     leaf: 36,
     active: require('@/assets/images/tabs/log-active.svg'),
     inactive: require('@/assets/images/tabs/log-inactive.svg'),
