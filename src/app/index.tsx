@@ -1,5 +1,7 @@
 import { Redirect } from 'expo-router';
 
+import { useAuth } from '@/features/auth';
+
 /**
  * 앱 진입점("/").
  *
@@ -11,5 +13,8 @@ import { Redirect } from 'expo-router';
  *   return <Redirect href={canEnterApp ? '/home' : '/auth/login'} />;
  */
 export default function Index() {
-  return <Redirect href="/auth/login" />;
+  const { canEnterApp, isReady } = useAuth();
+
+  if (!isReady) return null;
+  return <Redirect href={canEnterApp ? '/(tabs)/home' : '/auth/login'} />;
 }

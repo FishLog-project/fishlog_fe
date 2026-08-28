@@ -35,15 +35,23 @@ export default function LoginScreen() {
       setError(res.message);
       return;
     }
-    await signIn(res.tokens);
-    router.replace('/home');
+    // 메모리 세션은 signIn 호출 즉시 반영된다. SecureStore 쓰기를 기다리느라
+    // 로그인 화면에 멈춰 있지 않고 홈 전환과 저장을 동시에 진행한다.
+    const sessionWrite = signIn(res.tokens);
+    router.replace('/(tabs)/home');
+    try {
+      await sessionWrite;
+    } catch {
+      router.replace('/auth/login');
+      setError('로그인 정보를 저장하지 못했어요. 다시 시도해 주세요.');
+    }
   };
 
   // 로그인 없이 둘러보기 — 토큰이 아니라 게스트 플래그로 진입한다.
   // ('guest'를 토큰 자리에 넣으면 로그인 사용자와 구분이 안 된다)
   const handleGuest = async () => {
     await continueAsGuest();
-    router.replace('/home');
+    router.replace('/(tabs)/home');
   };
 
   return (

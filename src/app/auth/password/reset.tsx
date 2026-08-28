@@ -19,7 +19,7 @@ import {
  */
 export default function PasswordResetScreen() {
   const router = useRouter();
-  const { email, reset } = usePasswordReset();
+  const { email } = usePasswordReset();
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -40,8 +40,7 @@ export default function PasswordResetScreen() {
       setError(res.message);
       return;
     }
-    reset();
-    router.replace('/auth/password/complete');
+    router.replace('/auth/login');
   };
 
   return (

@@ -45,38 +45,66 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
+    let active = true;
+
     (async () => {
       try {
-        const stored = await SecureStore.getItemAsync(SESSION_KEY);
+        const [stored, guest] = await Promise.all([
+          SecureStore.getItemAsync(SESSION_KEY),
+          SecureStore.getItemAsync(GUEST_KEY),
+        ]);
 
         // 예전 빌드는 게스트도 토큰 자리에 넣었다. 그대로 두면 게스트가
         // 로그인 사용자로 보이므로 로드 시점에 플래그로 옮긴다.
         if (stored === LEGACY_GUEST_TOKEN) {
           await SecureStore.deleteItemAsync(SESSION_KEY);
           await SecureStore.setItemAsync(GUEST_KEY, '1');
-          setIsGuest(true);
+          if (active) setIsGuest(true);
           return;
         }
 
-        setTokens(parseStoredTokens(stored));
-        setIsGuest((await SecureStore.getItemAsync(GUEST_KEY)) === '1');
+        const restored = parseStoredTokens(stored);
+        if (!active) return;
+
+        // 저장된 세션을 먼저 복원해 앱 시작을 네트워크 요청으로 막지 않는다.
+        setTokens(restored);
+        setIsGuest(!restored && guest === '1');
+
+        // 회전 refresh 토큰이 있으면 홈 진입 뒤 백그라운드에서 최신 토큰으로 교체한다.
+        if (restored?.refreshToken) {
+          void authApi.refresh(restored.refreshToken).then(async (refreshed) => {
+            if (!active || !refreshed) return;
+            setTokens(refreshed);
+            try {
+              await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(refreshed));
+            } catch {
+              // 메모리 세션은 유지하고 다음 앱 시작 때 다시 갱신한다.
+            }
+          });
+        }
       } catch {
         // 저장소 접근 실패 시 비로그인으로 취급
       } finally {
-        setIsReady(true);
+        if (active) setIsReady(true);
       }
     })();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const signIn = useCallback(async (next: AuthTokens) => {
     // 보호 라우트가 홈 진입을 비로그인으로 오인하지 않도록 메모리 세션을 먼저 갱신한다.
     setTokens(next);
+    setIsGuest(false);
 
     try {
-      await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(next));
+      await Promise.all([
+        SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(next)),
       // 게스트로 둘러보다 로그인하면 게스트 상태는 끝난다.
-      await SecureStore.deleteItemAsync(GUEST_KEY);
-      setIsGuest(false);
+        SecureStore.deleteItemAsync(GUEST_KEY),
+      ]);
     } catch (error) {
       // 저장 실패 시 메모리 상태도 원래대로 되돌려 세션 상태가 엇갈리지 않게 한다.
       setTokens(null);
@@ -85,8 +113,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const continueAsGuest = useCallback(async () => {
-    await SecureStore.setItemAsync(GUEST_KEY, '1');
     setIsGuest(true);
+    await SecureStore.setItemAsync(GUEST_KEY, '1');
   }, []);
 
   const signOut = useCallback(async () => {

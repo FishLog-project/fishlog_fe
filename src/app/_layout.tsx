@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { FontAssets } from '@/constants/theme';
 import { AuthProvider, useAuth } from '@/features/auth';
+import '@/lib/assets/preload';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -17,7 +18,7 @@ SplashScreen.preventAutoHideAsync();
  * 그 규칙이 있으면 저장된 토큰 때문에 진입 화면이 로그인에서 홈으로 튕긴다.
  * 홈 진입은 로그인/가입 완료에서 명시적으로 이동시킨다.
  */
-function useProtectedRoute(canEnterApp: boolean, isReady: boolean) {
+function useProtectedRoute(token: string | null, canEnterApp: boolean, isReady: boolean) {
   const segments = useSegments();
   const router = useRouter();
 
@@ -27,14 +28,20 @@ function useProtectedRoute(canEnterApp: boolean, isReady: boolean) {
 
     if (!canEnterApp && inTabsGroup) {
       router.replace('/auth/login');
+      return;
     }
-  }, [canEnterApp, isReady, segments, router]);
+
+    const onLogin = segments[0] === 'auth' && segments[1] === 'login';
+    if (token && onLogin) {
+      router.replace('/(tabs)/home');
+    }
+  }, [token, canEnterApp, isReady, segments, router]);
 }
 
 function RootNavigator() {
   // 게스트도 앱 본문은 볼 수 있어야 하므로 토큰 유무가 아니라 canEnterApp으로 막는다.
-  const { canEnterApp, isReady } = useAuth();
-  useProtectedRoute(canEnterApp, isReady);
+  const { token, canEnterApp, isReady } = useAuth();
+  useProtectedRoute(token, canEnterApp, isReady);
 
   // 폰트 로드 실패는 앱을 막지 않는다. 시스템 폰트로 폴백되더라도 화면은 떠야 한다.
   const [fontsLoaded, fontError] = useFonts(FontAssets);
