@@ -72,11 +72,6 @@ export default function TabsLayout() {
           paddingBottom: insets.bottom,
           borderTopWidth: 0,
           backgroundColor: Brand.background,
-          elevation: 8,
-          shadowColor: '#000',
-          shadowOpacity: 0.06,
-          shadowRadius: 8,
-          shadowOffset: { width: 0, height: -2 },
         },
         // 버튼 하나의 터치 영역
         tabBarItemStyle: {
