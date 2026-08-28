@@ -1,8 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
 
-import { FormError } from '@/components/common';
+import { FormField } from '@/components/common';
 import {
   authApi,
   StepScreen,
@@ -44,7 +43,7 @@ export default function PasswordEmailScreen() {
       nextDisabled={!valid}
       loading={sending}
       onNext={handleNext}>
-      <View style={styles.inputWithError}>
+      <FormField error={error}>
         <UnderlineInput
           value={email}
           onChangeText={(v) => {
@@ -60,12 +59,7 @@ export default function PasswordEmailScreen() {
           returnKeyType="next"
           onSubmitEditing={() => valid && handleNext()}
         />
-        <FormError message={error} />
-      </View>
+      </FormField>
     </StepScreen>
   );
 }
-
-const styles = StyleSheet.create({
-  inputWithError: { gap: 12 },
-});

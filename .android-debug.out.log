@@ -500,3 +500,146 @@ Using src/app as the root directory for Expo Router.
 React Compiler enabled
 Starting Metro Bundler
 
+Waiting on http://localhost:8081
+› Installing C:\Users\winne\Desktop\daeun\fishlog\fishlog_fe\android\app\build\outputs\apk\debug\app-debug.apk
+› Opening fishlogfe://expo-development-client/?url=http%3A%2F%2F172.20.10.3%3A8081 on SM_A165N
+
+› Logs for your project will appear below.
+Android Bundled 16240ms node_modules\expo-router\entry.js (1915 modules)
+Android Bundled 62ms src\features\profile\api.ts (1 module)
+ WARN  [Layout children]: Too many screens defined. Route "profile" is extraneous.
+ ERROR  [Error: [Refresh] Expected to find the updated module.] 
+
+Code: require.js
+[0m [90m 378 |[39m             [36mconst[39m updatedMod [33m=[39m modules[33m.[39m[36mget[39m(updatedID)[33m;[39m
+ [90m 379 |[39m             [36mif[39m (updatedMod [33m==[39m [36mnull[39m) {
+[31m[1m>[22m[39m[90m 380 |[39m                 [36mthrow[39m [36mnew[39m [33mError[39m([32m'[Refresh] Expected to find the updated module.'[39m)[33m;[39m
+ [90m     |[39m                                [31m[1m^[22m[39m
+ [90m 381 |[39m             }
+ [90m 382 |[39m             [36mconst[39m prevExports [33m=[39m updatedMod[33m.[39mpublicModule[33m.[39mexports[33m;[39m
+ [90m 383 |[39m             [36mconst[39m didError [33m=[39m runUpdatedModule(updatedID[33m,[39m updatedID [33m===[39m id [33m?[39m factory [33m:[39m undefined[33m,[39m updatedID [33m===[39m id [33m?[39m dependencyMap [33m:[39m undefined)[33m;[39m[0m
+Call Stack
+  metroHotUpdateModule (node_modules\expo\node_modules\@expo\cli\build\metro-require\require.js:380:32)
+  define (node_modules\expo\node_modules\@expo\cli\build\metro-require\require.js:28:32)
+  eval (http:\localhost:8081\src\features\profile\api.bundle)
+  inject (node_modules\metro-runtime\src\modules\HMRClient.js:9:9)
+  forEach (<native>)
+  injectUpdate (node_modules\metro-runtime\src\modules\HMRClient.js:13:23)
+  on$argument_1 (node_modules\metro-runtime\src\modules\HMRClient.js:68:21)
+  call (<native>)
+  emit (node_modules\metro-runtime\src\modules\vendor\eventemitter3.js:104:31)
+  _ws.onmessage (node_modules\metro-runtime\src\modules\HMRClient.js:51:20)
+  invoke (node_modules\react-native\src\private\webapis\dom\events\EventTarget.js:424:29)
+  dispatch (node_modules\react-native\src\private\webapis\dom\events\EventTarget.js:310:11)
+  dispatchEvent (node_modules\react-native\src\private\webapis\dom\events\EventTarget.js:209:13)
+  _eventEmitter.addListener$argument_1 (node_modules\react-native\Libraries\WebSocket\WebSocket.js:248:27)
+  apply (<native>)
+  emit (node_modules\react-native\Libraries\vendor\emitter\EventEmitter.js:137:36)
+  apply (<native>)
+  RCTDeviceEventEmitterImpl#emit (node_modules\react-native\Libraries\EventEmitter\RCTDeviceEventEmitter.js:34:17)
+ ERROR  [Error: Requiring unknown module "1920". If you are sure the module exists, try restarting Metro. You may also want to run `yarn` or `npm install`.] 
+
+Code: index.tsx
+[0m [90m  5 |[39m [36mimport[39m { [33mAppDialog[39m[33m,[39m [33mScreen[39m[33m,[39m [33mScreenHeader[39m[33m,[39m [33mSettingsListItem[39m } [36mfrom[39m [32m'@/components/common'[39m[33m;[39m
+ [90m  6 |[39m [36mimport[39m { [33mBrand[39m[33m,[39m [33mComponents[39m[33m,[39m [33mLayout[39m[33m,[39m [33mTypography[39m } [36mfrom[39m [32m'@/constants/theme'[39m[33m;[39m
+[31m[1m>[22m[39m[90m  7 |[39m [36mimport[39m { accountApi } [36mfrom[39m [32m'@/features/account'[39m[33m;[39m
+ [90m    |[39m [31m[1m^[22m[39m
+ [90m  8 |[39m [36mimport[39m { useAuth } [36mfrom[39m [32m'@/features/auth'[39m[33m;[39m
+ [90m  9 |[39m [36mimport[39m {
+ [90m 10 |[39m   profileApi[33m,[39m[0m
+Call Stack
+  <global> (src\app\(tabs)\profile\index.tsx:7)
+ ERROR  [Error: Requiring unknown module "1922". If you are sure the module exists, try restarting Metro. You may also want to run `yarn` or `npm install`.] 
+
+Code: index.ts
+[0m [90m 1 |[39m [36mexport[39m [33m*[39m [36mas[39m profileApi [36mfrom[39m [32m'./api'[39m[33m;[39m
+[31m[1m>[22m[39m[90m 2 |[39m [36mexport[39m { [33mProfileHeader[39m } [36mfrom[39m [32m'./components/profile-header'[39m[33m;[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 3 |[39m [36mexport[39m { [33mProfileQuickMenu[39m } [36mfrom[39m [32m'./components/profile-quick-menu'[39m[33m;[39m
+ [90m 4 |[39m [36mexport[39m { [33mWithdrawDialog[39m } [36mfrom[39m [32m'./components/withdraw-dialog'[39m[33m;[39m
+ [90m 5 |[39m [36mexport[39m { useProfileImageUpload } [36mfrom[39m [32m'./use-profile-image-upload'[39m[33m;[39m[0m
+Call Stack
+  <global> (src\features\profile\index.ts:2)
+  <global> (src\app\(tabs)\ranking\index.tsx:14)
+ ERROR  [Error: [Refresh] Expected to find the updated module.] 
+
+Code: require.js
+[0m [90m 378 |[39m             [36mconst[39m updatedMod [33m=[39m modules[33m.[39m[36mget[39m(updatedID)[33m;[39m
+ [90m 379 |[39m             [36mif[39m (updatedMod [33m==[39m [36mnull[39m) {
+[31m[1m>[22m[39m[90m 380 |[39m                 [36mthrow[39m [36mnew[39m [33mError[39m([32m'[Refresh] Expected to find the updated module.'[39m)[33m;[39m
+ [90m     |[39m                                [31m[1m^[22m[39m
+ [90m 381 |[39m             }
+ [90m 382 |[39m             [36mconst[39m prevExports [33m=[39m updatedMod[33m.[39mpublicModule[33m.[39mexports[33m;[39m
+ [90m 383 |[39m             [36mconst[39m didError [33m=[39m runUpdatedModule(updatedID[33m,[39m updatedID [33m===[39m id [33m?[39m factory [33m:[39m undefined[33m,[39m updatedID [33m===[39m id [33m?[39m dependencyMap [33m:[39m undefined)[33m;[39m[0m
+Call Stack
+  metroHotUpdateModule (node_modules\expo\node_modules\@expo\cli\build\metro-require\require.js:380:32)
+  define (node_modules\expo\node_modules\@expo\cli\build\metro-require\require.js:28:32)
+  eval (http:\localhost:8081\src\constants\components.bundle)
+  inject (node_modules\metro-runtime\src\modules\HMRClient.js:9:9)
+  forEach (<native>)
+  injectUpdate (node_modules\metro-runtime\src\modules\HMRClient.js:14:26)
+  on$argument_1 (node_modules\metro-runtime\src\modules\HMRClient.js:68:21)
+  call (<native>)
+  emit (node_modules\metro-runtime\src\modules\vendor\eventemitter3.js:104:31)
+  _ws.onmessage (node_modules\metro-runtime\src\modules\HMRClient.js:51:20)
+  invoke (node_modules\react-native\src\private\webapis\dom\events\EventTarget.js:424:29)
+  dispatch (node_modules\react-native\src\private\webapis\dom\events\EventTarget.js:310:11)
+  dispatchEvent (node_modules\react-native\src\private\webapis\dom\events\EventTarget.js:209:13)
+  _eventEmitter.addListener$argument_1 (node_modules\react-native\Libraries\WebSocket\WebSocket.js:248:27)
+  apply (<native>)
+  emit (node_modules\react-native\Libraries\vendor\emitter\EventEmitter.js:137:36)
+  apply (<native>)
+  RCTDeviceEventEmitterImpl#emit (node_modules\react-native\Libraries\EventEmitter\RCTDeviceEventEmitter.js:34:17)
+ ERROR  [Error: [Refresh] Expected to find the updated module.] 
+
+Code: require.js
+[0m [90m 378 |[39m             [36mconst[39m updatedMod [33m=[39m modules[33m.[39m[36mget[39m(updatedID)[33m;[39m
+ [90m 379 |[39m             [36mif[39m (updatedMod [33m==[39m [36mnull[39m) {
+[31m[1m>[22m[39m[90m 380 |[39m                 [36mthrow[39m [36mnew[39m [33mError[39m([32m'[Refresh] Expected to find the updated module.'[39m)[33m;[39m
+ [90m     |[39m                                [31m[1m^[22m[39m
+ [90m 381 |[39m             }
+ [90m 382 |[39m             [36mconst[39m prevExports [33m=[39m updatedMod[33m.[39mpublicModule[33m.[39mexports[33m;[39m
+ [90m 383 |[39m             [36mconst[39m didError [33m=[39m runUpdatedModule(updatedID[33m,[39m updatedID [33m===[39m id [33m?[39m factory [33m:[39m undefined[33m,[39m updatedID [33m===[39m id [33m?[39m dependencyMap [33m:[39m undefined)[33m;[39m[0m
+Call Stack
+  metroHotUpdateModule (node_modules\expo\node_modules\@expo\cli\build\metro-require\require.js:380:32)
+  define (node_modules\expo\node_modules\@expo\cli\build\metro-require\require.js:28:32)
+  eval (http:\localhost:8081\src\features\auth\api.bundle)
+  inject (node_modules\metro-runtime\src\modules\HMRClient.js:9:9)
+  forEach (<native>)
+  injectUpdate (node_modules\metro-runtime\src\modules\HMRClient.js:14:26)
+  on$argument_1 (node_modules\metro-runtime\src\modules\HMRClient.js:68:21)
+  call (<native>)
+  emit (node_modules\metro-runtime\src\modules\vendor\eventemitter3.js:104:31)
+  _ws.onmessage (node_modules\metro-runtime\src\modules\HMRClient.js:51:20)
+  invoke (node_modules\react-native\src\private\webapis\dom\events\EventTarget.js:424:29)
+  dispatch (node_modules\react-native\src\private\webapis\dom\events\EventTarget.js:310:11)
+  dispatchEvent (node_modules\react-native\src\private\webapis\dom\events\EventTarget.js:209:13)
+  _eventEmitter.addListener$argument_1 (node_modules\react-native\Libraries\WebSocket\WebSocket.js:248:27)
+  apply (<native>)
+  emit (node_modules\react-native\Libraries\vendor\emitter\EventEmitter.js:137:36)
+  apply (<native>)
+  RCTDeviceEventEmitterImpl#emit (node_modules\react-native\Libraries\EventEmitter\RCTDeviceEventEmitter.js:34:17)
+ ERROR  [Error: useAuth must be used within <AuthProvider>] 
+
+Code: api.ts
+[0m [90m 141 |[39m [36mexport[39m [36masync[39m [36mfunction[39m logout(token[33m:[39m string [33m|[39m [36mnull[39m)[33m:[39m [33mPromise[39m[33m<[39m[36mvoid[39m[33m>[39m {
+ [90m 142 |[39m   [36mtry[39m {
+[31m[1m>[22m[39m[90m 143 |[39m     [36mawait[39m apiRequest([32m'/api/auth/logout'[39m[33m,[39m { method[33m:[39m [32m'POST'[39m[33m,[39m token })[33m;[39m
+ [90m     |[39m                                                            [31m[1m^[22m[39m
+ [90m 144 |[39m   } [36mcatch[39m {
+ [90m 145 |[39m     [90m// 무시 — 로컬 세션 삭제는 호출부에서 어차피 수행한다[39m
+ [90m 146 |[39m   }[0m
+Call Stack
+  logout (src\features\auth\api.ts:143:60)
+  <global> (src\app\auth\_layout.tsx:9:2) 
+
+Code: login.tsx
+[0m [90m  7 |[39m [36mimport[39m { authApi[33m,[39m useAuth } [36mfrom[39m [32m'@/features/auth'[39m[33m;[39m
+ [90m  8 |[39m
+[31m[1m>[22m[39m[90m  9 |[39m [36mconst[39m [33mLOGIN[39m [33m=[39m [33mComponents[39m[33m.[39mauthLogin[33m;[39m
+ [90m    |[39m                          [31m[1m^[22m[39m
+ [90m 10 |[39m
+ [90m 11 |[39m [90m/**[39m
+ [90m 12 |[39m [90m * 로그인 화면 (Figma 634:2544).[39m[0m
+Call Stack
+  <global> (src\app\auth\login.tsx:9:26)

@@ -10,7 +10,8 @@ import {
   SegmentControl,
 } from '@/components/common';
 import { Components } from '@/constants/theme';
-import { authApi, useAuth } from '@/features/auth';
+import { useAuth } from '@/features/auth';
+import { profileApi } from '@/features/profile';
 import {
   formatMyRankMeta,
   formatRankValue,
@@ -43,7 +44,7 @@ const DEV_RANKINGS = Array.from({ length: 25 }, (_, index) => ({
 type Loaded = {
   key: string;
   ranking: Ranking | null;
-  profile: authApi.MyProfile | null;
+  profile: profileApi.MyProfile | null;
   error: string | null;
 };
 
@@ -71,7 +72,7 @@ export default function RankingScreen() {
     let alive = true;
     Promise.all([
       rankingApi.getRanking(metric, token),
-      token ? authApi.getMyProfile(token) : Promise.resolve(null),
+      token ? profileApi.getMyProfile(token) : Promise.resolve(null),
     ]).then(([res, profile]) => {
       if (!alive) return;
       setLoaded(

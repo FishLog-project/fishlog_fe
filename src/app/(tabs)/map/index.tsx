@@ -3,7 +3,9 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Screen, ScreenHeader, SearchBar } from '@/components/common';
-import { Brand, Typography } from '@/constants/theme';
+import { Brand, Components, Layout, Typography } from '@/constants/theme';
+
+const MAP = Components.map;
 
 const MAP_ACTIONS = [
   { icon: require('@/assets/images/map/grid.svg'), label: '격자로 보기' },
@@ -102,10 +104,10 @@ function MapMarker({ name, left, top }: (typeof SPOTS)[number]) {
 
 const styles = StyleSheet.create({
   searchArea: {
-    height: 60,
+    height: MAP.searchHeight,
     justifyContent: 'flex-start',
-    paddingHorizontal: 20,
-    paddingTop: 4,
+    paddingHorizontal: Layout.screenPadding,
+    paddingTop: MAP.searchTop,
     backgroundColor: Brand.background,
   },
   mapCanvas: {
@@ -125,16 +127,16 @@ const styles = StyleSheet.create({
   },
   actionColumn: {
     position: 'absolute',
-    top: 20,
-    left: 20,
-    gap: 16,
+    top: MAP.overlayInset,
+    left: MAP.overlayInset,
+    gap: MAP.actionGap,
   },
   actionButton: {
-    width: 40,
-    height: 40,
+    width: MAP.actionSize,
+    height: MAP.actionSize,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 20,
+    borderRadius: MAP.actionSize / 2,
     backgroundColor: Brand.background,
     shadowColor: '#004E7C',
     shadowOffset: { width: 1, height: 3 },
@@ -142,17 +144,17 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
-  actionIcon: { width: 24, height: 24 },
+  actionIcon: { width: MAP.actionIconSize, height: MAP.actionIconSize },
   pressed: { opacity: 0.72 },
   locationButton: {
     position: 'absolute',
-    right: 20,
-    bottom: 20,
-    width: 40,
-    height: 40,
+    right: MAP.overlayInset,
+    bottom: MAP.overlayInset,
+    width: MAP.actionSize,
+    height: MAP.actionSize,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 20,
+    borderRadius: MAP.actionSize / 2,
     backgroundColor: Brand.background,
     shadowColor: '#004E7C',
     shadowOffset: { width: 1, height: 3 },
@@ -167,7 +169,7 @@ const styles = StyleSheet.create({
   },
   markerLabel: {
     ...Typography.badge,
-    marginBottom: 2,
+    marginBottom: MAP.markerLabelGap,
     color: Brand.textStrong,
     fontSize: 12,
     lineHeight: 20,

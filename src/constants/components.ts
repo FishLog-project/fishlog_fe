@@ -305,6 +305,27 @@ export const Components = {
       nameGap: 12,
     },
   },
+  /** 홈 화면에서 반복되는 섹션 배치 값 */
+  home: {
+    heroHeight: 168,
+    heroRadius: 16,
+    heroPadding: 24,
+    labelGap: 2,
+    blockGap: 20,
+    cardGap: 12,
+    sectionTitleGap: 6,
+    sectionBottom: 12,
+  },
+  /** 실제 지도 SDK 연결 전후에 공통으로 유지되는 지도 오버레이 배치 값 */
+  map: {
+    searchHeight: 60,
+    searchTop: 4,
+    overlayInset: 20,
+    actionGap: 16,
+    actionSize: 40,
+    actionIconSize: 24,
+    markerLabelGap: 2,
+  },
   /** 로딩·빈 화면·오류를 표시하는 ScreenState 카드 */
   state: {
     surface: Palette.font.white,

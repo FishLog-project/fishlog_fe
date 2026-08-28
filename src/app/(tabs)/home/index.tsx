@@ -160,21 +160,22 @@ function RankPin({ rank }: { rank: number }) {
 const CARD = Components.statCard;
 const BAR = Components.progress;
 const ROW = Components.spotRow;
+const HOME = Components.home;
 
 const styles = StyleSheet.create({
   // 히어로 — 배경 이미지 위에 문구만 얹는다
   hero: {
-    height: 168,
-    borderRadius: 16,
+    height: HOME.heroHeight,
+    borderRadius: HOME.heroRadius,
     overflow: 'hidden',
-    paddingLeft: 24,
-    paddingTop: 24,
+    paddingLeft: HOME.heroPadding,
+    paddingTop: HOME.heroPadding,
   },
   heroLabel: { ...Typography.heroLabel, color: Brand.onPrimary },
-  heroTitle: { ...Typography.heroTitle, color: Brand.onPrimary, marginTop: 2 },
+  heroTitle: { ...Typography.heroTitle, color: Brand.onPrimary, marginTop: HOME.labelGap },
 
   // 통계 카드
-  statRow: { flexDirection: 'row', gap: 12, marginTop: 20 },
+  statRow: { flexDirection: 'row', gap: HOME.cardGap, marginTop: HOME.blockGap },
   statCard: {
     flex: 1,
     height: CARD.height,
@@ -212,9 +213,9 @@ const styles = StyleSheet.create({
   sectionHead: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginTop: 20,
-    marginBottom: 12,
+    gap: HOME.sectionTitleGap,
+    marginTop: HOME.blockGap,
+    marginBottom: HOME.sectionBottom,
   },
   sectionTitle: { ...Typography.sectionTitle, color: Brand.textHeading },
   sectionIcon: { width: 20, height: 20 },

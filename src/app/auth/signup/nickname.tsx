@@ -1,8 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
 
-import { FormError } from '@/components/common';
+import { FormField } from '@/components/common';
 import { StepScreen, UnderlineInput, useSignup } from '@/features/auth';
 
 /** 서버가 요구하는 닉네임 길이 (Swagger SignupRequest: 2~10자, 유니크) */
@@ -40,7 +39,7 @@ export default function SignupNicknameScreen() {
       heading={'거의 다 왔어요!\n사용할 닉네임을 입력해 주세요'}
       nextDisabled={!valid}
       onNext={goNext}>
-      <View style={styles.inputWithError}>
+      <FormField error={message}>
         <UnderlineInput
           value={nickname}
           onChangeText={setNickname}
@@ -54,10 +53,7 @@ export default function SignupNicknameScreen() {
           onSubmitEditing={goNext}
           accessibilityLabel="닉네임"
         />
-        <FormError message={message} />
-      </View>
+      </FormField>
     </StepScreen>
   );
 }
-
-const styles = StyleSheet.create({ inputWithError: { gap: 12 } });

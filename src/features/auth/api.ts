@@ -7,7 +7,6 @@
  */
 import { apiRequest } from '@/lib/api/client';
 import { type Fail, type Ok, toFail } from '@/lib/api/result';
-import { File } from 'expo-file-system';
 
 export type { Fail, Ok } from '@/lib/api/result';
 
@@ -208,66 +207,10 @@ export async function resetPassword(
 // 내 계정 (로그인 후)
 // ─────────────────────────────────────────────────────────────
 
-export type MyProfile = {
-  userId: number;
-  email: string;
-  nickname: string;
-  profileImageUrl: string | null;
-};
 
 /** 내 프로필 조회. GET /api/users/me */
-export async function getMyProfile(token: string | null): Promise<MyProfile | null> {
-  try {
-    return await apiRequest<MyProfile>('/api/users/me', { token });
-  } catch {
-    return null;
-  }
-}
-
-export type ProfileImageFile = {
-  uri: string;
-  name: string;
-  mimeType: string;
-};
-
-export type UploadProfileImageResult =
-  | (Ok & { profileImageUrl: string })
-  | Fail<'invalid_file'>;
 
 /** 프로필 이미지 업로드/변경. POST /api/users/me/profile-image (최대 5MB 이미지) */
-export async function uploadProfileImage(
-  token: string | null,
-  file: ProfileImageFile,
-): Promise<UploadProfileImageResult> {
-  const imageFile = new File(file.uri);
-  const form = new FormData();
-  form.append('image', imageFile, file.name);
-
-  try {
-    const data = await apiRequest<{ profileImageUrl?: unknown }>(
-      '/api/users/me/profile-image',
-      { method: 'POST', token, body: form },
-    );
-    if (typeof data?.profileImageUrl !== 'string') {
-      return {
-        ok: false,
-        reason: 'invalid_file',
-        message: '업로드된 이미지 주소를 확인하지 못했어요.',
-      };
-    }
-    return { ok: true, profileImageUrl: data.profileImageUrl };
-  } catch (e) {
-    console.error('[profile-image] upload failed', {
-      error: e,
-      uri: file.uri,
-      name: file.name,
-      mimeType: file.mimeType,
-    });
-    return toFail<'invalid_file'>(e);
-  }
-}
-
-export type ChangePasswordResult = Ok | Fail<'wrong_password'>;
 
 /**
  * 비밀번호 변경. PATCH /api/users/me/password
@@ -275,42 +218,5 @@ export type ChangePasswordResult = Ok | Fail<'wrong_password'>;
  * 새 비밀번호 형식(영문+숫자 8자 이상)은 호출 전에 앱이 이미 검사한다.
  * 그래서 여기 400은 사실상 "현재 비밀번호가 틀렸다"는 뜻이다.
  */
-export async function changePassword(
-  token: string | null,
-  currentPassword: string,
-  newPassword: string,
-): Promise<ChangePasswordResult> {
-  try {
-    await apiRequest('/api/users/me/password', {
-      method: 'PATCH',
-      token,
-      body: { currentPassword, newPassword },
-    });
-    return { ok: true };
-  } catch (e) {
-    return toFail(e, {
-      400: { reason: 'wrong_password', message: '현재 비밀번호가 올바르지 않아요.' },
-    });
-  }
-}
-
-export type WithdrawResult = Ok | Fail<'wrong_password'>;
 
 /** 회원탈퇴. DELETE /api/users/me */
-export async function withdraw(
-  token: string | null,
-  password: string,
-): Promise<WithdrawResult> {
-  try {
-    await apiRequest('/api/users/me', {
-      method: 'DELETE',
-      token,
-      body: { password },
-    });
-    return { ok: true };
-  } catch (e) {
-    return toFail(e, {
-      400: { reason: 'wrong_password', message: '비밀번호가 올바르지 않아요.' },
-    });
-  }
-}

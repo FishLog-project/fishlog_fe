@@ -1,8 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
 
-import { FormError } from '@/components/common';
+import { FormField } from '@/components/common';
 import { checkPassword, PasswordFields, StepScreen, useSignup } from '@/features/auth';
 
 /**
@@ -24,7 +23,7 @@ export default function SignupPasswordScreen() {
       nextDisabled={!valid}
       compactWhenKeyboard
       onNext={goNext}>
-      <View style={styles.fieldsWithError}>
+      <FormField error={message}>
         <PasswordFields
           password={password}
           onPasswordChange={setPassword}
@@ -33,12 +32,7 @@ export default function SignupPasswordScreen() {
           onSubmit={goNext}
           autoFocus
         />
-        <FormError message={message} />
-      </View>
+      </FormField>
     </StepScreen>
   );
 }
-
-const styles = StyleSheet.create({
-  fieldsWithError: { gap: 12 },
-});

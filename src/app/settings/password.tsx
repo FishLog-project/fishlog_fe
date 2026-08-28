@@ -2,10 +2,10 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { AppDialog, FormError } from '@/components/common';
+import { AppDialog, FormField } from '@/components/common';
 import { Components } from '@/constants/theme';
+import { accountApi } from '@/features/account';
 import {
-  authApi,
   checkPassword,
   PasswordFields,
   StepScreen,
@@ -38,7 +38,7 @@ export default function ChangePasswordScreen() {
     setSubmitting(true);
     setError(null);
 
-    const res = await authApi.changePassword(token, current, password);
+    const res = await accountApi.changePassword(token, current, password);
     setSubmitting(false);
     if (!res.ok) {
       setError(res.message);
@@ -62,7 +62,7 @@ export default function ChangePasswordScreen() {
         loading={submitting}
         compactWhenKeyboard
         onNext={handleSubmit}>
-        <View style={styles.fieldsWithError}>
+        <FormField error={error ?? message}>
           <View style={styles.fields}>
             <UnderlineInput
               value={current}
@@ -97,8 +97,7 @@ export default function ChangePasswordScreen() {
               onSubmit={handleSubmit}
             />
           </View>
-          <FormError message={error ?? message} />
-        </View>
+        </FormField>
       </StepScreen>
 
       <AppDialog
@@ -117,5 +116,4 @@ export default function ChangePasswordScreen() {
 const styles = StyleSheet.create({
   /** 현재 비밀번호 ~ 새 비밀번호 묶음 간격은 부모가 gap으로 준다 */
   fields: { gap: Components.authStep.fieldGap },
-  fieldsWithError: { gap: 12 },
 });

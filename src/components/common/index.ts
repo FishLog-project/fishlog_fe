@@ -4,6 +4,7 @@ export { PrimaryButton } from './primary-button';
 export { TextField } from './text-field';
 export { ReadonlyField } from './readonly-field';
 export { FormError } from './form-error';
+export { FormField } from './form-field';
 export { SettingsListItem } from './settings-list-item';
 export { SearchBar } from './search-bar';
 export { FilterChip } from './filter-chip';

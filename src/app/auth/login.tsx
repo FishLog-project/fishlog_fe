@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { FormError, PrimaryButton, Screen, TextField } from '@/components/common';
+import { FormField, PrimaryButton, Screen, TextField } from '@/components/common';
 import { Brand, Components, Typography } from '@/constants/theme';
 import { authApi, useAuth } from '@/features/auth';
 
@@ -72,7 +72,7 @@ export default function LoginScreen() {
         </Text>
 
         <View style={styles.form}>
-          <View style={styles.fieldsWithError}>
+          <FormField error={error} gap={LOGIN.errorGap}>
             <View style={styles.fields}>
               <TextField
                 value={email}
@@ -99,8 +99,7 @@ export default function LoginScreen() {
                 onSubmitEditing={() => canSubmit && handleLogin()}
               />
             </View>
-            <FormError message={error} />
-          </View>
+          </FormField>
 
           <PrimaryButton
             label="다음"
@@ -131,7 +130,6 @@ const styles = StyleSheet.create({
   /** 입력 묶음 ~ 버튼 ~ 링크 */
   form: { gap: LOGIN.blockGap },
   fields: { gap: LOGIN.fieldGap },
-  fieldsWithError: { gap: LOGIN.errorGap },
   links: {
     flexDirection: 'row',
     alignItems: 'center',
