@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMemo } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -19,6 +20,7 @@ const HERO_FALLBACK = {
 } as const;
 
 export default function HomeScreen() {
+  const router = useRouter();
   // 렌더마다 새로 만들면 useSection 의존성이 흔들려 무한 재요청이 된다.
   // 빈/오류 화면을 확인하려면 인자를 'empty' | 'partial-error'로 바꾼다.
   const dataSource = useMemo(() => createFixtureFishLogDataSource(), []);
@@ -41,7 +43,10 @@ export default function HomeScreen() {
 
       {/* 통계 카드 2개 */}
       <View style={styles.statRow}>
-        <StatCard title="도감 진행도">
+        <StatCard
+          title="도감 진행도"
+          accessibilityLabel="도감 진행도, 도감 화면으로 이동"
+          onPress={() => router.push('/log')}>
           {collectionProgress.status === 'ready' ? (
             <>
               <View style={styles.progressNumWrap}>
@@ -77,7 +82,10 @@ export default function HomeScreen() {
           )}
         </StatCard>
 
-        <StatCard title="물고기 인증하기">
+        <StatCard
+          title="물고기 인증하기"
+          accessibilityLabel="물고기 인증하기, 낚시 인증 화면으로 이동"
+          onPress={() => router.push('/catch')}>
           <View style={styles.scanWrap}>
             <Image
               source={require('@/assets/images/home/scan-fish.svg')}
@@ -103,9 +111,10 @@ export default function HomeScreen() {
           {recommendedSpots.data.map((s) => (
             <Pressable
               key={s.id}
-              style={styles.spotRow}
+              style={({ pressed }) => [styles.spotRow, pressed && styles.pressed]}
               accessibilityRole="button"
-              accessibilityLabel={`${s.rank}위 ${s.name}, ${s.distance}, ${s.species}`}>
+              accessibilityLabel={`${s.rank}위 ${s.name}, ${s.distance}, ${s.species}. 지도에서 보기`}
+              onPress={() => router.push('/map')}>
               <RankPin rank={s.rank} />
               <View style={styles.spotText}>
                 <Text style={styles.spotName}>{s.name}</Text>
@@ -143,31 +152,41 @@ export default function HomeScreen() {
   );
 }
 
-/** 도감/인증 통계 카드 (헤더 + 화살표 + 내용) */
+/** 도감/인증 통계 카드 (헤더 + 화살표 + 내용). 카드 전체가 이동 버튼이다 */
 function StatCard({
   title,
+  accessibilityLabel,
+  onPress,
   children,
 }: {
   title: string;
+  accessibilityLabel: string;
+  onPress: () => void;
   children: React.ReactNode;
 }) {
   return (
-    <LinearGradient
-      colors={[...Brand.cardSurface]}
-      // Figma는 151.27deg. 아래로 내려가면서 살짝 오른쪽으로 기운다.
-      start={{ x: 0, y: 0 }}
-      end={{ x: 0.5, y: 1 }}
-      style={styles.statCard}>
-      <View style={styles.statHead}>
-        <Text style={styles.statTitle}>{title}</Text>
-        <Image
-          source={require('@/assets/images/home/chevron-20.svg')}
-          style={styles.statChevron}
-          contentFit="contain"
-        />
-      </View>
-      {children}
-    </LinearGradient>
+    <Pressable
+      style={({ pressed }) => [styles.statCardPress, pressed && styles.pressed]}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      onPress={onPress}>
+      <LinearGradient
+        colors={[...Brand.cardSurface]}
+        // Figma는 151.27deg. 아래로 내려가면서 살짝 오른쪽으로 기운다.
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={styles.statCard}>
+        <View style={styles.statHead}>
+          <Text style={styles.statTitle}>{title}</Text>
+          <Image
+            source={require('@/assets/images/home/chevron-20.svg')}
+            style={styles.statChevron}
+            contentFit="contain"
+          />
+        </View>
+        {children}
+      </LinearGradient>
+    </Pressable>
   );
 }
 
@@ -214,6 +233,9 @@ const styles = StyleSheet.create({
 
   // 통계 카드
   statRow: { flexDirection: 'row', gap: 12, marginTop: 20 },
+  /** flex는 바깥 Pressable이 갖고, 그라데이션은 그 안을 채운다 */
+  statCardPress: { flex: 1 },
+  pressed: { opacity: 0.85 },
   statCard: {
     flex: 1,
     height: CARD.height,
