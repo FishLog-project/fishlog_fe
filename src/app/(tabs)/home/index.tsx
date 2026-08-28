@@ -6,9 +6,12 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { Screen, ScreenHeader, ScreenState } from '@/components/common';
 import { Brand, Components, Typography } from '@/constants/theme';
 import { createFixtureFishLogDataSource } from '@/features/home/home-data';
+import { HeroCarousel } from '@/features/home/components/hero-carousel';
 import { useHomeViewModel } from '@/features/home/use-home-view-model';
 
-/** 히어로 타이틀 자리에 상태별로 넣는 대체 문구 */
+const HERO_LABEL = '오늘의 추천 어종';
+
+/** 슬라이드를 못 받았을 때 히어로 자리에 넣는 대체 문구 */
 const HERO_FALLBACK = {
   loading: '오늘의 바다를 읽는 중…',
   empty: '오늘은 추천 어종이 없어요',
@@ -23,31 +26,18 @@ export default function HomeScreen() {
     useHomeViewModel(dataSource);
   const { featuredSpecies, collectionProgress, recommendedSpots } = viewModel;
 
-  const heroTitle =
-    featuredSpecies.status === 'ready'
-      ? featuredSpecies.data.title
-      : HERO_FALLBACK[featuredSpecies.status];
-
   return (
     <Screen scroll header={<ScreenHeader title="Fishlog" variant="brand" />}>
-      {/*
-        히어로 카드.
-        배경은 SVG가 아니라 3배 PNG를 쓴다. 원본이 feGaussianBlur(stdDeviation 32.75)로
-        glow 타원 두 개를 흐리게 깔아 두는데, expo-image의 SVG 렌더러는 filter를
-        지원하지 않아 민트색 덩어리가 그대로 찍힌다. Figma가 렌더한 래스터를 쓰면 블러가 살아난다.
-
-        ⚠️ 하단 페이지 인디케이터(점 5개)도 이 이미지에 함께 구워져 있다.
-           캐러셀을 붙일 때는 인디케이터가 빠진 배경 에셋을 새로 받아야 한다.
-      */}
-      <View style={styles.hero}>
-        <Image
-          source={require('@/assets/images/home/hero-card.png')}
-          style={StyleSheet.absoluteFill}
-          contentFit="fill"
-        />
-        <Text style={styles.heroLabel}>오늘의 추천 어종</Text>
-        <Text style={styles.heroTitle}>{heroTitle}</Text>
-      </View>
+      {featuredSpecies.status === 'ready' ? (
+        <HeroCarousel slides={featuredSpecies.data} label={HERO_LABEL} />
+      ) : (
+        <View style={styles.heroFallback}>
+          <Text style={styles.heroFallbackLabel}>{HERO_LABEL}</Text>
+          <Text style={styles.heroFallbackTitle}>
+            {HERO_FALLBACK[featuredSpecies.status]}
+          </Text>
+        </View>
+      )}
 
       {/* 통계 카드 2개 */}
       <View style={styles.statRow}>
@@ -207,16 +197,20 @@ const BAR = Components.progress;
 const ROW = Components.spotRow;
 
 const styles = StyleSheet.create({
-  // 히어로 — 배경 이미지 위에 문구만 얹는다
-  hero: {
+  /** 슬라이드가 없을 때의 히어로 자리 (캐러셀과 같은 크기·여백) */
+  heroFallback: {
     height: 168,
     borderRadius: 16,
-    overflow: 'hidden',
     paddingLeft: 24,
     paddingTop: 24,
+    backgroundColor: Brand.primary,
   },
-  heroLabel: { ...Typography.heroLabel, color: Brand.onPrimary },
-  heroTitle: { ...Typography.heroTitle, color: Brand.onPrimary, marginTop: 2 },
+  heroFallbackLabel: { ...Typography.heroLabel, color: Brand.onPrimary },
+  heroFallbackTitle: {
+    ...Typography.heroTitle,
+    color: Brand.onPrimary,
+    marginTop: 2,
+  },
 
   // 통계 카드
   statRow: { flexDirection: 'row', gap: 12, marginTop: 20 },

@@ -14,7 +14,7 @@ export type HomeSectionState<T> =
   | { status: 'error' }
   | { status: 'ready'; data: T };
 
-export interface FeaturedSpeciesViewModel {
+export interface FeaturedSlideViewModel {
   speciesId: string;
   /** 히어로 타이틀 — "광어 잡기 좋은 날!" */
   title: string;
@@ -38,7 +38,7 @@ export interface RecommendedSpotViewModel {
 }
 
 export interface HomeViewModel {
-  featuredSpecies: HomeSectionState<FeaturedSpeciesViewModel>;
+  featuredSpecies: HomeSectionState<readonly FeaturedSlideViewModel[]>;
   collectionProgress: HomeSectionState<CollectionProgressViewModel>;
   recommendedSpots: HomeSectionState<readonly RecommendedSpotViewModel[]>;
 }
@@ -95,14 +95,11 @@ function loadFeaturedSpecies(dataSource: FishLogDataSource) {
 }
 
 function toFeaturedSpeciesViewModel(
-  species: FishSpecies | null,
-): FeaturedSpeciesViewModel | null {
-  if (!species) return null;
+  species: readonly FishSpecies[],
+): readonly FeaturedSlideViewModel[] | null {
+  if (species.length === 0) return null;
 
-  return {
-    speciesId: species.id,
-    title: species.seasonalHeadline,
-  };
+  return species.map((s) => ({ speciesId: s.id, title: s.seasonalHeadline }));
 }
 
 function loadCollectionProgress(dataSource: FishLogDataSource) {

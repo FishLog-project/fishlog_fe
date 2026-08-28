@@ -33,7 +33,8 @@ export interface CollectionProgress {
  * 정적 진입점이라 데이터 섹션이 아니다.
  */
 export interface FishLogDataSource {
-  getFeaturedSpecies(): Promise<FishSpecies | null>;
+  /** 히어로 캐러셀 슬라이드. 빈 배열이면 추천할 어종이 없는 상태 */
+  getFeaturedSpecies(): Promise<readonly FishSpecies[]>;
   getCollectionProgress(): Promise<CollectionProgress>;
   getRecommendedSpots(limit: number): Promise<readonly FishingSpot[]>;
 }
@@ -46,11 +47,14 @@ export interface FishLogDataSource {
  */
 export type HomeFixtureScenario = 'ready' | 'empty' | 'partial-error';
 
-const featuredSpecies: FishSpecies = {
-  id: 'species-flatfish',
-  name: '광어',
-  seasonalHeadline: '광어 잡기 좋은 날!',
-};
+/** 디자인의 인디케이터가 점 5개라 슬라이드도 5장으로 맞춘다 */
+const featuredSpecies: readonly FishSpecies[] = [
+  { id: 'species-flatfish', name: '광어', seasonalHeadline: '광어 잡기 좋은 날!' },
+  { id: 'species-rockfish', name: '우럭', seasonalHeadline: '우럭이 잘 무는 시기예요' },
+  { id: 'species-seabream', name: '참돔', seasonalHeadline: '참돔 손맛 보기 좋은 날!' },
+  { id: 'species-hairtail', name: '갈치', seasonalHeadline: '갈치는 지금이 제철이에요' },
+  { id: 'species-mackerel', name: '고등어', seasonalHeadline: '고등어 떼가 몰려왔어요' },
+];
 
 const recommendedSpots: readonly FishingSpot[] = [
   {
@@ -95,7 +99,7 @@ export function createFixtureFishLogDataSource(
 
   return {
     getFeaturedSpecies() {
-      return resolveAfter(scenario === 'empty' ? null : featuredSpecies);
+      return resolveAfter(scenario === 'empty' ? [] : featuredSpecies);
     },
     getCollectionProgress() {
       // Figma 홈의 "34/150종"
