@@ -18,7 +18,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.fishlog_fe"
+      "package": "xyz.fishlog.app"
     },
     "web": {
       "output": "static",

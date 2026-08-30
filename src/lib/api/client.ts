@@ -11,7 +11,7 @@
  * 여기서 봉투를 벗겨 `data`만 돌려준다. 호출부가 매번 `.data`를 파고들지 않게 하기 위함이다.
  */
 
-import { fetch } from 'expo/fetch';
+import { fetch as expoFetch } from 'expo/fetch';
 
 export const API_BASE_URL = 'https://api.fishlog.xyz';
 
@@ -52,7 +52,10 @@ export async function apiRequest<T = unknown>(
   if (body !== undefined && !multipart) headers['Content-Type'] = 'application/json';
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(`${API_BASE_URL}${path}`, {
+  // expo/fetch는 Expo File을 multipart로 전송할 때만 사용한다.
+  // 일반 JSON 요청은 기존 전역 fetch를 유지해 AbortSignal 동작 범위를 바꾸지 않는다.
+  const request = multipart ? expoFetch : globalThis.fetch;
+  const res = await request(`${API_BASE_URL}${path}`, {
     method,
     headers,
     body: body !== undefined ? (multipart ? body : JSON.stringify(body)) : undefined,

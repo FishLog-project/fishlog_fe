@@ -73,7 +73,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // 회전 refresh 토큰이 있으면 홈 진입 뒤 백그라운드에서 최신 토큰으로 교체한다.
         if (restored?.refreshToken) {
           void authApi.refresh(restored.refreshToken).then(async (refreshed) => {
-            if (!active || !refreshed) return;
+            if (!active) return;
+            if (!refreshed) {
+              // refresh 토큰까지 만료되면 낡은 access 토큰을 유지하지 않는다.
+              // 서버 로그아웃은 이미 만료된 토큰으로 실패할 수 있으므로 로컬 세션을 직접 정리한다.
+              setTokens(null);
+              setIsGuest(false);
+              await clearStoredSession();
+              return;
+            }
             setTokens(refreshed);
             try {
               await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(refreshed));
@@ -161,6 +169,13 @@ function parseStoredTokens(stored: string | null): AuthTokens | null {
     // JSON이 아니면 아래로 흘려보낸다
   }
   return null;
+}
+
+async function clearStoredSession() {
+  await Promise.allSettled([
+    SecureStore.deleteItemAsync(SESSION_KEY),
+    SecureStore.deleteItemAsync(GUEST_KEY),
+  ]);
 }
 
 export function useAuth() {

@@ -50,12 +50,7 @@ export async function uploadProfileImage(
     }
     return { ok: true, profileImageUrl: data.profileImageUrl };
   } catch (error) {
-    console.error('[profile-image] upload failed', {
-      error,
-      uri: file.uri,
-      name: file.name,
-      mimeType: file.mimeType,
-    });
+    if (__DEV__) console.error('[profile-image] upload failed', error);
     return toFail<'invalid_file'>(error);
   }
 }
