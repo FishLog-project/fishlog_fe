@@ -13,6 +13,10 @@ export interface DexSpecies {
   habitat: string;
   /** 아직 못 잡은 어종. 화면에서 잠금 카드로 그린다 */
   collected: boolean;
+  /** 상세 카드 설명문 */
+  description: string;
+  /** 내가 이 어종을 잡은 횟수. 미획득이면 0 */
+  catchCount: number;
 }
 
 /**
@@ -85,12 +89,21 @@ const SPECIES: readonly (readonly [string, string])[] = [
 /** Figma의 "13/50종" */
 const COLLECTED_COUNT = 13;
 
-const species: readonly DexSpecies[] = SPECIES.map(([name, habitat], index) => ({
-  id: `species-${index + 1}`,
-  name,
-  habitat,
-  collected: index < COLLECTED_COUNT,
-}));
+const species: readonly DexSpecies[] = SPECIES.map(([name, habitat], index) => {
+  const collected = index < COLLECTED_COUNT;
+
+  return {
+    id: `species-${index + 1}`,
+    name,
+    habitat,
+    collected,
+    // 어종별 실제 설명문은 서버(GET /api/fish/{id})가 준다.
+    // fixture는 없는 사실을 지어내지 않도록 이름·서식지만 조합한다.
+    description: `${name}는 주로 ${habitat}에서 볼 수 있는 어종이에요. 자세한 설명은 준비 중이에요.`,
+    // 잡은 횟수도 서버 값이다. 화면에서 1회/여러 회가 다 보이도록 흩어 둔다.
+    catchCount: collected ? (index % 4) + 1 : 0,
+  };
+});
 
 /** 실제 네트워크처럼 로딩 상태가 잠깐 보이도록 지연을 준다 */
 const FIXTURE_DELAY_MS = 250;

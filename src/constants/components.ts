@@ -372,6 +372,33 @@ export const Components = {
 
     columnGap: 12,
     rowGap: 16,
+
+    /** 어종 상세 카드 (Figma 106:454 — 240x340 기준을 화면 폭에 맞춰 키운다) */
+    detail: {
+      maxWidth: 300,
+      radius: 20,
+      padding: 16,
+      /** 그림 칸 가로:세로 (Figma 208x120) */
+      tileRatio: 208 / 120,
+      tileRadius: 8,
+      tileBorderWidth: 2,
+      tileBorder: Derived.dexDetailTileBorder,
+      /** 칩 */
+      chipHeight: 24,
+      chipRadius: 22,
+      habitatChip: Derived.dexHabitatChip,
+      catchChip: Derived.dexCatchChip,
+      chipText: Palette.bluegray[400],
+      /** 인증샷 4칸 */
+      photoCount: 4,
+      photoGap: 8,
+      photoRadius: 4,
+      photoBg: Derived.neutral,
+      /** 카드를 띄우는 발광 + 뒤를 덮는 막 */
+      glow: Derived.dexDetailGlow,
+      glowOuter: Derived.dexDetailGlowOuter,
+      scrim: Derived.scrim,
+    },
   },
   /** 로딩·빈 화면·오류를 표시하는 ScreenState 카드 */
   state: {

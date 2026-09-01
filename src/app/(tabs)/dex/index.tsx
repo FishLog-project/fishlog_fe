@@ -1,13 +1,17 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 
 import { Screen, ScreenHeader, ScreenState, SearchBar } from '@/components/common';
 import { Brand, Components, Layout, Typography } from '@/constants/theme';
 import { createFixtureDexDataSource } from '@/features/dex/dex-data';
 import { SpeciesCard } from '@/features/dex/components/species-card';
-import { useDexViewModel } from '@/features/dex/use-dex-view-model';
+import { SpeciesDetailDialog } from '@/features/dex/components/species-detail-dialog';
+import {
+  useDexViewModel,
+  type DexSpeciesDetailViewModel,
+} from '@/features/dex/use-dex-view-model';
 
 const DEX = Components.dex;
 
@@ -47,6 +51,9 @@ export default function DexScreen() {
   const { state, results, query, setQuery, retry, isSearching } =
     useDexViewModel(dataSource);
 
+  // 열려 있는 상세 카드. 잠금 카드는 detail이 null이라 애초에 열리지 않는다.
+  const [detail, setDetail] = useState<DexSpeciesDetailViewModel | null>(null);
+
   /**
    * 마지막 줄이 덜 차면 flex:1 카드가 남은 자리를 나눠 갖느라 넓어진다.
    * 빈 칸을 채워 줄마다 카드 폭을 같게 만든다.
@@ -80,7 +87,14 @@ export default function DexScreen() {
                 keyExtractor={(item, index) => item?.id ?? `filler-${index}`}
                 numColumns={COLUMNS}
                 renderItem={({ item }) =>
-                  item ? <SpeciesCard species={item} /> : <View style={styles.filler} />
+                  item ? (
+                    <SpeciesCard
+                      species={item}
+                      onPress={(s) => setDetail(s.detail)}
+                    />
+                  ) : (
+                    <View style={styles.filler} />
+                  )
                 }
                 columnWrapperStyle={styles.row}
                 contentContainerStyle={styles.listContent}
@@ -123,6 +137,8 @@ export default function DexScreen() {
         {/* 테두리보다 나중에 그려야 뚜껑이 위로 올라온다 */}
         <Image source={LID} style={styles.lid} contentFit="contain" />
       </View>
+
+      <SpeciesDetailDialog species={detail} onClose={() => setDetail(null)} />
     </Screen>
   );
 }

@@ -15,6 +15,20 @@ export interface DexSpeciesViewModel {
    * 화면에 이름이 '???'로 나오는데 이름으로 검색되면 정답을 흘리는 셈이라서다.
    */
   searchText: string;
+  /**
+   * 상세 카드에 띄울 내용. 미획득 어종은 null이다 —
+   * 이름·설명·서식지가 곧 정답이라 잠금 카드에서는 아예 들려 보내지 않는다.
+   */
+  detail: DexSpeciesDetailViewModel | null;
+}
+
+export interface DexSpeciesDetailViewModel {
+  name: string;
+  description: string;
+  /** "주요 서식지: 강" */
+  habitatLabel: string;
+  /** "잡은 횟수: 3회" */
+  catchLabel: string;
 }
 
 export interface DexViewModel {
@@ -49,6 +63,14 @@ function toDexViewModel(species: readonly DexSpecies[]): DexViewModel | null {
         ? `${s.name}, 서식지 ${s.habitat}`
         : '아직 잡지 못한 어종',
       searchText: s.collected ? `${s.name} ${s.habitat}` : '',
+      detail: s.collected
+        ? {
+            name: s.name,
+            description: s.description,
+            habitatLabel: `주요 서식지: ${s.habitat}`,
+            catchLabel: `잡은 횟수: ${s.catchCount}회`,
+          }
+        : null,
     })),
     collected,
     total: species.length,

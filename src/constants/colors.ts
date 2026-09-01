@@ -95,6 +95,19 @@ export const Derived = {
   dexTileBorder: '#B1DFFF',
   /** 어종 카드 그림자 (알파 필요) */
   dexCardShadow: 'rgba(0, 94, 170, 0.69)',
+
+  // 도감 어종 상세 카드 (Figma 106:454 외)
+  /** 상세 카드 그림 칸 테두리 — 목록 칸(dexTileBorder)보다 진하다 */
+  dexDetailTileBorder: '#71C4FF',
+  /** "주요 서식지" 칩 배경 */
+  dexHabitatChip: '#B1DFFF',
+  /** "잡은 횟수" 칩 배경 */
+  dexCatchChip: '#9FF3F7',
+  /** 상세 카드를 띄우는 파란 발광 (2겹) */
+  dexDetailGlow: 'rgba(0, 127, 231, 0.35)',
+  dexDetailGlowOuter: 'rgba(63, 146, 201, 0.28)',
+  /** 모달 뒤를 덮는 막 */
+  scrim: 'rgba(0, 55, 92, 0.45)',
 } as const;
 
 /**

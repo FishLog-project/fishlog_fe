@@ -173,6 +173,30 @@ export const Typography = {
     lineHeight: 16,
     letterSpacing: -0.2,
   },
+  /** 어종 상세 카드 제목 — "개복치" (Figma 106:455) */
+  detailTitle: {
+    fontFamily: Fonts.bold,
+    fontWeight: '700',
+    fontSize: 18,
+    lineHeight: 40,
+    letterSpacing: -0.36,
+  },
+  /** 어종 상세 설명 (Figma 106:461) */
+  detailBody: {
+    fontFamily: Fonts.medium,
+    fontWeight: '500',
+    fontSize: 12,
+    lineHeight: 16,
+    letterSpacing: -0.24,
+  },
+  /** 칩 안의 문구 — "주요 서식지: 강" (Figma 130:185) */
+  chipLabel: {
+    fontFamily: Fonts.medium,
+    fontWeight: '500',
+    fontSize: 11,
+    lineHeight: 16,
+    letterSpacing: -0.22,
+  },
   /** 순위 배지 숫자 — 스팟 핀 안의 1·2·3 (Figma 72:1218) */
   badge: {
     fontFamily: Fonts.extraBold,

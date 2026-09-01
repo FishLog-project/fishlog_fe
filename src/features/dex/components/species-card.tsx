@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Brand, Components, Typography } from '@/constants/theme';
 import type { DexSpeciesViewModel } from '@/features/dex/use-dex-view-model';
@@ -20,12 +20,27 @@ const ART = require('@/assets/images/dex/species-placeholder.svg');
  * 미획득 카드는 같은 틀에 회색 실루엣 + "???"다.
  * (잠금 상태는 Figma에 없어 기존 회색 토큰으로만 구성했다)
  */
-export function SpeciesCard({ species }: { species: DexSpeciesViewModel }) {
+export function SpeciesCard({
+  species,
+  onPress,
+}: {
+  species: DexSpeciesViewModel;
+  /** 획득한 어종만 상세가 열린다. 잠금 카드는 눌러도 아무 일이 없다 */
+  onPress: (species: DexSpeciesViewModel) => void;
+}) {
   return (
-    <View
-      style={[styles.card, species.collected && styles.cardCollected]}
+    <Pressable
+      style={({ pressed }) => [
+        styles.card,
+        species.collected && styles.cardCollected,
+        pressed && species.collected && styles.pressed,
+      ]}
+      // 잠금 카드는 버튼이 아니다 — 스크린리더에도 누를 수 있는 것처럼 읽히면 안 된다
+      accessibilityRole={species.collected ? 'button' : undefined}
       accessible
-      accessibilityLabel={species.accessibilityLabel}>
+      accessibilityLabel={species.accessibilityLabel}
+      disabled={!species.collected}
+      onPress={() => onPress(species)}>
       {species.collected ? (
         <LinearGradient
           colors={[...DEX.tileFill]}
@@ -51,7 +66,7 @@ export function SpeciesCard({ species }: { species: DexSpeciesViewModel }) {
         style={[styles.name, !species.collected && styles.nameLocked]}>
         {species.label}
       </Text>
-    </View>
+    </Pressable>
   );
 }
 
@@ -66,6 +81,7 @@ const styles = StyleSheet.create({
     // Figma 108 카드에서 그림 칸이 좌우로 10씩 물러난 만큼
     paddingHorizontal: DEX.tileInset,
   },
+  pressed: { opacity: 0.85 },
   /** 미획득 카드는 그림자를 빼서 물 밑에 가라앉은 느낌으로 둔다 */
   cardCollected: {
     // Figma의 바깥 그림자. RN 0.76+ 새 아키텍처에서 지원한다.
