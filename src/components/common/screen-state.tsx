@@ -4,6 +4,9 @@ import { Brand, Components, Typography } from '@/constants/theme';
 
 type ScreenStateProps = {
   variant: 'loading' | 'empty' | 'error';
+  /** 기본 문구가 화면 맥락과 안 맞을 때만 넘긴다 (예: 빈 스팟 목록) */
+  title?: string;
+  description?: string;
   /** error 변형에서만 노출되는 재시도 핸들러 */
   onRetry?: () => void;
 };
@@ -27,7 +30,7 @@ const copy = {
  * Common/ScreenState — 로딩·빈 화면·오류를 한 벌로 처리하는 카드.
  * 목록/상세 화면이 데이터를 못 채울 때 본문 자리에 그대로 끼워 넣는다.
  */
-export function ScreenState({ variant, onRetry }: ScreenStateProps) {
+export function ScreenState({ variant, title, description, onRetry }: ScreenStateProps) {
   const state = copy[variant];
 
   return (
@@ -45,8 +48,8 @@ export function ScreenState({ variant, onRetry }: ScreenStateProps) {
           </Text>
         </View>
       )}
-      <Text style={styles.title}>{state.title}</Text>
-      <Text style={styles.description}>{state.description}</Text>
+      <Text style={styles.title}>{title ?? state.title}</Text>
+      <Text style={styles.description}>{description ?? state.description}</Text>
       {variant === 'error' && onRetry && (
         <Pressable
           accessibilityRole="button"

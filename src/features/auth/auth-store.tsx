@@ -69,23 +69,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signIn = useCallback(async (next: AuthTokens) => {
-    await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(next));
-    // 게스트로 둘러보다 로그인하면 게스트 상태는 끝난다.
-    await SecureStore.deleteItemAsync(GUEST_KEY);
+    try {
+      await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(next));
+      // 게스트로 둘러보다 로그인하면 게스트 상태는 끝난다.
+      await SecureStore.deleteItemAsync(GUEST_KEY);
+    } catch {
+      // 웹 미리보기: SecureStore 웹 구현이 빈 스텁이라 저장이 불가능하다.
+      // 저장 실패로 로그인 자체를 막지 않는다 — 상태는 메모리로 유지되고
+      // (새로고침하면 풀림) 네이티브에서는 정상 저장된다.
+    }
     setTokens(next);
     setIsGuest(false);
   }, []);
 
   const continueAsGuest = useCallback(async () => {
-    await SecureStore.setItemAsync(GUEST_KEY, '1');
+    try {
+      await SecureStore.setItemAsync(GUEST_KEY, '1');
+    } catch {
+      // 웹 미리보기 — 위 signIn 주석 참고
+    }
     setIsGuest(true);
   }, []);
 
   const signOut = useCallback(async () => {
     // 서버 로그아웃이 실패해도(토큰 만료 등) 로컬 세션은 반드시 지운다.
     await authApi.logout(tokens?.accessToken ?? null);
-    await SecureStore.deleteItemAsync(SESSION_KEY);
-    await SecureStore.deleteItemAsync(GUEST_KEY);
+    try {
+      await SecureStore.deleteItemAsync(SESSION_KEY);
+      await SecureStore.deleteItemAsync(GUEST_KEY);
+    } catch {
+      // 웹 미리보기 — 위 signIn 주석 참고
+    }
     setTokens(null);
     setIsGuest(false);
   }, [tokens]);

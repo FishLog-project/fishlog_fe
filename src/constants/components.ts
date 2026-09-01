@@ -77,8 +77,8 @@ export const Components = {
     radius: 43,
     paddingX: 16,
     paddingY: 12,
-    /** 행과 행 사이 간격 (리스트가 쓴다) */
-    rowGap: 24,
+    /** 행과 행 사이 간격 (리스트가 쓴다). Figma 72:1213/1224/1235 기준 8 */
+    rowGap: 8,
     /** 핀·텍스트·화살표 사이 간격 */
     contentGap: 12,
     pinSize: 40,
