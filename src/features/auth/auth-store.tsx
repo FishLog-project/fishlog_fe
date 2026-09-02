@@ -113,23 +113,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // 게스트로 둘러보다 로그인하면 게스트 상태는 끝난다.
         SecureStore.deleteItemAsync(GUEST_KEY),
       ]);
-    } catch (error) {
-      // 저장 실패 시 메모리 상태도 원래대로 되돌려 세션 상태가 엇갈리지 않게 한다.
-      setTokens(null);
-      throw error;
+    } catch {
+      // SecureStore를 지원하지 않는 웹 미리보기에서는 메모리 세션만 유지한다.
     }
   }, []);
 
   const continueAsGuest = useCallback(async () => {
     setIsGuest(true);
-    await SecureStore.setItemAsync(GUEST_KEY, '1');
+    try {
+      await SecureStore.setItemAsync(GUEST_KEY, '1');
+    } catch {
+      // SecureStore를 지원하지 않는 웹 미리보기에서는 메모리 상태만 유지한다.
+    }
   }, []);
 
   const signOut = useCallback(async () => {
     // 서버 로그아웃이 실패해도(토큰 만료 등) 로컬 세션은 반드시 지운다.
     await authApi.logout(tokens?.accessToken ?? null);
-    await SecureStore.deleteItemAsync(SESSION_KEY);
-    await SecureStore.deleteItemAsync(GUEST_KEY);
+    await clearStoredSession();
     setTokens(null);
     setIsGuest(false);
   }, [tokens]);
