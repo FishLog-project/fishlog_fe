@@ -5,36 +5,10 @@
  * 모든 함수는 성공/실패를 예외가 아니라 결과 객체로 돌려준다.
  * 화면이 상태코드를 몰라도 되게 하려는 것이고, 문구도 여기서 확정한다.
  */
-import { ApiError, apiRequest } from '@/lib/api/client';
+import { apiRequest } from '@/lib/api/client';
+import { type Fail, type Ok, toFail } from '@/lib/api/result';
 
-export type Ok = { ok: true };
-export type Fail<R extends string = 'unknown'> = {
-  ok: false;
-  reason: R | 'unknown';
-  message: string;
-};
-
-const NETWORK_FAIL = {
-  ok: false as const,
-  reason: 'unknown' as const,
-  message: '네트워크 오류가 발생했어요.',
-};
-
-/**
- * 공통 에러 변환기.
- * `map`에 없는 상태코드는 서버 메시지를 그대로 보여준다 (서버가 한국어로 내려준다).
- */
-function toFail<R extends string>(
-  e: unknown,
-  map: Partial<Record<number, { reason: R; message: string }>>,
-): Fail<R> {
-  if (e instanceof ApiError) {
-    const hit = map[e.status];
-    if (hit) return { ok: false, reason: hit.reason, message: hit.message };
-    return { ok: false, reason: 'unknown', message: e.message };
-  }
-  return NETWORK_FAIL;
-}
+export type { Fail, Ok } from '@/lib/api/result';
 
 // ─────────────────────────────────────────────────────────────
 // 이메일 인증 (회원가입용)
@@ -80,22 +54,24 @@ export async function verifyEmailCode(
 // ─────────────────────────────────────────────────────────────
 
 export type SignupInput = { email: string; password: string; nickname: string };
-export type SignupResult = Ok | Fail<'duplicated'>;
+
+/** 로그인·회원가입·재발급이 돌려주는 토큰 쌍 */
+export type AuthTokens = { accessToken: string; refreshToken: string | null };
+
+export type SignupResult = (Ok & { tokens: AuthTokens | null }) | Fail<'duplicated'>;
 
 /** 회원가입. POST /api/auth/signup (이메일 인증 완료 후 호출) */
 export async function signup(input: SignupInput): Promise<SignupResult> {
   try {
-    await apiRequest('/api/auth/signup', { method: 'POST', body: input });
-    return { ok: true };
+    const data = await apiRequest('/api/auth/signup', { method: 'POST', body: input });
+    // 서버가 회원가입 응답에서 바로 토큰을 주는 경우에는 재로그인 없이 사용한다.
+    return { ok: true, tokens: toTokens(data) };
   } catch (e) {
     return toFail(e, {
       409: { reason: 'duplicated', message: '이미 사용 중인 이메일 또는 닉네임이에요.' },
     });
   }
 }
-
-/** 로그인·재발급이 돌려주는 토큰 쌍 */
-export type AuthTokens = { accessToken: string; refreshToken: string | null };
 
 /**
  * 서버가 주는 토큰 응답을 앱 타입으로 정규화한다.
@@ -231,34 +207,16 @@ export async function resetPassword(
 // 내 계정 (로그인 후)
 // ─────────────────────────────────────────────────────────────
 
-export type MyProfile = { userId: number; email: string; nickname: string };
 
 /** 내 프로필 조회. GET /api/users/me */
-export async function getMyProfile(token: string | null): Promise<MyProfile | null> {
-  try {
-    return await apiRequest<MyProfile>('/api/users/me', { token });
-  } catch {
-    return null;
-  }
-}
 
-export type WithdrawResult = Ok | Fail<'wrong_password'>;
+/** 프로필 이미지 업로드/변경. POST /api/users/me/profile-image (최대 5MB 이미지) */
+
+/**
+ * 비밀번호 변경. PATCH /api/users/me/password
+ *
+ * 새 비밀번호 형식(영문+숫자 8자 이상)은 호출 전에 앱이 이미 검사한다.
+ * 그래서 여기 400은 사실상 "현재 비밀번호가 틀렸다"는 뜻이다.
+ */
 
 /** 회원탈퇴. DELETE /api/users/me */
-export async function withdraw(
-  token: string | null,
-  password: string,
-): Promise<WithdrawResult> {
-  try {
-    await apiRequest('/api/users/me', {
-      method: 'DELETE',
-      token,
-      body: { password },
-    });
-    return { ok: true };
-  } catch (e) {
-    return toFail(e, {
-      400: { reason: 'wrong_password', message: '비밀번호가 올바르지 않아요.' },
-    });
-  }
-}

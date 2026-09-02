@@ -11,18 +11,18 @@ type Props = {
 };
 
 /**
- * 이메일 인증번호용 N자리 코드 입력.
- * 숨겨진 TextInput 하나에 입력받고, 각 자리를 언더라인 셀로 표시한다.
- * 채워진 자리는 파란 언더라인 + 숫자, 빈 자리는 회색 언더라인.
+ * 이메일 인증번호용 N자리 코드 입력 (Figma 634:2674~2679).
+ *
+ * 숨긴 TextInput 하나로 입력받고 각 자리를 언더라인 셀로 보여준다.
+ * 채워진 자리(와 커서가 놓인 자리)는 파란 언더라인, 나머지는 회색이다.
  */
-export function OtpInput({ value, onChangeText, length = 6 }: Props) {
+export function OtpInput({ value, onChangeText, length = Components.otp.length }: Props) {
   const inputRef = useRef<TextInput>(null);
   const [focused, setFocused] = useState(false);
   const cells = Array.from({ length });
 
   const handleChange = (text: string) => {
-    const digits = text.replace(/[^0-9]/g, '').slice(0, length);
-    onChangeText(digits);
+    onChangeText(text.replace(/[^0-9]/g, '').slice(0, length));
   };
 
   return (
@@ -34,7 +34,7 @@ export function OtpInput({ value, onChangeText, length = 6 }: Props) {
       {cells.map((_, i) => {
         const char = value[i] ?? '';
         const isCursor = focused && i === value.length;
-        const filled = char !== '' || isCursor;
+        const lit = char !== '' || isCursor;
         return (
           <View
             key={i}
@@ -43,7 +43,7 @@ export function OtpInput({ value, onChangeText, length = 6 }: Props) {
             style={[
               styles.cell,
               {
-                borderBottomColor: filled
+                borderBottomColor: lit
                   ? Components.authInput.underlineActive
                   : Components.authInput.underline,
               },
@@ -53,7 +53,11 @@ export function OtpInput({ value, onChangeText, length = 6 }: Props) {
         );
       })}
 
-      {/* 실제 입력을 받는 숨김 TextInput */}
+      {/*
+        실제 입력을 받는 투명 TextInput. 셀 전체를 덮게 깔아 둔다.
+        1x1로 숨겨 두면 키보드가 올라올 때 ScrollView의 자동 스크롤이
+        그 점 하나만 보이게 맞춰서, 정작 셀 줄은 화면 밖에 남는다.
+      */}
       <TextInput
         ref={inputRef}
         style={styles.hidden}
@@ -74,14 +78,20 @@ export function OtpInput({ value, onChangeText, length = 6 }: Props) {
 }
 
 const styles = StyleSheet.create({
-  wrap: { flexDirection: 'row', gap: 12 },
+  wrap: {
+    flexDirection: 'row',
+    gap: Components.otp.gap,
+    // 언더라인 입력과 같은 안쪽 여백으로 좌우를 맞춘다
+    paddingHorizontal: Components.authInput.inset,
+  },
   cell: {
     flex: 1,
-    height: 44,
-    borderBottomWidth: 2,
+    height: Components.otp.cellHeight,
+    borderBottomWidth: Components.authInput.underlineWidth,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
+    paddingBottom: Components.authInput.underlineGap,
   },
-  digit: { ...Typography.inputLarge, fontSize: 22, color: Components.authInput.text },
-  hidden: { position: 'absolute', opacity: 0, width: 1, height: 1 },
+  digit: { ...Typography.otpDigit, color: Components.authInput.text },
+  hidden: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0 },
 });

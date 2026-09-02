@@ -1,16 +1,14 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
 
-import { Brand, Typography } from '@/constants/theme';
+import { FormField } from '@/components/common';
 import {
   authApi,
+  checkPassword,
+  PasswordFields,
   StepScreen,
-  UnderlineInput,
   usePasswordReset,
 } from '@/features/auth';
-
-const MIN_LENGTH = 8;
 
 /**
  * 비밀번호 찾기 3단계 — 새 비밀번호 설정.
@@ -20,7 +18,7 @@ const MIN_LENGTH = 8;
  */
 export default function PasswordResetScreen() {
   const router = useRouter();
-  const { email, reset } = usePasswordReset();
+  const { email } = usePasswordReset();
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -30,9 +28,7 @@ export default function PasswordResetScreen() {
     if (!email) router.replace('/auth/password/email');
   }, [email, router]);
 
-  const longEnough = password.length >= MIN_LENGTH;
-  const matches = confirm.length > 0 && password === confirm;
-  const valid = longEnough && matches;
+  const { valid, message } = checkPassword(password, confirm);
 
   const handleSubmit = async () => {
     setSubmitting(true);
@@ -43,8 +39,7 @@ export default function PasswordResetScreen() {
       setError(res.message);
       return;
     }
-    reset();
-    router.replace('/auth/password/complete');
+    router.replace('/auth/login');
   };
 
   return (
@@ -54,43 +49,25 @@ export default function PasswordResetScreen() {
       buttonLabel="변경하기"
       nextDisabled={!valid}
       loading={submitting}
+      compactWhenKeyboard
       onNext={handleSubmit}>
-      <UnderlineInput
-        value={password}
-        onChangeText={setPassword}
-        placeholder="새 비밀번호 (8자 이상)"
-        secureTextEntry
-        autoCapitalize="none"
-        autoCorrect={false}
-        textContentType="newPassword"
-        autoFocus
-        returnKeyType="next"
-      />
-
-      <View style={styles.second}>
-        <UnderlineInput
-          value={confirm}
-          onChangeText={setConfirm}
-          placeholder="비밀번호 확인"
-          secureTextEntry
-          autoCapitalize="none"
-          autoCorrect={false}
-          textContentType="newPassword"
-          returnKeyType="done"
-          onSubmitEditing={() => valid && handleSubmit()}
+      <FormField error={error ?? message}>
+        <PasswordFields
+          password={password}
+          onPasswordChange={(value) => {
+            setPassword(value);
+            if (error) setError(null);
+          }}
+          confirm={confirm}
+          onConfirmChange={(value) => {
+            setConfirm(value);
+            if (error) setError(null);
+          }}
+          placeholder="새 비밀번호 (8자 이상)"
+          onSubmit={handleSubmit}
+          autoFocus
         />
-      </View>
-
-      {/* 확인란을 채우기 전에는 불일치 문구를 띄우지 않는다 (타이핑 중 잔소리 방지) */}
-      {confirm.length > 0 && !matches ? (
-        <Text style={styles.error}>비밀번호가 일치하지 않아요.</Text>
-      ) : null}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      </FormField>
     </StepScreen>
   );
 }
-
-const styles = StyleSheet.create({
-  second: { marginTop: 32 },
-  error: { ...Typography.footnote, color: Brand.textError, marginTop: 16 },
-});

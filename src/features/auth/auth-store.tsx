@@ -45,61 +45,92 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
+    let active = true;
+
     (async () => {
       try {
-        const stored = await SecureStore.getItemAsync(SESSION_KEY);
+        const [stored, guest] = await Promise.all([
+          SecureStore.getItemAsync(SESSION_KEY),
+          SecureStore.getItemAsync(GUEST_KEY),
+        ]);
 
         // 예전 빌드는 게스트도 토큰 자리에 넣었다. 그대로 두면 게스트가
         // 로그인 사용자로 보이므로 로드 시점에 플래그로 옮긴다.
         if (stored === LEGACY_GUEST_TOKEN) {
           await SecureStore.deleteItemAsync(SESSION_KEY);
           await SecureStore.setItemAsync(GUEST_KEY, '1');
-          setIsGuest(true);
+          if (active) setIsGuest(true);
           return;
         }
 
-        setTokens(parseStoredTokens(stored));
-        setIsGuest((await SecureStore.getItemAsync(GUEST_KEY)) === '1');
+        const restored = parseStoredTokens(stored);
+        if (!active) return;
+
+        // 저장된 세션을 먼저 복원해 앱 시작을 네트워크 요청으로 막지 않는다.
+        setTokens(restored);
+        setIsGuest(!restored && guest === '1');
+
+        // 회전 refresh 토큰이 있으면 홈 진입 뒤 백그라운드에서 최신 토큰으로 교체한다.
+        if (restored?.refreshToken) {
+          void authApi.refresh(restored.refreshToken).then(async (refreshed) => {
+            if (!active) return;
+            if (!refreshed) {
+              // refresh 토큰까지 만료되면 낡은 access 토큰을 유지하지 않는다.
+              // 서버 로그아웃은 이미 만료된 토큰으로 실패할 수 있으므로 로컬 세션을 직접 정리한다.
+              setTokens(null);
+              setIsGuest(false);
+              await clearStoredSession();
+              return;
+            }
+            setTokens(refreshed);
+            try {
+              await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(refreshed));
+            } catch {
+              // 메모리 세션은 유지하고 다음 앱 시작 때 다시 갱신한다.
+            }
+          });
+        }
       } catch {
         // 저장소 접근 실패 시 비로그인으로 취급
       } finally {
-        setIsReady(true);
+        if (active) setIsReady(true);
       }
     })();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const signIn = useCallback(async (next: AuthTokens) => {
-    try {
-      await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(next));
-      // 게스트로 둘러보다 로그인하면 게스트 상태는 끝난다.
-      await SecureStore.deleteItemAsync(GUEST_KEY);
-    } catch {
-      // 웹 미리보기: SecureStore 웹 구현이 빈 스텁이라 저장이 불가능하다.
-      // 저장 실패로 로그인 자체를 막지 않는다 — 상태는 메모리로 유지되고
-      // (새로고침하면 풀림) 네이티브에서는 정상 저장된다.
-    }
+    // 보호 라우트가 홈 진입을 비로그인으로 오인하지 않도록 메모리 세션을 먼저 갱신한다.
     setTokens(next);
     setIsGuest(false);
+
+    try {
+      await Promise.all([
+        SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(next)),
+      // 게스트로 둘러보다 로그인하면 게스트 상태는 끝난다.
+        SecureStore.deleteItemAsync(GUEST_KEY),
+      ]);
+    } catch {
+      // SecureStore를 지원하지 않는 웹 미리보기에서는 메모리 세션만 유지한다.
+    }
   }, []);
 
   const continueAsGuest = useCallback(async () => {
+    setIsGuest(true);
     try {
       await SecureStore.setItemAsync(GUEST_KEY, '1');
     } catch {
-      // 웹 미리보기 — 위 signIn 주석 참고
+      // SecureStore를 지원하지 않는 웹 미리보기에서는 메모리 상태만 유지한다.
     }
-    setIsGuest(true);
   }, []);
 
   const signOut = useCallback(async () => {
     // 서버 로그아웃이 실패해도(토큰 만료 등) 로컬 세션은 반드시 지운다.
     await authApi.logout(tokens?.accessToken ?? null);
-    try {
-      await SecureStore.deleteItemAsync(SESSION_KEY);
-      await SecureStore.deleteItemAsync(GUEST_KEY);
-    } catch {
-      // 웹 미리보기 — 위 signIn 주석 참고
-    }
+    await clearStoredSession();
     setTokens(null);
     setIsGuest(false);
   }, [tokens]);
@@ -139,6 +170,13 @@ function parseStoredTokens(stored: string | null): AuthTokens | null {
     // JSON이 아니면 아래로 흘려보낸다
   }
   return null;
+}
+
+async function clearStoredSession() {
+  await Promise.allSettled([
+    SecureStore.deleteItemAsync(SESSION_KEY),
+    SecureStore.deleteItemAsync(GUEST_KEY),
+  ]);
 }
 
 export function useAuth() {

@@ -71,6 +71,10 @@ export const Derived = {
   shadow: '#004E7C',
   /** 입력 오류 문구 */
   error: '#E5484D',
+  /** 모달 뒤를 덮는 막 (알파가 필요해 rgba 표기) */
+  scrim: 'rgba(0, 0, 0, 0.4)',
+  /** 세그먼트 컨트롤의 선택된 칸이 떠 보이게 하는 그림자 (Figma 323:1045) */
+  segmentShadow: 'rgba(17, 82, 125, 0.18)',
   /** 진행바 트랙 테두리 (Figma 74:1764) */
   progressTrackBorder: '#69CDFF',
   /** 통계 카드 안쪽 그림자 (알파가 필요해 이 항목만 rgba 표기) */
@@ -104,6 +108,10 @@ export const Brand = {
   textError: Derived.error,
   /** 섹션 제목 (Figma Bluegray/500) — 카드 제목의 primaryDark보다 진한 남색 */
   textHeading: Palette.bluegray[500],
+  /** 수치 강조 — 랭킹 점수·순위처럼 값 자체를 읽어야 하는 자리 */
+  textAccent: Palette.bluegray[400],
+  /** 선택되지 않은 항목의 라벨 (세그먼트 컨트롤의 비활성 칸 등) */
+  textSubtle: Palette.bluegray[200],
   /**
    * 컬러 면 위에 얹는 글자/아이콘.
    *
@@ -119,6 +127,8 @@ export const Brand = {
   divider: Derived.neutral,
   /** 떠 있는 요소(칩/FAB)의 그림자 */
   shadow: Derived.shadow,
+  /** 모달이 떠 있을 때 뒤를 덮는 막 */
+  scrim: Derived.scrim,
 
   // 그라데이션 — 쓰는 쪽에서 [...Brand.xxx] 로 펼쳐 넣는다
   /** 히어로 카드 배경 */

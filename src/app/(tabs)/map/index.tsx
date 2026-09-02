@@ -1,78 +1,185 @@
+import { Image } from 'expo-image';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import {
-  FabButton,
-  FilterChip,
-  PrimaryButton,
-  Screen,
-  SearchBar,
-} from '@/components/common';
-import { Brand, Layout } from '@/constants/theme';
+import { Screen, ScreenHeader, SearchBar } from '@/components/common';
+import { Brand, Components, Layout, Typography } from '@/constants/theme';
+
+const MAP = Components.map;
+
+const MAP_ACTIONS = [
+  { icon: require('@/assets/images/map/grid.svg'), label: '격자로 보기' },
+  { icon: require('@/assets/images/map/sea-info.svg'), label: '해양 정보 보기' },
+  { icon: require('@/assets/images/map/fishing-disabled.svg'), label: '낚시 금지 구역 보기' },
+  { icon: require('@/assets/images/map/fish-scan.svg'), label: '어종 탐색' },
+] as const;
+
+const SPOTS = [
+  { name: '땡땡저수지', left: '31%', top: '40%' },
+  { name: '청명호', left: '72%', top: '67%' },
+  { name: '하늘연못', left: '27%', top: '79%' },
+] as const;
 
 /**
- * 지도 탭 — 아직 실제 지도는 없지만, 공통 컴포넌트
- * (SearchBar / FilterChip / FabButton / PrimaryButton)를 배치해 둔 화면.
- *
- * 지도는 화면 끝까지 채워야 해서 Screen을 edgeToEdge로 쓰고,
- * 그 위에 얹히는 컨트롤만 Layout.screenPadding을 참조한다.
+ * 지도 화면의 카카오 지도 연결 전 UI.
+ * 실제 SDK 연결 시 mapCanvas의 정적 이미지만 지도 뷰로 교체한다.
  */
 export default function MapScreen() {
   const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<'food' | 'parking' | null>('food');
-  const [locateOn, setLocateOn] = useState(true);
 
   return (
-    <Screen edgeToEdge footer={<PrimaryButton label="다음" onPress={() => {}} />}>
-      {/* 지도 placeholder 영역 */}
-      <View style={styles.mapArea}>
-        {/* 상단: 검색 + 필터 칩 */}
-        <View style={styles.top}>
-          <SearchBar value={query} onChangeText={setQuery} />
-          <View style={styles.chips}>
-            <FilterChip
-              label="관광지/음식점"
-              variant="food"
-              selected={filter === 'food'}
-              onPress={() => setFilter('food')}
-            />
-            <FilterChip
-              label="화장실/주차장"
-              variant="parking"
-              selected={filter === 'parking'}
-              onPress={() => setFilter('parking')}
-            />
-          </View>
+    <Screen edgeToEdge header={<ScreenHeader title="지도" />}>
+      <View style={styles.searchArea}>
+        <SearchBar
+          value={query}
+          onChangeText={setQuery}
+          placeholder="낚시터 검색"
+          returnKeyType="search"
+        />
+      </View>
+
+      <View style={styles.mapCanvas}>
+        <Image
+          source={require('@/assets/images/map/map-placeholder.png')}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+          contentPosition="center"
+        />
+        <View pointerEvents="none" style={styles.mapShade} />
+
+        <View style={styles.actionColumn}>
+          {MAP_ACTIONS.map((action) => (
+            <MapAction key={action.label} {...action} />
+          ))}
         </View>
 
-        {/* 지도 위에 떠 있는 FAB — 지도를 가리지 않고 겹쳐야 하므로 오버레이 */}
-        <View style={styles.fabColumn}>
-          <FabButton icon="scan" label="스캔" active={false} />
-          <FabButton icon="grid" label="목록 보기" active={false} />
-          <FabButton
-            icon="locate"
-            label="현재 위치"
-            active={locateOn}
-            onPress={() => setLocateOn((v) => !v)}
+        {SPOTS.map((spot) => (
+          <MapMarker key={spot.name} {...spot} />
+        ))}
+
+        <Image
+          source={require('@/assets/images/map/current-location.svg')}
+          style={styles.currentMarker}
+          contentFit="contain"
+        />
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="현재 위치로 이동"
+          style={({ pressed }) => [styles.locationButton, pressed && styles.pressed]}>
+          <Image
+            source={require('@/assets/images/map/my-location.svg')}
+            style={styles.actionIcon}
+            contentFit="contain"
           />
-        </View>
+        </Pressable>
       </View>
     </Screen>
   );
 }
 
+function MapAction({ icon, label }: (typeof MAP_ACTIONS)[number]) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}>
+      <Image source={icon} style={styles.actionIcon} contentFit="contain" />
+    </Pressable>
+  );
+}
+
+function MapMarker({ name, left, top }: (typeof SPOTS)[number]) {
+  return (
+    <View pointerEvents="none" style={[styles.marker, { left, top }]}>
+      <Text style={styles.markerLabel}>{name}</Text>
+      <Image
+        source={require('@/assets/images/map/marker.svg')}
+        style={styles.markerImage}
+        contentFit="contain"
+      />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  mapArea: { flex: 1, backgroundColor: Brand.surfaceSoft },
-  top: {
+  searchArea: {
+    height: MAP.searchHeight,
+    justifyContent: 'flex-start',
     paddingHorizontal: Layout.screenPadding,
-    paddingTop: 12,
-    gap: 12,
+    paddingTop: MAP.searchTop,
+    backgroundColor: Brand.background,
   },
-  chips: { flexDirection: 'row', gap: 10 },
-  fabColumn: {
+  mapCanvas: {
+    flex: 1,
+    position: 'relative',
+    overflow: 'hidden',
+    backgroundColor: '#D7EAF4',
+  },
+  mapShade: {
     position: 'absolute',
-    right: Layout.screenPadding,
-    bottom: 24,
-    gap: 12,
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 0, 0, 0.08)',
+  },
+  actionColumn: {
+    position: 'absolute',
+    top: MAP.overlayInset,
+    left: MAP.overlayInset,
+    gap: MAP.actionGap,
+  },
+  actionButton: {
+    width: MAP.actionSize,
+    height: MAP.actionSize,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: MAP.actionSize / 2,
+    backgroundColor: Brand.background,
+    shadowColor: '#004E7C',
+    shadowOffset: { width: 1, height: 3 },
+    shadowOpacity: 0.22,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  actionIcon: { width: MAP.actionIconSize, height: MAP.actionIconSize },
+  pressed: { opacity: 0.72 },
+  locationButton: {
+    position: 'absolute',
+    right: MAP.overlayInset,
+    bottom: MAP.overlayInset,
+    width: MAP.actionSize,
+    height: MAP.actionSize,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: MAP.actionSize / 2,
+    backgroundColor: Brand.background,
+    shadowColor: '#004E7C',
+    shadowOffset: { width: 1, height: 3 },
+    shadowOpacity: 0.22,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  marker: {
+    position: 'absolute',
+    alignItems: 'center',
+    transform: [{ translateX: -32 }, { translateY: -10 }],
+  },
+  markerLabel: {
+    ...Typography.badge,
+    marginBottom: MAP.markerLabelGap,
+    color: Brand.textStrong,
+    fontSize: 12,
+    lineHeight: 20,
+  },
+  markerImage: { width: 34, height: 46 },
+  currentMarker: {
+    position: 'absolute',
+    left: '62%',
+    top: '41%',
+    width: 67,
+    height: 67,
   },
 });
