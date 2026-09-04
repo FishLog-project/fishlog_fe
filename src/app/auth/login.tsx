@@ -1,12 +1,21 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { PrimaryButton, Screen } from '@/components/common';
-import { Brand, Components, Spacing, Typography } from '@/constants/theme';
+import { FormField, PrimaryButton, Screen, TextField } from '@/components/common';
+import { Brand, Components, Typography } from '@/constants/theme';
 import { authApi, useAuth } from '@/features/auth';
 
-/** 로그인 화면 — 이메일/비밀번호 입력 후 진입. 하단에 비밀번호 찾기 / 회원가입. */
+const LOGIN = Components.authLogin;
+
+/**
+ * 로그인 화면 (Figma 634:2544).
+ * 로고 + 이메일/비밀번호 + "다음", 그 아래 비밀번호 찾기 / 회원가입.
+ * 하단에는 로그인 없이 둘러보는 외곽선 버튼이 따로 붙는다.
+ *
+ * 세로 간격은 전부 부모 컨테이너의 gap이다. 간격이 다른 구간마다 묶음을
+ * 하나씩 두고, 자식은 자기 여백을 갖지 않는다.
+ */
 export default function LoginScreen() {
   const router = useRouter();
   const { signIn, continueAsGuest } = useAuth();
@@ -26,104 +35,107 @@ export default function LoginScreen() {
       setError(res.message);
       return;
     }
-    await signIn(res.tokens);
-    router.replace('/home');
+    // 메모리 세션은 signIn 호출 즉시 반영된다. SecureStore 쓰기를 기다리느라
+    // 로그인 화면에 멈춰 있지 않고 홈 전환과 저장을 동시에 진행한다.
+    const sessionWrite = signIn(res.tokens);
+    router.replace('/(tabs)/home');
+    try {
+      await sessionWrite;
+    } catch {
+      router.replace('/auth/login');
+      setError('로그인 정보를 저장하지 못했어요. 다시 시도해 주세요.');
+    }
   };
 
   // 로그인 없이 둘러보기 — 토큰이 아니라 게스트 플래그로 진입한다.
   // ('guest'를 토큰 자리에 넣으면 로그인 사용자와 구분이 안 된다)
   const handleGuest = async () => {
     await continueAsGuest();
-    router.replace('/home');
+    router.replace('/(tabs)/home');
   };
 
   return (
-    <Screen keyboardAvoiding edges={['top', 'bottom']}>
-      <Text style={styles.logo}>Fishlog</Text>
-
-      <View style={styles.form}>
-        <TextInput
-          style={styles.input}
-          value={email}
-          onChangeText={setEmail}
-          placeholder="이메일"
-          placeholderTextColor={Components.authInput.placeholder}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-          textContentType="emailAddress"
-        />
-        <TextInput
-          style={styles.input}
-          value={password}
-          onChangeText={setPassword}
-          placeholder="비밀번호"
-          placeholderTextColor={Components.authInput.placeholder}
-          secureTextEntry
-          textContentType="password"
-        />
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-
+    <Screen
+      keyboardAvoiding
+      footerAvoidsKeyboard={false}
+      edges={['top', 'bottom']}
+      footer={
         <PrimaryButton
-          label="다음"
-          onPress={handleLogin}
-          disabled={!canSubmit}
-          loading={submitting}
+          label="로그인 없이 둘러보기"
+          variant="outline"
+          onPress={handleGuest}
         />
+      }>
+      <View style={styles.body}>
+        <Text style={styles.logo} accessibilityRole="header">
+          Fishlog
+        </Text>
 
-        <View style={styles.links}>
-          <Pressable
-            hitSlop={8}
-            onPress={() => router.push('/auth/password/email')}>
-            <Text style={styles.link}>비밀번호 찾기</Text>
-          </Pressable>
-          <View style={styles.divider} />
-          <Pressable hitSlop={8} onPress={() => router.push('/auth/signup/email')}>
-            <Text style={styles.link}>회원가입</Text>
-          </Pressable>
+        <View style={styles.form}>
+          <FormField error={error} gap={LOGIN.errorGap}>
+            <View style={styles.fields}>
+              <TextField
+                value={email}
+                onChangeText={(value) => {
+                  setEmail(value);
+                  if (error) setError(null);
+                }}
+                placeholder="이메일"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                textContentType="emailAddress"
+              />
+              <TextField
+                value={password}
+                onChangeText={(value) => {
+                  setPassword(value);
+                  if (error) setError(null);
+                }}
+                placeholder="비밀번호"
+                secureTextEntry
+                textContentType="password"
+                returnKeyType="done"
+                onSubmitEditing={() => canSubmit && handleLogin()}
+              />
+            </View>
+          </FormField>
+
+          <PrimaryButton
+            label="다음"
+            onPress={handleLogin}
+            disabled={!canSubmit}
+            loading={submitting}
+          />
+
+          <View style={styles.links}>
+            <Pressable hitSlop={8} onPress={() => router.push('/auth/password/email')}>
+              <Text style={styles.link}>비밀번호 찾기</Text>
+            </Pressable>
+            <View style={styles.divider} />
+            <Pressable hitSlop={8} onPress={() => router.push('/auth/signup/email')}>
+              <Text style={styles.link}>회원가입</Text>
+            </Pressable>
+          </View>
         </View>
-
-        <Pressable hitSlop={8} onPress={handleGuest} style={styles.guest}>
-          <Text style={styles.guestText}>로그인 없이 둘러보기</Text>
-        </Pressable>
       </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  logo: {
-    ...Typography.brand,
-    fontSize: 37,
-    lineHeight: 44,
-    color: Brand.primary,
-    textAlign: 'center',
-    marginTop: 120,
-  },
-  form: { marginTop: 'auto', marginBottom: Spacing.six, gap: 12 },
-  input: {
-    ...Typography.input,
-    height: Components.authInput.boxHeight,
-    borderRadius: Components.authInput.boxRadius,
-    backgroundColor: Components.authInput.boxBg,
-    paddingHorizontal: Components.authInput.boxPaddingX,
-    color: Components.authInput.text,
-  },
+  /** 로고 ~ 입력 묶음 (Figma y151 → y325) */
+  body: { flex: 1, paddingTop: LOGIN.logoTop, gap: LOGIN.formTop },
+  logo: { ...Typography.brandAuth, color: Brand.primary, textAlign: 'center' },
+  /** 입력 묶음 ~ 버튼 ~ 링크 */
+  form: { gap: LOGIN.blockGap },
+  fields: { gap: LOGIN.fieldGap },
   links: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 20,
-    marginTop: 8,
+    gap: LOGIN.linksGap,
   },
-  error: { ...Typography.footnote, color: Brand.textError, textAlign: 'center' },
-  link: { ...Typography.caption, color: Components.authInput.placeholder },
-  divider: { width: 1, height: 12, backgroundColor: Brand.divider },
-  guest: { alignSelf: 'center', marginTop: 20, paddingVertical: 4 },
-  guestText: {
-    ...Typography.caption,
-    fontWeight: '600',
-    color: Brand.primary,
-    textDecorationLine: 'underline',
-  },
+  link: { ...Typography.caption, color: Brand.textWeak },
+  divider: { width: 1, height: LOGIN.dividerHeight, backgroundColor: Brand.divider },
 });

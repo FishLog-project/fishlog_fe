@@ -1,8 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text } from 'react-native';
 
-import { Brand, Typography } from '@/constants/theme';
+import { FormField } from '@/components/common';
 import {
   authApi,
   StepScreen,
@@ -44,23 +43,23 @@ export default function PasswordEmailScreen() {
       nextDisabled={!valid}
       loading={sending}
       onNext={handleNext}>
-      <UnderlineInput
-        value={email}
-        onChangeText={(v) => setEmail(v.trim())}
-        placeholder="이메일 주소"
-        keyboardType="email-address"
-        autoCapitalize="none"
-        autoCorrect={false}
-        textContentType="emailAddress"
-        autoFocus
-        returnKeyType="next"
-        onSubmitEditing={() => valid && handleNext()}
-      />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      <FormField error={error}>
+        <UnderlineInput
+          value={email}
+          onChangeText={(v) => {
+            setEmail(v.trim());
+            if (error) setError(null);
+          }}
+          placeholder="이메일 주소"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          textContentType="emailAddress"
+          autoFocus
+          returnKeyType="next"
+          onSubmitEditing={() => valid && handleNext()}
+        />
+      </FormField>
     </StepScreen>
   );
 }
-
-const styles = StyleSheet.create({
-  error: { ...Typography.footnote, color: Brand.textError, marginTop: 16 },
-});

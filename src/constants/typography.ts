@@ -50,8 +50,27 @@ export const Typography = {
     fontFamily: Fonts.semiBold,
     fontWeight: '600',
     fontSize: 28,
-    lineHeight: 28,
+    // Figma는 28(=fontSize)이지만 그대로 쓰면 'g'의 꼬리가 잘린다
+    lineHeight: 36,
     letterSpacing: -0.56,
+  },
+  /** 브랜드 로고 — 온보딩 스플래시의 큰 "Fishlog" (Figma 634:2541) */
+  brandSplash: {
+    fontFamily: Fonts.semiBold,
+    fontWeight: '600',
+    fontSize: 52,
+    // 디센더가 잘리지 않게 Figma(52)보다 넉넉히
+    lineHeight: 66,
+    letterSpacing: -1.04,
+  },
+  /** 브랜드 로고 — 로그인 화면 (Figma 634:2564) */
+  brandAuth: {
+    fontFamily: Fonts.semiBold,
+    fontWeight: '600',
+    fontSize: 38,
+    // 디센더가 잘리지 않게 Figma(37.8)보다 넉넉히
+    lineHeight: 48,
+    letterSpacing: -0.76,
   },
   /** 화면 헤더 타이틀 (Figma I316:668;315:713) */
   header: {
@@ -61,12 +80,13 @@ export const Typography = {
     lineHeight: 28,
     letterSpacing: -0.36,
   },
-  /** 단계 안내 문구 — 회원가입·비밀번호찾기 스텝 */
+  /** 단계 안내 문구 — 회원가입·비밀번호찾기 스텝 (Figma 634:2583) */
   heading: {
     fontFamily: Fonts.semiBold,
     fontWeight: '600',
     fontSize: 24,
-    lineHeight: 34,
+    lineHeight: 32,
+    letterSpacing: -0.48,
   },
   /** 섹션 제목 — "추천 낚시 스팟 Top 3" (Figma 72:1211) */
   sectionTitle: {
@@ -146,22 +166,37 @@ export const Typography = {
   },
   /** 버튼 라벨 (Figma 147:1131) */
   button: {
-    fontFamily: Fonts.semiBold,
-    fontWeight: '600',
+    fontFamily: Fonts.bold,
+    fontWeight: '700',
+    fontSize: 16,
+    lineHeight: 32,
+    letterSpacing: -0.32,
+  },
+  /** 입력 텍스트 — 박스형(로그인, Figma 634:2562) */
+  input: {
+    fontFamily: Fonts.medium,
+    fontWeight: '500',
     fontSize: 16,
     letterSpacing: -0.32,
   },
-  /** 입력 텍스트 — 박스형(로그인) */
-  input: {
-    fontFamily: Fonts.regular,
-    fontWeight: '400',
-    fontSize: 16,
-  },
-  /** 입력 텍스트 — 언더라인형(회원가입 스텝) */
+  /**
+   * 입력 텍스트 — 언더라인형(회원가입 스텝)의 빈 상태 (Figma 634:2586).
+   *
+   * lineHeight는 일부러 넣지 않는다. 안드로이드 TextInput은 lineHeight를 주면
+   * 글자가 위아래로 잘리는 경우가 있어, 줄 높이는 컴포넌트에서 height로 잡는다.
+   */
   inputLarge: {
     fontFamily: Fonts.regular,
     fontWeight: '400',
     fontSize: 18,
+    letterSpacing: -0.36,
+  },
+  /** 위와 같은 입력에 값이 들어간 상태 — 한 단계 굵어진다 (Figma 634:2648) */
+  inputLargeFilled: {
+    fontFamily: Fonts.medium,
+    fontWeight: '500',
+    fontSize: 18,
+    letterSpacing: -0.36,
   },
   /** 본문 */
   body: {
@@ -180,5 +215,85 @@ export const Typography = {
     fontFamily: Fonts.regular,
     fontWeight: '400',
     fontSize: 13,
+  },
+  /** 세그먼트 컨트롤의 선택된 칸 라벨 (Figma 323:1046) */
+  segmentLabel: {
+    fontFamily: Fonts.semiBold,
+    fontWeight: '600',
+    fontSize: 14,
+    lineHeight: 28,
+    letterSpacing: -0.28,
+  },
+  /** 세그먼트 컨트롤의 선택되지 않은 칸 라벨 — 한 단계 얇다 (Figma 323:1049) */
+  segmentLabelIdle: {
+    fontFamily: Fonts.medium,
+    fontWeight: '500',
+    fontSize: 14,
+    lineHeight: 28,
+    letterSpacing: -0.28,
+  },
+  /** 랭킹 4위 이하의 순위 숫자 (Figma 323:884) */
+  rankNumber: {
+    fontFamily: Fonts.semiBold,
+    fontWeight: '600',
+    fontSize: 18,
+    lineHeight: 28,
+    letterSpacing: -0.45,
+  },
+  /** 카드 안의 보조 수치 — "12/50종 (22%)" (Figma 634:2292) */
+  cardMeta: {
+    fontFamily: Fonts.medium,
+    fontWeight: '500',
+    fontSize: 13,
+    lineHeight: 20,
+    letterSpacing: -0.325,
+  },
+  /** 인증번호 한 자리 숫자 (Figma 634:2726) */
+  otpDigit: {
+    fontFamily: Fonts.medium,
+    fontWeight: '500',
+    fontSize: 20,
+    lineHeight: 32,
+    letterSpacing: -0.4,
+  },
+  /** 설정 목록 항목 라벨 (Figma 566:1243) */
+  listItem: {
+    fontFamily: Fonts.medium,
+    fontWeight: '500',
+    fontSize: 16,
+    lineHeight: 20,
+    letterSpacing: -0.4,
+  },
+  /** 목록 위 구분 라벨 — "기타" · "설정" (Figma 634:3038) */
+  sectionLabel: {
+    fontFamily: Fonts.regular,
+    fontWeight: '400',
+    fontSize: 14,
+    lineHeight: 20,
+    letterSpacing: -0.35,
+  },
+  /** 마이페이지 닉네임 (Figma 634:3036) */
+  profileName: {
+    fontFamily: Fonts.bold,
+    fontWeight: '700',
+    fontSize: 20,
+    lineHeight: 28,
+    letterSpacing: -0.5,
+  },
+  /** 마이페이지 이메일 (Figma 634:3037) */
+  profileEmail: {
+    fontFamily: Fonts.medium,
+    fontWeight: '500',
+    fontSize: 14,
+    lineHeight: 20,
+    letterSpacing: -0.35,
+  },
+  /** 바로가기 카드 라벨 — "내 도감" (Figma 634:3045) */
+  quickLabel: {
+    fontFamily: Fonts.semiBold,
+    fontWeight: '600',
+    fontSize: 14,
+    lineHeight: 28,
+    letterSpacing: -0.35,
   },
 } as const;

@@ -131,7 +131,34 @@ Swagger에 `LoginResponse` 스키마가 **정의돼 있지 않다** (`POST /api/
 
 ---
 
-## 6. 미착수 기능
+## 6. 저장소 설정
+
+### 6-1. `.gitattributes` 부재 — 줄바꿈 충돌 위험
+
+리포에 `.gitattributes`가 없어서 줄바꿈 처리가 **각자 로컬 설정에 의존**하고 있다.
+
+- 윈도우: `core.autocrlf=true`가 기본 → 체크아웃 시 CRLF, 저장은 LF
+- 맥/리눅스: `core.autocrlf=false`가 기본 → LF 그대로
+
+지금은 저장소 안이 LF로 통일돼 있어 겉으로 문제가 없지만, 설정이 다른 사람이 파일을 건드리면
+**줄바꿈만 바뀐 수천 줄짜리 diff**가 생길 수 있다. 현재 팀에 맥 사용자가 있어 실제 위험이 있다.
+
+지금 PR에 넣지 않은 이유: 이번 diff가 이미 크고, 줄바꿈 정규화가 섞이면 리뷰가 더 어려워진다.
+
+- [ ] **별도 PR로** 아래 내용의 `.gitattributes` 추가 후 `git add --renormalize .`
+
+  ```
+  * text=auto eol=lf
+
+  *.png binary
+  *.jpg binary
+  *.ttf binary
+  *.otf binary
+  ```
+
+---
+
+## 7. 미착수 기능
 
 Swagger에 있으나 아직 화면/연동이 없는 API.
 
