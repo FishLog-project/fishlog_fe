@@ -15,7 +15,10 @@ const CRITICAL_IMAGES = [
   require('@/assets/images/tabs/profile-inactive.svg'),
 
   // 홈
-  require('@/assets/images/home/hero-card.png'),
+  require('@/assets/images/home/featured-flatfish.png'),
+  require('@/assets/images/home/featured-flatfish-shadow.png'),
+  require('@/assets/images/home/unowned-fish.png'),
+  require('@/assets/images/home/recommended-spot-marine.jpg'),
   require('@/assets/images/home/scan-fish.svg'),
   require('@/assets/images/home/fishing-rod.png'),
   require('@/assets/images/home/chevron-20.svg'),
@@ -25,6 +28,9 @@ const CRITICAL_IMAGES = [
 ] as const;
 
 const DEFERRED_IMAGES = [
+  // 홈 — 추천 스팟 1위가 내륙일 때만 쓰는 사진
+  require('@/assets/images/home/recommended-spot-inland.jpg'),
+
   // 지도
   require('@/assets/images/map/map-placeholder.png'),
   require('@/assets/images/map/grid.svg'),

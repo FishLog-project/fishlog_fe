@@ -1,83 +1,84 @@
 /**
- * 홈 화면 데이터 인터페이스 + fixture 어댑터.
- *
- * 화면은 FishLogDataSource 인터페이스만 알고, 홈 API가 나오면
- * 이 인터페이스의 서버 구현으로 갈아끼운다 (화면 코드는 그대로).
- * fixture 값은 Figma 홈(72:1104)의 문구·수치를 따른다.
+ * 홈 데이터 인터페이스 + fixture 어댑터.
+ * 타입은 BE 응답 DTO를 그대로 따른다 — 서버 구현이 응답을 변환 없이 넘길 수 있게.
  */
 
-export interface FishSpecies {
-  id: string;
+/** GET /api/banner/seasonal-fish */
+export interface SeasonalFish {
+  fishId: number;
   name: string;
-  /** 히어로 타이틀 — "광어 잡기 좋은 날!" */
-  seasonalHeadline: string;
+  imageUrl: string | null;
 }
 
-export interface FishingSpot {
-  id: string;
+/** GET /api/spots/popular. 거리는 BE에 없어 FE가 현재 위치로 계산한다 */
+export interface PopularSpot {
+  id: number;
   name: string;
-  distanceMeters: number;
-  /** 잡히는 어종 — 디자인의 "광어, 멸치, 개복치" 줄 */
-  species: readonly string[];
+  lat: number;
+  lot: number;
+  category: '해양' | '내륙';
+  viewCount: number;
+  majorFishes: readonly string[];
+  distanceMeters?: number;
 }
 
+/** GET /api/collections/dex의 집계 필드 (fishes[]는 홈이 쓰지 않는다) */
 export interface CollectionProgress {
-  collectedSpeciesCount: number;
-  totalSpeciesCount: number;
+  totalCount: number;
+  caughtCount: number;
 }
 
-/**
- * 홈이 서버에서 받아야 하는 데이터 전부.
- *
- * "물고기 인증하기" 카드는 여기 없다 — 내용이 상태와 무관하게 항상 같은
- * 정적 진입점이라 데이터 섹션이 아니다.
- */
+/** "물고기 인증하기" 카드는 상태와 무관한 정적 진입점이라 여기 없다 */
 export interface FishLogDataSource {
-  /** 히어로 캐러셀 슬라이드. 빈 배열이면 추천할 어종이 없는 상태 */
-  getFeaturedSpecies(): Promise<readonly FishSpecies[]>;
+  getSeasonalFish(): Promise<readonly SeasonalFish[]>;
   getCollectionProgress(): Promise<CollectionProgress>;
-  getRecommendedSpots(limit: number): Promise<readonly FishingSpot[]>;
+  getPopularSpots(limit: number): Promise<readonly PopularSpot[]>;
 }
 
-/**
- * fixture 시나리오.
- * - ready: 정상 데이터
- * - empty: 추천 어종 없음 · 도감 0종 · 스팟 없음
- * - partial-error: 스팟 요청만 1회 실패 (재시도하면 성공 — 오류→복구 흐름 확인용)
- */
+/** partial-error는 스팟만 1회 실패한다 (오류→재시도 복구 흐름 확인용) */
 export type HomeFixtureScenario = 'ready' | 'empty' | 'partial-error';
 
-/** 디자인의 인디케이터가 점 5개라 슬라이드도 5장으로 맞춘다 */
-const featuredSpecies: readonly FishSpecies[] = [
-  { id: 'species-flatfish', name: '광어', seasonalHeadline: '광어 잡기 좋은 날!' },
-  { id: 'species-rockfish', name: '우럭', seasonalHeadline: '우럭이 잘 무는 시기예요' },
-  { id: 'species-seabream', name: '참돔', seasonalHeadline: '참돔 손맛 보기 좋은 날!' },
-  { id: 'species-hairtail', name: '갈치', seasonalHeadline: '갈치는 지금이 제철이에요' },
-  { id: 'species-mackerel', name: '고등어', seasonalHeadline: '고등어 떼가 몰려왔어요' },
+const seasonalFish: readonly SeasonalFish[] = [
+  { fishId: 7, name: '광어', imageUrl: null },
+  { fishId: 5, name: '우럭', imageUrl: null },
+  { fishId: 6, name: '참돔', imageUrl: null },
 ];
 
-const recommendedSpots: readonly FishingSpot[] = [
+/** 이름·분류는 Figma 추천 스팟 슬라이드(해양 778:2679 · 내륙 958:2613)의 예시 */
+const popularSpots: readonly PopularSpot[] = [
   {
-    id: 'spot-gimnyeong',
-    name: '제주 김녕항',
+    id: 1,
+    name: '인천 영종도 천혜바다낚시터',
+    lat: 37.4949,
+    lot: 126.4533,
+    category: '해양',
+    viewCount: 412,
+    majorFishes: ['광어', '우럭', '참돔'],
     distanceMeters: 3200,
-    species: ['광어', '멸치', '개복치'],
   },
   {
-    id: 'spot-dadaepo',
-    name: '부산 다대포',
+    id: 2,
+    name: '안산 수암저수지 낚시터',
+    lat: 37.3399,
+    lot: 126.8876,
+    category: '내륙',
+    viewCount: 287,
+    majorFishes: ['붕어', '잉어', '배스'],
     distanceMeters: 8700,
-    species: ['우럭', '참돔'],
   },
   {
-    id: 'spot-misu',
+    id: 3,
     name: '통영 미수항',
+    lat: 34.8306,
+    lot: 128.4153,
+    category: '해양',
+    viewCount: 173,
+    majorFishes: ['갈치', '고등어', '전갱이'],
     distanceMeters: 12400,
-    species: ['갈치', '고등어', '전갱이'],
   },
 ];
 
-/** 실제 네트워크처럼 로딩 상태가 잠깐 보이도록 지연을 준다 */
+/** 실제 네트워크처럼 로딩 상태가 잠깐 보이도록 */
 const FIXTURE_DELAY_MS = 250;
 
 function resolveAfter<T>(value: T): Promise<T> {
@@ -95,28 +96,26 @@ function rejectAfter(message: string): Promise<never> {
 export function createFixtureFishLogDataSource(
   scenario: HomeFixtureScenario = 'ready',
 ): FishLogDataSource {
-  let shouldFailRecommendedSpots = scenario === 'partial-error';
+  let shouldFailPopularSpots = scenario === 'partial-error';
 
   return {
-    getFeaturedSpecies() {
-      return resolveAfter(scenario === 'empty' ? [] : featuredSpecies);
+    getSeasonalFish() {
+      return resolveAfter(scenario === 'empty' ? [] : seasonalFish);
     },
     getCollectionProgress() {
-      // Figma 홈의 "34/150종"
+      // BE 시드 24종 기준 예시값
       return resolveAfter({
-        collectedSpeciesCount: scenario === 'empty' ? 0 : 34,
-        totalSpeciesCount: 150,
+        totalCount: 24,
+        caughtCount: scenario === 'empty' ? 0 : 7,
       });
     },
-    getRecommendedSpots(limit) {
-      if (shouldFailRecommendedSpots) {
-        shouldFailRecommendedSpots = false;
+    getPopularSpots(limit) {
+      if (shouldFailPopularSpots) {
+        shouldFailPopularSpots = false;
         return rejectAfter('추천 낚시 스팟 fixture를 불러오지 못했습니다.');
       }
-      const safeLimit = Math.max(0, Math.min(limit, recommendedSpots.length));
-      return resolveAfter(
-        scenario === 'empty' ? [] : recommendedSpots.slice(0, safeLimit),
-      );
+      const safeLimit = Math.max(0, Math.min(limit, popularSpots.length));
+      return resolveAfter(scenario === 'empty' ? [] : popularSpots.slice(0, safeLimit));
     },
   };
 }
