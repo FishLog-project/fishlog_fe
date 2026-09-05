@@ -84,7 +84,7 @@ export default function DexScreen() {
             {gridData ? (
               <FlatList
                 data={gridData}
-                keyExtractor={(item, index) => item?.id ?? `filler-${index}`}
+                keyExtractor={(item, index) => (item ? String(item.id) : `filler-${index}`)}
                 numColumns={COLUMNS}
                 renderItem={({ item }) =>
                   item ? (

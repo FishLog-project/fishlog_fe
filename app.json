@@ -35,6 +35,13 @@
           "resizeMode": "contain"
         }
       ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "잡은 물고기를 촬영해 도감에 등록하기 위해 카메라를 사용해요.",
+          "recordAudioAndroid": false
+        }
+      ],
       "expo-secure-store",
       "expo-image",
       "expo-status-bar",

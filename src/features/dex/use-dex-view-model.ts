@@ -1,10 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
+import { dexFixtureRevision } from '@/features/dex/dex-data';
 import type { DexDataSource, DexSpecies } from '@/features/dex/dex-data';
 import { useSection } from '@/lib/use-section';
 
 export interface DexSpeciesViewModel {
-  id: string;
+  id: number;
   /** 잠금 카드는 이름을 감춘다 — 화면이 아니라 여기서 결정한다 */
   label: string;
   collected: boolean;
@@ -49,6 +51,16 @@ function loadSpecies(dataSource: DexDataSource) {
   return dataSource.getSpecies();
 }
 
+/** 어종 한 마리를 상세 카드용으로 옮긴다. 낚시 인증 완료 화면도 같은 카드를 쓴다 */
+export function toDexSpeciesDetail(s: DexSpecies): DexSpeciesDetailViewModel {
+  return {
+    name: s.name,
+    description: s.description,
+    habitatLabel: s.habitat ? `주요 서식지: ${s.habitat}` : '',
+    catchLabel: `잡은 횟수: ${s.catchCount}회`,
+  };
+}
+
 function toDexViewModel(species: readonly DexSpecies[]): DexViewModel | null {
   if (species.length === 0) return null;
 
@@ -63,14 +75,7 @@ function toDexViewModel(species: readonly DexSpecies[]): DexViewModel | null {
         ? `${s.name}, 서식지 ${s.habitat}`
         : '아직 잡지 못한 어종',
       searchText: s.collected ? `${s.name} ${s.habitat}` : '',
-      detail: s.collected
-        ? {
-            name: s.name,
-            description: s.description,
-            habitatLabel: `주요 서식지: ${s.habitat}`,
-            catchLabel: `잡은 횟수: ${s.catchCount}회`,
-          }
-        : null,
+      detail: s.collected ? toDexSpeciesDetail(s) : null,
     })),
     collected,
     total: species.length,
@@ -81,6 +86,20 @@ function toDexViewModel(species: readonly DexSpecies[]): DexViewModel | null {
 export function useDexViewModel(dataSource: DexDataSource) {
   const [query, setQuery] = useState('');
   const [state, retry] = useSection(dataSource, loadSpecies, toDexViewModel);
+
+  /**
+   * 낚시 인증이 도감 fixture를 바꾼 뒤 탭에 돌아오면 다시 읽는다.
+   * 탭 화면은 마운트가 유지돼 그냥 두면 등록 전 목록이 그대로 남는다.
+   * 서버가 붙으면 revision 비교 없이 포커스마다 다시 받는 식으로 바꾼다.
+   */
+  const seenRevision = useRef(dexFixtureRevision());
+  useFocusEffect(
+    useCallback(() => {
+      if (seenRevision.current === dexFixtureRevision()) return;
+      seenRevision.current = dexFixtureRevision();
+      retry();
+    }, [retry]),
+  );
 
   const trimmedQuery = query.trim();
 

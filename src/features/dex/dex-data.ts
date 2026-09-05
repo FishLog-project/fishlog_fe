@@ -2,12 +2,13 @@
  * 도감 데이터 인터페이스 + fixture 어댑터.
  *
  * 홈(`home-data.ts`)과 같은 방식이다. 화면은 DexDataSource만 알고,
- * `GET /api/fish`가 나오면 이 인터페이스의 서버 구현으로 갈아끼운다.
+ * `GET /api/collections/dex`가 나오면 이 인터페이스의 서버 구현으로 갈아끼운다.
  * fixture 값은 Figma 도감2안(103:173)의 "13/50종"을 따른다.
  */
 
 export interface DexSpecies {
-  id: string;
+  /** BE DexEntryResponse.id (Long) */
+  id: number;
   name: string;
   /** 주요 서식지 — 검색이 어종명과 함께 훑는 대상 ("어종 또는 지역 검색") */
   habitat: string;
@@ -89,11 +90,12 @@ const SPECIES: readonly (readonly [string, string])[] = [
 /** Figma의 "13/50종" */
 const COLLECTED_COUNT = 13;
 
-const species: readonly DexSpecies[] = SPECIES.map(([name, habitat], index) => {
+// 낚시 인증이 등록 결과를 반영하므로 fixture 목록은 바뀔 수 있다 (서버였다면 DB)
+let species: readonly DexSpecies[] = SPECIES.map(([name, habitat], index) => {
   const collected = index < COLLECTED_COUNT;
 
   return {
-    id: `species-${index + 1}`,
+    id: index + 1,
     name,
     habitat,
     collected,
@@ -104,6 +106,32 @@ const species: readonly DexSpecies[] = SPECIES.map(([name, habitat], index) => {
     catchCount: collected ? (index % 4) + 1 : 0,
   };
 });
+
+/** 등록으로 목록이 바뀔 때마다 오른다. 도감 화면이 탭에 돌아올 때 다시 읽을지 판단한다 */
+let revision = 0;
+
+export function dexFixtureRevision() {
+  return revision;
+}
+
+/**
+ * 낚시 인증 fixture가 등록(verify) 결과를 여기에 반영한다.
+ * 첫 획득이면 잠금이 풀리고, 잡은 횟수가 1 오른다. 없는 어종이면 null.
+ */
+export function recordFixtureCatch(fishId: number) {
+  const found = species.find((s) => s.id === fishId);
+  if (!found) return null;
+
+  const updated = { ...found, collected: true, catchCount: found.catchCount + 1 };
+  species = species.map((s) => (s.id === fishId ? updated : s));
+  revision += 1;
+
+  return {
+    name: updated.name,
+    firstCatch: !found.collected,
+    catchCount: updated.catchCount,
+  };
+}
 
 /** 실제 네트워크처럼 로딩 상태가 잠깐 보이도록 지연을 준다 */
 const FIXTURE_DELAY_MS = 250;

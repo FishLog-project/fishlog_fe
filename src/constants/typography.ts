@@ -173,6 +173,17 @@ export const Typography = {
     lineHeight: 16,
     letterSpacing: -0.2,
   },
+  /**
+   * 단계 안내 문구 — 인증 플로우의 "잡은 물고기가 잘 보이게 촬영해 주세요" (Figma 634:3121).
+   * 디자인은 Pretendard SemiBold지만 앱 기본 서체가 SUITE라 SUITE로 맞춘다.
+   */
+  stepTitle: {
+    fontFamily: Fonts.semiBold,
+    fontWeight: '600',
+    fontSize: 20,
+    lineHeight: 28,
+    letterSpacing: -0.4,
+  },
   /** 어종 상세 카드 제목 — "개복치" (Figma 106:455) */
   detailTitle: {
     fontFamily: Fonts.bold,

@@ -106,8 +106,6 @@ export const Derived = {
   /** 상세 카드를 띄우는 파란 발광 (2겹) */
   dexDetailGlow: 'rgba(0, 127, 231, 0.35)',
   dexDetailGlowOuter: 'rgba(63, 146, 201, 0.28)',
-  /** 모달 뒤를 덮는 막 */
-  scrim: 'rgba(0, 55, 92, 0.45)',
 } as const;
 
 /**

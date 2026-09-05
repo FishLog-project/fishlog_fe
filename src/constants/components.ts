@@ -23,6 +23,15 @@ export const Components = {
     outlineLabel: Palette.bluegray[400],
     outlineWidth: 1,
   },
+  /** 낚시 인증 플로우 (Figma UI 634:3106 ~ 634:3158) */
+  catch: {
+    /** 카메라 미리보기·결과 사진 자리표시 배경 (Figma 634:3122 / 664:3414) */
+    previewBg: Derived.neutral,
+    /** 셔터 버튼 지름 (Figma 634:3123) */
+    shutterSize: 68,
+    /** 하단 버튼 사이 간격 (Figma 670 → 734) */
+    actionGap: 8,
+  },
   searchBar: {
     bg: Palette.bluegray[100],
     radius: 50,

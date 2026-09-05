@@ -55,61 +55,100 @@ export function SpeciesDetailDialog({
         onPress={onClose}>
         {species ? (
           // 카드 안쪽 터치가 막까지 올라가 모달을 닫지 않도록 막는다
-          <Pressable style={styles.card} onPress={() => {}}>
-            <Text style={styles.title} accessibilityRole="header">
-              {species.name}
-            </Text>
-
-            <LinearGradient
-              colors={[...DEX.tileFill]}
-              // Figma는 -44.04deg. 아래 오른쪽에서 위 왼쪽으로 흐른다.
-              start={{ x: 0.85, y: 0.85 }}
-              end={{ x: 0.15, y: 0.15 }}
-              locations={[0.129, 0.978]}
-              style={styles.tile}>
-              {BUBBLES.map((b, i) => (
-                <View
-                  key={i}
-                  style={[
-                    styles.bubble,
-                    {
-                      left: b.left,
-                      top: b.top,
-                      width: b.size,
-                      height: b.size,
-                      borderRadius: b.size / 2,
-                      opacity: b.opacity,
-                    },
-                  ]}
-                />
-              ))}
-              <Image source={ART} style={styles.art} contentFit="contain" />
-            </LinearGradient>
-
-            <Text style={styles.description}>{species.description}</Text>
-
-            <View style={styles.chipRow}>
-              <View style={[styles.chip, styles.habitatChip]}>
-                <Text style={styles.chipText}>{species.habitatLabel}</Text>
-              </View>
-              <View style={[styles.chip, styles.catchChip]}>
-                <Text style={styles.chipText}>{species.catchLabel}</Text>
-              </View>
-            </View>
-
-            {/* 인증샷 4칸 — 사진 데이터가 아직 없어 빈 칸으로 둔다 */}
-            <View
-              style={styles.photoRow}
-              accessible
-              accessibilityLabel="인증샷 준비 중">
-              {Array.from({ length: D.photoCount }, (_, i) => (
-                <View key={i} style={styles.photo} />
-              ))}
-            </View>
+          <Pressable style={styles.cardSlot} onPress={() => {}}>
+            <SpeciesDetailCard species={species} />
           </Pressable>
         ) : null}
       </Pressable>
     </Modal>
+  );
+}
+
+/**
+ * 상세 카드 본문. 모달 없이도 쓸 수 있게 분리했다 —
+ * 낚시 인증 완료 화면(Figma 634:3158)이 등록된 어종을 이 카드로 보여준다.
+ */
+export function SpeciesDetailCard({
+  species,
+  verificationPhotoUri,
+  onVerificationPhotoPress,
+}: {
+  species: DexSpeciesDetailViewModel;
+  /** 인증 완료 화면이 방금 찍은 사진을 첫 칸에 넣는다. 도감 모달은 아직 사진 데이터가 없다 */
+  verificationPhotoUri?: string;
+  onVerificationPhotoPress?: () => void;
+}) {
+  return (
+    <View style={styles.card}>
+      <Text style={styles.title} accessibilityRole="header">
+        {species.name}
+      </Text>
+
+      <LinearGradient
+        colors={[...DEX.tileFill]}
+        // Figma는 -44.04deg. 아래 오른쪽에서 위 왼쪽으로 흐른다.
+        start={{ x: 0.85, y: 0.85 }}
+        end={{ x: 0.15, y: 0.15 }}
+        locations={[0.129, 0.978]}
+        style={styles.tile}>
+        {BUBBLES.map((b, i) => (
+          <View
+            key={i}
+            style={[
+              styles.bubble,
+              {
+                left: b.left,
+                top: b.top,
+                width: b.size,
+                height: b.size,
+                borderRadius: b.size / 2,
+                opacity: b.opacity,
+              },
+            ]}
+          />
+        ))}
+        <Image source={ART} style={styles.art} contentFit="contain" />
+      </LinearGradient>
+
+      <Text style={styles.description}>{species.description}</Text>
+
+      <View style={styles.chipRow}>
+        {species.habitatLabel ? (
+          <View style={[styles.chip, styles.habitatChip]}>
+            <Text style={styles.chipText}>{species.habitatLabel}</Text>
+          </View>
+        ) : null}
+        <View style={[styles.chip, styles.catchChip]}>
+          <Text style={styles.chipText}>{species.catchLabel}</Text>
+        </View>
+      </View>
+
+      {/* 인증샷 4칸 — 인증 직후엔 첫 칸만 방금 찍은 사진, 나머지는 사진 데이터가 없어 빈 칸이다 */}
+      <View
+        style={styles.photoRow}
+        accessible={!verificationPhotoUri}
+        accessibilityLabel={verificationPhotoUri ? undefined : '인증샷 준비 중'}>
+        {verificationPhotoUri ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="인증 사진 보기"
+            disabled={!onVerificationPhotoPress}
+            style={({ pressed }) => [styles.photo, pressed && styles.photoPressed]}
+            onPress={onVerificationPhotoPress}>
+            <Image
+              source={{ uri: verificationPhotoUri }}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+            />
+          </Pressable>
+        ) : (
+          <View style={styles.photo} />
+        )}
+        {Array.from({ length: D.photoCount - 1 }, (_, i) => (
+          <View key={i} style={styles.photo} />
+        ))}
+      </View>
+    </View>
   );
 }
 
@@ -121,6 +160,8 @@ const styles = StyleSheet.create({
     padding: 24,
     backgroundColor: D.scrim,
   },
+  /** 카드의 width:100%가 막 폭을 기준으로 잡히도록 한 겹 받친다 */
+  cardSlot: { width: '100%', alignItems: 'center' },
   card: {
     width: '100%',
     maxWidth: D.maxWidth,
@@ -176,5 +217,7 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     borderRadius: D.photoRadius,
     backgroundColor: D.photoBg,
+    overflow: 'hidden',
   },
+  photoPressed: { opacity: 0.75 },
 });
