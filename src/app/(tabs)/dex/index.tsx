@@ -1,22 +1,23 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 
 import { Screen, ScreenHeader, ScreenState, SearchBar } from '@/components/common';
 import { Brand, Components, Layout, Typography } from '@/constants/theme';
+import { useAuth } from '@/features/auth';
+import { createApiDexDataSource } from '@/features/dex/dex-api';
 import { createFixtureDexDataSource } from '@/features/dex/dex-data';
 import { SpeciesCard } from '@/features/dex/components/species-card';
 import { SpeciesDetailDialog } from '@/features/dex/components/species-detail-dialog';
-import {
-  useDexViewModel,
-  type DexSpeciesDetailViewModel,
-} from '@/features/dex/use-dex-view-model';
+import { useDexViewModel } from '@/features/dex/use-dex-view-model';
+import { USE_FIXTURE } from '@/lib/data-source-mode';
 
 const DEX = Components.dex;
 
 /**
- * 수조 뚜껑 에셋 (Figma Subtract 103:213).
+ * 수조 뚜껑 에셋 (Figma Subtract 634:1346).
  *
  * 그림자가 구워져 있어 SVG 캔버스(142.194x50.6)가 디자인 박스(134.594x43)보다 크다.
  * 바깥 박스를 그대로 두고 넣어야 뚜껑이 수조 테두리에 정확히 걸친다.
@@ -32,6 +33,8 @@ const TANK_TOP_INSET = 23.8;
 
 /** 수조 안쪽 윗면부터 완성도 카드까지 (Figma 192 → 223) */
 const TANK_PADDING_TOP = 31;
+/** 검색 중엔 완성도 카드가 빠지고 첫 줄이 더 아래에서 시작한다 (Figma 도감 검색 192 → 243) */
+const SEARCH_LIST_TOP = 51;
 /** 완성도 카드와 첫 줄 사이 (Figma 296 → 316). rowGap 위에 얹는 값이다 */
 const SUMMARY_GAP = DEX.rowGap;
 
@@ -45,14 +48,18 @@ const LABEL_FITS_PERCENT = 15;
 const COLUMNS = 3;
 
 export default function DexScreen() {
-  // 렌더마다 새로 만들면 useSection 의존성이 흔들려 무한 재요청이 된다.
-  // 빈/오류 화면을 확인하려면 인자를 'empty' | 'error'로 바꾼다.
-  const dataSource = useMemo(() => createFixtureDexDataSource(), []);
+  const router = useRouter();
+  const { token } = useAuth();
+  const needsLogin = !USE_FIXTURE && token === null;
+  const dataSource = useMemo(
+    () => (USE_FIXTURE ? createFixtureDexDataSource() : createApiDexDataSource(token)),
+    [token],
+  );
   const { state, results, query, setQuery, retry, isSearching } =
     useDexViewModel(dataSource);
 
-  // 열려 있는 상세 카드. 잠금 카드는 detail이 null이라 애초에 열리지 않는다.
-  const [detail, setDetail] = useState<DexSpeciesDetailViewModel | null>(null);
+  // 상세 카드를 연 어종. 잠금 카드는 눌리지 않으므로 획득한 어종만 들어온다.
+  const [selectedId, setSelectedId] = useState<number | null>(null);
 
   /**
    * 마지막 줄이 덜 차면 flex:1 카드가 남은 자리를 나눠 갖느라 넓어진다.
@@ -81,23 +88,33 @@ export default function DexScreen() {
       <View style={styles.tankArea}>
         <View style={styles.tankRim}>
           <View style={styles.tankWater}>
-            {gridData ? (
+            {needsLogin ? (
+              <View style={styles.stateWrap}>
+                <ScreenState
+                  variant="empty"
+                  title="로그인하면 도감을 볼 수 있어요"
+                  description="잡은 물고기가 도감에 차곡차곡 쌓여요."
+                  actionLabel="로그인하기"
+                  onAction={() => router.push('/auth/login')}
+                />
+              </View>
+            ) : gridData ? (
               <FlatList
                 data={gridData}
-                keyExtractor={(item, index) => item?.id ?? `filler-${index}`}
+                keyExtractor={(item, index) => (item ? String(item.id) : `filler-${index}`)}
                 numColumns={COLUMNS}
                 renderItem={({ item }) =>
                   item ? (
-                    <SpeciesCard
-                      species={item}
-                      onPress={(s) => setDetail(s.detail)}
-                    />
+                    <SpeciesCard species={item} onPress={(s) => setSelectedId(s.id)} />
                   ) : (
                     <View style={styles.filler} />
                   )
                 }
                 columnWrapperStyle={styles.row}
-                contentContainerStyle={styles.listContent}
+                contentContainerStyle={[
+                  styles.listContent,
+                  isSearching && styles.listContentSearching,
+                ]}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
                 ListHeaderComponent={
@@ -138,12 +155,16 @@ export default function DexScreen() {
         <Image source={LID} style={styles.lid} contentFit="contain" />
       </View>
 
-      <SpeciesDetailDialog species={detail} onClose={() => setDetail(null)} />
+      <SpeciesDetailDialog
+        dataSource={dataSource}
+        fishId={selectedId}
+        onClose={() => setSelectedId(null)}
+      />
     </Screen>
   );
 }
 
-/** 도감 완성도 카드 — 좌측 수치 + 우측 막대 (Figma 103:193) */
+/** 도감 완성도 카드 — 좌측 수치 + 우측 막대 (Figma 634:1308) */
 function CompletionSummary({
   collected,
   total,
@@ -223,6 +244,7 @@ const styles = StyleSheet.create({
     // 줄 간격. 완성도 카드와 첫 줄 사이도 이 값이 먹는다
     gap: DEX.rowGap,
   },
+  listContentSearching: { paddingTop: SEARCH_LIST_TOP },
   row: { gap: DEX.columnGap },
   /** 마지막 줄의 빈 칸 — 카드와 같은 폭을 차지하기만 한다 */
   filler: { flex: 1 },

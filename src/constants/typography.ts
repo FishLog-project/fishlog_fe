@@ -173,15 +173,15 @@ export const Typography = {
     lineHeight: 16,
     letterSpacing: -0.2,
   },
-  /** 어종 상세 카드 제목 — "개복치" (Figma 106:455) */
+  /** 어종 상세 카드 제목 — "개복치" (Figma 634:1445) */
   detailTitle: {
     fontFamily: Fonts.bold,
     fontWeight: '700',
     fontSize: 18,
-    lineHeight: 40,
+    lineHeight: 24,
     letterSpacing: -0.36,
   },
-  /** 어종 상세 설명 (Figma 106:461) */
+  /** 어종 상세 설명 · "최대 크기 300cm" (Figma 634:1448 · 665:3435) */
   detailBody: {
     fontFamily: Fonts.medium,
     fontWeight: '500',
@@ -189,7 +189,7 @@ export const Typography = {
     lineHeight: 16,
     letterSpacing: -0.24,
   },
-  /** 칩 안의 문구 — "주요 서식지: 강" (Figma 130:185) */
+  /** 칩 안의 문구 — "주요 서식지: 바다" (Figma 665:3440) */
   chipLabel: {
     fontFamily: Fonts.medium,
     fontWeight: '500',

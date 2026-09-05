@@ -1,114 +1,211 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Brand, Components, Typography } from '@/constants/theme';
-import type { DexSpeciesDetailViewModel } from '@/features/dex/use-dex-view-model';
+import { ScreenState } from '@/components/common';
+import { Brand, Components, Fonts, Typography } from '@/constants/theme';
+import type { DexDataSource, RecentCatch } from '@/features/dex/dex-data';
+import {
+  useDexDetailViewModel,
+  type DexSpeciesDetailViewModel,
+} from '@/features/dex/use-dex-view-model';
 
 const DEX = Components.dex;
 const D = DEX.detail;
 
-/** ⚠️ 임시 — 목록 카드와 같은 자리표시 에셋. 어종별 그림이 오면 교체한다 */
-const ART = require('@/assets/images/dex/species-placeholder.svg');
+/** Figma 상세 카드의 그림 칸(665:3461) — 테두리·그라데이션·물방울이 한 장에 들어 있다 */
+const TILE = require('@/assets/images/dex/species-detail-tile.svg');
+/** 서버 이미지(imageUrl)가 아직 없을 때 쓰는 기본 그림 — 목록 카드와 같은 그림이다 */
+const FALLBACK_ART = require('@/assets/images/dex/species-card.png');
+const PHOTO_CLOSE = require('@/assets/images/dex/photo-close.svg');
+const PHOTO_PIN = require('@/assets/images/dex/photo-pin.svg');
+
+/** 인증샷 뷰어 (Figma Collection/Card/Photo 1019:2928) */
+const VIEWER = {
+  width: 291,
+  height: 290,
+  radius: 16,
+  border: 2,
+  closeSize: 24,
+  closeTop: 10,
+  closeRight: 14,
+  footerInset: 18,
+  footerBottom: 26,
+  pinWidth: 20,
+  pinHeight: 32,
+  gap: 8,
+} as const;
 
 /**
- * 그림 칸에 떠 있는 물방울 (Figma 130:201·205·207·208·209).
- * 칸 크기에 비례해 놓이도록 비율로 잡는다.
+ * 어종 상세 모달 (Figma 카드 선택 시 978:3165).
  *
- * ponytail: Figma에서 채도·투명도를 개별로 뽑지 않고 흰색 반투명으로 통일했다.
- *           디자인이 확정되면 노드별 fill을 그대로 옮긴다.
- */
-const BUBBLES = [
-  { left: '7%', top: '25%', size: 20, opacity: 0.55 },
-  { left: '17%', top: '44%', size: 9, opacity: 0.7 },
-  { left: '25%', top: '82%', size: 11, opacity: 0.5 },
-  { left: '82%', top: '12%', size: 10, opacity: 0.6 },
-  { left: '85%', top: '57%', size: 19, opacity: 0.45 },
-  { left: '92%', top: '79%', size: 8, opacity: 0.7 },
-] as const;
-
-/**
- * 어종 상세 카드 (Figma 106:454 외).
- *
- * 목록에서 획득한 어종을 누르면 뜨는 모달이다. 잠금 카드는 애초에 눌리지 않으므로
- * 여기서 미획득 상태를 다루지 않는다.
- * 닫기 버튼이 디자인에 없어서 배경(막)을 누르거나 안드로이드 뒤로가기로 닫는다.
+ * 획득한 어종만 열린다. 닫기 버튼이 디자인에 없어 배경(막)이나 안드로이드 뒤로가기로 닫는다.
+ * 상세는 열릴 때마다 새로 받는다 — fishId를 key로 써서 어종이 바뀌면 로더가 새로 올라간다.
  */
 export function SpeciesDetailDialog({
-  species,
+  dataSource,
+  fishId,
   onClose,
 }: {
-  species: DexSpeciesDetailViewModel | null;
+  dataSource: DexDataSource;
+  fishId: number | null;
   onClose: () => void;
 }) {
   return (
     <Modal
-      visible={species !== null}
+      visible={fishId !== null}
       transparent
       animationType="fade"
-      // 안드로이드 하드웨어 뒤로가기
       onRequestClose={onClose}>
-      <Pressable
-        style={styles.scrim}
-        accessibilityRole="button"
-        accessibilityLabel="닫기"
-        onPress={onClose}>
-        {species ? (
-          // 카드 안쪽 터치가 막까지 올라가 모달을 닫지 않도록 막는다
-          <Pressable style={styles.card} onPress={() => {}}>
-            <Text style={styles.title} accessibilityRole="header">
-              {species.name}
-            </Text>
-
-            <LinearGradient
-              colors={[...DEX.tileFill]}
-              // Figma는 -44.04deg. 아래 오른쪽에서 위 왼쪽으로 흐른다.
-              start={{ x: 0.85, y: 0.85 }}
-              end={{ x: 0.15, y: 0.15 }}
-              locations={[0.129, 0.978]}
-              style={styles.tile}>
-              {BUBBLES.map((b, i) => (
-                <View
-                  key={i}
-                  style={[
-                    styles.bubble,
-                    {
-                      left: b.left,
-                      top: b.top,
-                      width: b.size,
-                      height: b.size,
-                      borderRadius: b.size / 2,
-                      opacity: b.opacity,
-                    },
-                  ]}
-                />
-              ))}
-              <Image source={ART} style={styles.art} contentFit="contain" />
-            </LinearGradient>
-
-            <Text style={styles.description}>{species.description}</Text>
-
-            <View style={styles.chipRow}>
-              <View style={[styles.chip, styles.habitatChip]}>
-                <Text style={styles.chipText}>{species.habitatLabel}</Text>
-              </View>
-              <View style={[styles.chip, styles.catchChip]}>
-                <Text style={styles.chipText}>{species.catchLabel}</Text>
-              </View>
-            </View>
-
-            {/* 인증샷 4칸 — 사진 데이터가 아직 없어 빈 칸으로 둔다 */}
-            <View
-              style={styles.photoRow}
-              accessible
-              accessibilityLabel="인증샷 준비 중">
-              {Array.from({ length: D.photoCount }, (_, i) => (
-                <View key={i} style={styles.photo} />
-              ))}
-            </View>
-          </Pressable>
+      <View style={styles.scrim}>
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          accessibilityRole="button"
+          accessibilityLabel="닫기"
+          onPress={onClose}
+        />
+        {fishId !== null ? (
+          <SpeciesDetailLoader key={fishId} dataSource={dataSource} fishId={fishId} />
         ) : null}
-      </Pressable>
+      </View>
+    </Modal>
+  );
+}
+
+function SpeciesDetailLoader({
+  dataSource,
+  fishId,
+}: {
+  dataSource: DexDataSource;
+  fishId: number;
+}) {
+  const [state, retry] = useDexDetailViewModel(dataSource, fishId);
+
+  return (
+    <View accessibilityViewIsModal>
+      {state.status === 'ready' ? (
+        <SpeciesDetailCard species={state.data} />
+      ) : (
+        <View style={styles.stateWrap}>
+          <ScreenState
+            variant={state.status}
+            onRetry={state.status === 'error' ? retry : undefined}
+          />
+        </View>
+      )}
+    </View>
+  );
+}
+
+/**
+ * 어종 상세 카드 본문 (Figma Collection/Card 665:3472).
+ * 모달과 분리해 두어 다른 화면(낚시 인증 완료)에서도 같은 카드를 그릴 수 있다.
+ */
+export function SpeciesDetailCard({ species }: { species: DexSpeciesDetailViewModel }) {
+  const [viewing, setViewing] = useState<RecentCatch | null>(null);
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.heading}>
+        <Text numberOfLines={1} style={styles.title} accessibilityRole="header">
+          {species.name}
+        </Text>
+        {species.maxSizeLabel ? <Text style={styles.meta}>{species.maxSizeLabel}</Text> : null}
+      </View>
+
+      <View style={styles.tile}>
+        <Image source={TILE} style={StyleSheet.absoluteFill} contentFit="fill" />
+        {/* Figma는 120 높이 칸 위에 140 그림을 가운데 얹는다 (899:2555) */}
+        <Image
+          source={species.imageUrl ?? FALLBACK_ART}
+          style={styles.art}
+          contentFit="contain"
+        />
+      </View>
+
+      <View style={styles.content}>
+        <Text style={styles.description}>{species.description}</Text>
+
+        <View style={[styles.chipRow, !species.habitatLabel && styles.chipRowSingle]}>
+          {species.habitatLabel ? (
+            <View style={[styles.chip, styles.habitatChip]}>
+              <Text style={styles.chipText}>{species.habitatLabel}</Text>
+            </View>
+          ) : null}
+          <View style={[styles.chip, styles.catchChip]}>
+            <Text style={styles.chipText}>{species.catchLabel}</Text>
+          </View>
+        </View>
+
+        <View
+          style={styles.photoRow}
+          accessible={species.photos.length === 0}
+          accessibilityLabel={species.photos.length === 0 ? '인증 사진 없음' : undefined}>
+          {Array.from({ length: D.photoCount }, (_, i) => {
+            const photo = species.photos[i];
+            return photo ? (
+              <Pressable
+                key={photo.catchRecordId}
+                accessibilityRole="imagebutton"
+                accessibilityLabel={`인증 사진 ${i + 1} 크게 보기`}
+                onPress={() => setViewing(photo)}>
+                <Image source={photo.imageUrl} style={styles.photo} contentFit="cover" />
+              </Pressable>
+            ) : (
+              <View key={i} style={styles.photo} />
+            );
+          })}
+        </View>
+      </View>
+
+      <PhotoViewer photo={viewing} onClose={() => setViewing(null)} />
+    </View>
+  );
+}
+
+function PhotoViewer({ photo, onClose }: { photo: RecentCatch | null; onClose: () => void }) {
+  return (
+    <Modal visible={photo !== null} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.scrim}>
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          accessibilityRole="button"
+          accessibilityLabel="닫기"
+          onPress={onClose}
+        />
+        {photo ? (
+          <View style={styles.viewer} accessibilityViewIsModal>
+            <Image source={photo.imageUrl} style={StyleSheet.absoluteFill} contentFit="cover" />
+            <LinearGradient
+              colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.32)', 'rgba(0,0,0,0.7)']}
+              locations={[0.517, 0.787, 1]}
+              style={StyleSheet.absoluteFill}
+            />
+            <Pressable
+              style={styles.viewerClose}
+              accessibilityRole="button"
+              accessibilityLabel="닫기"
+              hitSlop={12}
+              onPress={onClose}>
+              <Image source={PHOTO_CLOSE} style={styles.viewerCloseIcon} contentFit="contain" />
+            </Pressable>
+            <View style={styles.viewerFooter}>
+              <View style={styles.viewerPlace}>
+                {photo.location ? (
+                  <>
+                    <Image source={PHOTO_PIN} style={styles.viewerPin} contentFit="contain" />
+                    <Text numberOfLines={1} style={[styles.viewerText, styles.viewerLocation]}>
+                      {photo.location}
+                    </Text>
+                  </>
+                ) : null}
+              </View>
+              <Text style={[styles.viewerText, styles.viewerSize]}>{photo.size}cm</Text>
+            </View>
+          </View>
+        ) : null}
+      </View>
     </Modal>
   );
 }
@@ -118,62 +215,94 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
     backgroundColor: D.scrim,
   },
+  stateWrap: { width: D.width },
+
   card: {
-    width: '100%',
-    maxWidth: D.maxWidth,
-    padding: D.padding,
+    width: D.width,
+    paddingHorizontal: D.paddingX,
+    paddingVertical: D.paddingY,
+    gap: D.gap,
+    alignItems: 'center',
     borderRadius: D.radius,
     backgroundColor: DEX.cardBg,
     // Figma의 2겹 파란 발광. RN 0.76+ 새 아키텍처에서 지원한다.
-    boxShadow: `0px 0px 11.6px -2.2px ${D.glow}, 0px 0px 19.1px 4.4px ${D.glowOuter}`,
+    boxShadow: `0px 0px 11.556px ${D.glow}, 0px 0px 19.111px ${D.glowOuter}`,
   },
-  title: { ...Typography.detailTitle, color: Brand.textMuted, textAlign: 'center' },
+  heading: { maxWidth: '100%', gap: 4, alignItems: 'center' },
+  title: { ...Typography.detailTitle, color: Brand.textAccent, textAlign: 'center' },
+  meta: { ...Typography.detailBody, color: Brand.textMuted, textAlign: 'center' },
 
   tile: {
-    width: '100%',
-    aspectRatio: D.tileRatio,
-    borderRadius: D.tileRadius,
-    borderWidth: D.tileBorderWidth,
-    borderColor: D.tileBorder,
+    width: D.tileWidth,
+    height: D.tileHeight,
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
   },
-  bubble: { position: 'absolute', backgroundColor: Brand.onPrimary },
-  /** 그림 칸 높이의 절반 남짓 (Figma 120칸에 67 그림) */
-  art: { width: '35%', height: '56%' },
+  art: { width: D.artSize, height: D.artSize },
 
-  description: {
-    ...Typography.detailBody,
-    marginTop: 15,
-    color: Brand.textMuted,
-  },
+  content: { width: D.contentWidth, gap: D.gap },
+  description: { ...Typography.detailBody, color: Brand.textMuted },
 
-  /** Figma는 칩 두 개가 좌우 끝에 붙고 가운데가 비어 있다 (16→99, 141→224) */
-  chipRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 8,
-    marginTop: 16,
-  },
+  chipRow: { flexDirection: 'row', justifyContent: 'space-between' },
   chip: {
     height: D.chipHeight,
+    paddingHorizontal: D.chipPaddingX,
     borderRadius: D.chipRadius,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 10,
   },
   habitatChip: { backgroundColor: D.habitatChip },
   catchChip: { backgroundColor: D.catchChip },
   chipText: { ...Typography.chipLabel, color: D.chipText },
 
-  photoRow: { flexDirection: 'row', gap: D.photoGap, marginTop: 12 },
+  chipRowSingle: { justifyContent: 'flex-start' },
+  photoRow: { flexDirection: 'row', gap: D.photoGap },
+
+  viewer: {
+    width: VIEWER.width,
+    height: VIEWER.height,
+    borderRadius: VIEWER.radius,
+    borderWidth: VIEWER.border,
+    borderColor: Brand.onPrimary,
+    overflow: 'hidden',
+    backgroundColor: D.photoBg,
+    boxShadow: '0px 0px 8.2px rgba(0, 0, 0, 0.42)',
+  },
+  viewerClose: {
+    position: 'absolute',
+    top: VIEWER.closeTop,
+    right: VIEWER.closeRight,
+    width: VIEWER.closeSize,
+    height: VIEWER.closeSize,
+  },
+  viewerCloseIcon: { width: VIEWER.closeSize, height: VIEWER.closeSize },
+  viewerFooter: {
+    position: 'absolute',
+    left: VIEWER.footerInset,
+    right: VIEWER.footerInset,
+    bottom: VIEWER.footerBottom,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: VIEWER.gap,
+  },
+  viewerPlace: { flex: 1, flexDirection: 'row', alignItems: 'flex-end', gap: VIEWER.gap },
+  viewerPin: { width: VIEWER.pinWidth, height: VIEWER.pinHeight },
+  viewerText: {
+    fontSize: 16,
+    lineHeight: 28,
+    letterSpacing: -0.32,
+    color: Brand.onPrimary,
+    textShadowColor: 'rgba(0, 0, 0, 0.44)',
+    textShadowRadius: 13.9,
+  },
+  viewerLocation: { flex: 1, fontFamily: Fonts.bold },
+  viewerSize: { fontFamily: Fonts.semiBold, textAlign: 'right' },
   photo: {
-    flex: 1,
-    aspectRatio: 1,
+    width: D.photoSize,
+    height: D.photoSize,
     borderRadius: D.photoRadius,
     backgroundColor: D.photoBg,
   },

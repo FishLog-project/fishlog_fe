@@ -127,7 +127,7 @@ export default function RankingScreen() {
                   <ScreenState
                     variant="empty"
                     actionLabel="기록하러 가기"
-                    onAction={() => router.push('/log')}
+                    onAction={() => router.push('/dex')}
                   />
                 </View>
               ) : null}
