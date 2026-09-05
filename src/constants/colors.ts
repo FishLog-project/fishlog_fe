@@ -79,6 +79,31 @@ export const Derived = {
   progressTrackBorder: '#69CDFF',
   /** 통계 카드 안쪽 그림자 (알파가 필요해 이 항목만 rgba 표기) */
   cardInnerGlow: 'rgba(153, 221, 255, 0.73)',
+
+  // 도감 수조 (Figma 도감 메인 634:1294)
+  /** 수조 윗면 테두리 띠 */
+  tankRim: '#B3E3F8',
+  /** 수조 안쪽 상단에 드리우는 그림자 */
+  tankShade: '#A6C7DD',
+  /** 도감 완성도 카드 배경 */
+  dexSummary: '#D7F1FC',
+  /** 완성도 막대 채움 */
+  dexBarGradient: ['#EEF9FF', '#84D6FF'] as const,
+  /** 어종 카드 안쪽 그림 칸 배경 */
+  dexTileGradient: ['#F5FCFF', '#BCE9FF'] as const,
+  /** 어종 카드 안쪽 그림 칸 테두리 */
+  dexTileBorder: '#B1DFFF',
+  /** 어종 카드 그림자 (알파 필요) */
+  dexCardShadow: 'rgba(0, 94, 170, 0.69)',
+
+  // 도감 어종 상세 카드 (Figma Collection/Card 665:3472)
+  /** "주요 서식지" 칩 배경 (Figma tag/blue) */
+  dexHabitatChip: '#B1DFFF',
+  /** "잡은 횟수" 칩 배경 (Figma tag/green) */
+  dexCatchChip: '#9FF2F7',
+  /** 상세 카드를 띄우는 파란 발광 (2겹) */
+  dexDetailGlow: 'rgba(0, 127, 231, 0.35)',
+  dexDetailGlowOuter: 'rgba(63, 146, 201, 0.28)',
 } as const;
 
 /**

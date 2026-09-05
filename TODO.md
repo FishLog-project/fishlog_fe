@@ -40,6 +40,20 @@
 - [ ] 디자인 확정 후 파일 통째로 교체
 - [ ] 회원탈퇴 확인 UI — 지금은 iOS `Alert.prompt`, 안드로이드는 인라인 입력으로 분기해 둠
 
+
+### 1-3. 도감 어종 상세
+
+Figma 도감 섹션(75:1968) 우측에 **러프한 목업만** 있고 정식 프레임이 없다.
+(어종명 / 그림 / 설명 한 줄 / "주요 서식지" · "잡은 횟수" 칩 / 인증샷 4장 그리드)
+카드를 눌러도 아무 일도 일어나지 않는 상태로 뒀다 — 임의로 만들면 어차피 다시 만든다.
+
+디자인 나오면 할 일
+- [ ] 어종 카드 → 상세 진입 (모달/스택 중 무엇인지도 디자인에서 확정)
+- [ ] 미획득 어종을 눌렀을 때의 화면 (잠금 상태 자체가 디자인에 없다)
+
+또한 **미획득 어종 카드(잠금 상태)에 디자인이 없다**. 현재는 회색 실루엣 + "???"로
+기존 회색 토큰만 써서 최소 구성했다 (`src/features/dex/components/species-card.tsx`).
+
 ---
 
 ## 2. 백엔드 확인 필요
@@ -164,11 +178,13 @@ Swagger에 있으나 아직 화면/연동이 없는 API.
 
 - [ ] `GET /api/collections` 내 어종 인증 조회
 - [ ] `GET /api/collections/dex` 내 도감 조회 → 홈 "도감 진행도" 실데이터 연결
-- [ ] `GET /api/fish`, `GET /api/fish/{id}` 도감 목록·상세
+- [ ] `GET /api/fish` 도감 목록 → `DexDataSource` fixture 자리 교체
+- [ ] `GET /api/fish/{id}` 어종 상세 → 상세 화면(디자인 대기, 1-3) 붙일 때
 - [ ] `GET /api/rankings/completion`, `GET /api/rankings/size` 랭킹 탭
 - [ ] `GET /api/spots` 낚시 스팟 → 홈 "추천 낚시 스팟 Top 3" 실데이터 연결
 - [ ] `PATCH /api/users/me/nickname`, `PATCH /api/users/me/password` 마이페이지 편집
 
 현재 목데이터 위치
 - `src/app/(tabs)/home/index.tsx` — `DEX_PROGRESS`, `SPOTS`
-- `src/app/(tabs)/log`, `ranking` — `PlaceholderScreen` (임시 컴포넌트, 실제 화면 들어오면 삭제)
+- `src/features/dex/dex-data.ts` — 도감 어종 50종 fixture (`createFixtureDexDataSource`)
+- `src/app/(tabs)/ranking` — `PlaceholderScreen` (임시 컴포넌트, 실제 화면 들어오면 삭제)

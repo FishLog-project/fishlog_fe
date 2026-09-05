@@ -326,6 +326,85 @@ export const Components = {
     actionIconSize: 24,
     markerLabelGap: 2,
   },
+  /**
+   * 도감 화면 (Figma 도감 메인 634:1294).
+   * 화면 전체가 "수조" 은유다 — 뚜껑(에셋) + 테두리 띠 + 안쪽 물색 배경.
+   */
+  dex: {
+    /** 수조 윗면 테두리 띠 높이 (Figma 186 → 192) */
+    rimHeight: 6,
+    rim: Derived.tankRim,
+    /** 수조 안쪽 물색 */
+    water: Palette.blue[100],
+    shade: Derived.tankShade,
+
+    /** 완성도 카드 */
+    summaryBg: Derived.dexSummary,
+    summaryHeight: 73,
+    summaryRadius: 12,
+
+    /** 완성도 막대 — 트랙이 진한 남색이고 채움이 밝다 (홈 진행바와 반대) */
+    barHeight: 22,
+    barRadius: 17,
+    barTrack: Palette.bluegray[300],
+    /** 트랙 테두리(1) 안쪽 여백. 테두리까지 합쳐 채움이 3 물러난다 (Figma 249→252) */
+    barInset: 2,
+    barFill: Derived.dexBarGradient,
+    /** 트랙을 물색 카드에서 떼어 놓는 흰 테두리 */
+    barBorder: Palette.line.white,
+
+    /** 어종 카드 */
+    cardHeight: 142,
+    cardRadius: 10,
+    cardBg: Palette.bluegray[100],
+    cardShadow: Derived.dexCardShadow,
+    /** 카드 안쪽 그림 칸 (정사각). 카드 좌우에서 tileInset만큼 물러난다 */
+    tileSize: 88,
+    tileInset: 10,
+    tileRadius: 4,
+    tileBorder: Derived.dexTileBorder,
+    tileFill: Derived.dexTileGradient,
+    /** 그림 칸 안 어종 이미지 (Figma 80x80) */
+    artSize: 80,
+    /** 미획득 카드 — 같은 그림을 검은 실루엣으로 칠하고 40%만 보인다 (Figma 978:3087) */
+    silhouette: Palette.font.black,
+    silhouetteOpacity: 0.4,
+
+    columnGap: 12,
+    rowGap: 16,
+
+    /** 어종 상세 카드 (Figma 665:3472) */
+    detail: {
+      width: 240,
+      radius: 17.778,
+      paddingX: 8,
+      paddingY: 20,
+      gap: 16,
+      /** 그림 칸(내보낸 배경 SVG)과 그 위에 얹는 어종 이미지 크기 */
+      tileWidth: 208,
+      tileHeight: 120,
+      artSize: 140,
+      /** 설명·칩·인증샷 묶음의 폭 */
+      contentWidth: 200,
+      /** 칩 (Figma Tag 665:3450) */
+      chipHeight: 24,
+      chipPaddingX: 12,
+      chipRadius: 29,
+      habitatChip: Derived.dexHabitatChip,
+      catchChip: Derived.dexCatchChip,
+      chipText: Palette.bluegray[400],
+      /** 인증샷 4칸 */
+      photoCount: 4,
+      photoSize: 44,
+      photoGap: 8,
+      photoRadius: 4,
+      photoBg: Derived.neutral,
+      /** 카드를 띄우는 발광 + 뒤를 덮는 막 */
+      glow: Derived.dexDetailGlow,
+      glowOuter: Derived.dexDetailGlowOuter,
+      scrim: Derived.scrim,
+    },
+  },
   /** 로딩·빈 화면·오류를 표시하는 ScreenState 카드 */
   state: {
     surface: Palette.font.white,

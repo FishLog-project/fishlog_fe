@@ -46,7 +46,7 @@ export default function HomeScreen() {
         <StatCard
           title="도감 진행도"
           accessibilityLabel="도감 진행도, 도감 화면으로 이동"
-          onPress={() => router.push('/log')}>
+          onPress={() => router.push('/dex')}>
           {collectionProgress.status === 'ready' ? (
             <>
               <View style={styles.progressNumWrap}>
