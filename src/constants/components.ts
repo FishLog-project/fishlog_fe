@@ -197,13 +197,19 @@ export const Components = {
       chevronSize: 20,
     },
   },
-  /** 홈 통계 카드 (도감 진행도 / 물고기 인증하기) */
+  /** 홈 통계 카드 (도감 진행도 / 물고기 인증하기, Figma 634:1244 · 634:1251) */
   statCard: {
     height: 140,
     radius: 16,
     padding: 16,
     /** 카드 안쪽 은은한 발광 — Figma의 inset shadow */
     innerGlow: Derived.cardInnerGlow,
+    /** 제목 하단(y44) ~ 수치(y68) */
+    valueTop: 24,
+    /** 수치 하단(y96) ~ 진행바(y108) */
+    barTop: 12,
+    /** 제목 하단(y44) ~ 스캔 아이콘(y63) */
+    iconTop: 19,
   },
   /** 도감 진행바 */
   progress: {
@@ -305,15 +311,21 @@ export const Components = {
       nameGap: 12,
     },
   },
-  /** 홈 화면에서 반복되는 섹션 배치 값 */
+  /** 홈 화면에서 반복되는 섹션 배치 값 (Figma 634:1177) */
   home: {
     heroHeight: 168,
     heroRadius: 16,
     heroPadding: 24,
+    /** 헤더 하단(y100) ~ 히어로(y104) */
+    heroTop: 4,
+    /** 히어로 슬라이드 안쪽 글로우 — 진한 슬라이드 / 연한 슬라이드 */
+    heroInnerGlow: Derived.heroInnerGlow,
+    heroInnerGlowSoft: Derived.heroSoftInnerGlow,
     labelGap: 2,
     blockGap: 20,
     cardGap: 12,
-    sectionTitleGap: 6,
+    /** 섹션 제목 우측(x165) ~ 낚싯대 아이콘(x173) */
+    sectionTitleGap: 8,
     sectionBottom: 12,
   },
   /** 실제 지도 SDK 연결 전후에 공통으로 유지되는 지도 오버레이 배치 값 */
