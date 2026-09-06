@@ -53,8 +53,14 @@ export const Palette = {
  * 디자인에서 정식 변수로 올라오면 Palette로 옮기고 여기서 지운다.
  */
 export const Derived = {
-  /** 히어로 카드 배경 그라데이션 */
-  heroGradient: ['#1D79E9', '#2E9BF5'] as const,
+  /**
+   * 히어로 슬라이드 배경 [바탕색, 우상단 글로우색].
+   * Figma(778:2648 · 778:2662)는 단색 위에 블러 타원을 얹은 글로우인데, 네이티브에서
+   * 블러 도형을 그릴 수 없어 좌하단→우상단 그라데이션으로 근사한다. 글로우색은 시안 측정값.
+   */
+  heroGradient: ['#1D79E9', '#5FC0EE'] as const,
+  /** 연한 슬라이드(미보유 어종·추천 스팟)의 같은 구성 */
+  heroSoftGradient: ['#C7E0FF', '#B9EDFF'] as const,
   /** 통계 카드 배경 그라데이션 */
   cardGradient: ['#F5FCFF', '#DCF5FF'] as const,
   /** 진행바 그라데이션 */
@@ -77,10 +83,10 @@ export const Derived = {
   segmentShadow: 'rgba(17, 82, 125, 0.18)',
   /** 진행바 트랙 테두리 (Figma 74:1764) */
   progressTrackBorder: '#69CDFF',
-  /** 통계 카드 안쪽 그림자 (알파가 필요해 이 항목만 rgba 표기) */
+  /** 통계 카드 안쪽 그림자 (알파가 필요해 rgba 표기) */
   cardInnerGlow: 'rgba(153, 221, 255, 0.73)',
 
-  // 도감 수조 (Figma 도감2안 103:173)
+  // 도감 수조 (Figma 도감 메인 634:1294)
   /** 수조 윗면 테두리 띠 */
   tankRim: '#B3E3F8',
   /** 수조 안쪽 상단에 드리우는 그림자 */
@@ -96,16 +102,17 @@ export const Derived = {
   /** 어종 카드 그림자 (알파 필요) */
   dexCardShadow: 'rgba(0, 94, 170, 0.69)',
 
-  // 도감 어종 상세 카드 (Figma 106:454 외)
-  /** 상세 카드 그림 칸 테두리 — 목록 칸(dexTileBorder)보다 진하다 */
-  dexDetailTileBorder: '#71C4FF',
-  /** "주요 서식지" 칩 배경 */
+  // 도감 어종 상세 카드 (Figma Collection/Card 665:3472)
+  /** "주요 서식지" 칩 배경 (Figma tag/blue) */
   dexHabitatChip: '#B1DFFF',
-  /** "잡은 횟수" 칩 배경 */
-  dexCatchChip: '#9FF3F7',
+  /** "잡은 횟수" 칩 배경 (Figma tag/green) */
+  dexCatchChip: '#9FF2F7',
   /** 상세 카드를 띄우는 파란 발광 (2겹) */
   dexDetailGlow: 'rgba(0, 127, 231, 0.35)',
   dexDetailGlowOuter: 'rgba(63, 146, 201, 0.28)',
+  /** 히어로 슬라이드 안쪽 글로우 — 진한 슬라이드 / 연한 슬라이드 */
+  heroInnerGlow: 'rgba(32, 201, 243, 0.61)',
+  heroSoftInnerGlow: 'rgba(112, 195, 255, 0.61)',
 } as const;
 
 /**
@@ -158,8 +165,10 @@ export const Brand = {
   scrim: Derived.scrim,
 
   // 그라데이션 — 쓰는 쪽에서 [...Brand.xxx] 로 펼쳐 넣는다
-  /** 히어로 카드 배경 */
+  /** 히어로 카드 배경 — 진한 슬라이드(오늘의 추천 어종) */
   heroSurface: Derived.heroGradient,
+  /** 히어로 카드 배경 — 연한 슬라이드(미보유 어종·추천 스팟) */
+  heroSurfaceSoft: Derived.heroSoftGradient,
   /** 통계 카드 배경 */
   cardSurface: Derived.cardGradient,
   /** 진행바 채움 */

@@ -5,7 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { usePreventRemove } from 'expo-router/react-navigation';
 import { useMemo, useRef, useState } from 'react';
-import { Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import {
   AppDialog,
@@ -141,9 +141,6 @@ export default function CatchScreen() {
       ) : (
         <RegisteredStep
           detail={state.detail}
-          imageUrl={state.imageUrl}
-          sizeCm={state.sizeCm}
-          location={state.location}
           onDex={() => router.replace('/dex')}
           onHome={leaveRegistered}
         />
@@ -630,84 +627,26 @@ function EditableFactRow({
 /** 인증 5 (634:3158) — 등록된 어종의 도감 카드(665:3471)와 다음 이동. */
 function RegisteredStep({
   detail,
-  imageUrl,
-  sizeCm,
-  location,
   onDex,
   onHome,
 }: {
   detail: DexSpeciesDetailViewModel;
-  imageUrl: string;
-  sizeCm: number;
-  location: string;
   onDex: () => void;
   onHome: () => void;
 }) {
-  const [showingPhoto, setShowingPhoto] = useState(false);
-
   return (
-    <>
-      <ScrollView
-        contentContainerStyle={styles.pageScroll}
-        showsVerticalScrollIndicator={false}>
-        <StepCopy lines={['물고기가 도감에 등록되었어요!']} />
-        <View style={styles.registeredCard}>
-          <SpeciesDetailCard
-            species={detail}
-            verificationPhotoUri={imageUrl}
-            onVerificationPhotoPress={() => setShowingPhoto(true)}
-          />
-        </View>
-        <View style={styles.registeredActions}>
-          <PrimaryButton label="도감 보러 가기" onPress={onDex} />
-          <PrimaryButton label="홈화면으로 가기" variant="outline" onPress={onHome} />
-        </View>
-      </ScrollView>
-      <VerificationPhotoModal
-        visible={showingPhoto}
-        imageUrl={imageUrl}
-        sizeCm={sizeCm}
-        location={location}
-        onClose={() => setShowingPhoto(false)}
-      />
-    </>
-  );
-}
-
-/** 인증샷 클릭 상태 (905:2553) — 사진과 위치·크기. 위치는 BE 미제공이라 로컬 값이다. */
-function VerificationPhotoModal({
-  visible,
-  imageUrl,
-  sizeCm,
-  location,
-  onClose,
-}: {
-  visible: boolean;
-  imageUrl: string;
-  sizeCm: number;
-  location: string;
-  onClose: () => void;
-}) {
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable
-        style={styles.modalScrim}
-        accessibilityRole="button"
-        accessibilityLabel="인증 사진 닫기"
-        onPress={onClose}>
-        <Pressable
-          style={styles.verificationDialog}
-          accessible
-          accessibilityLabel={`인증 사진, 크기 약 ${sizeCm}센티미터, 잡은 위치 ${location || '미입력'}`}
-          onPress={() => {}}>
-          <Image source={{ uri: imageUrl }} style={styles.verificationPhoto} contentFit="cover" />
-          <View style={styles.verificationFacts}>
-            <FactRow label="잡은 위치" value={location || '미입력'} />
-            <FactRow label="크기" value={`약 ${sizeCm}cm`} />
-          </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
+    <ScrollView
+      contentContainerStyle={styles.pageScroll}
+      showsVerticalScrollIndicator={false}>
+      <StepCopy lines={['물고기가 도감에 등록되었어요!']} />
+      <View style={styles.registeredCard}>
+        <SpeciesDetailCard species={detail} />
+      </View>
+      <View style={styles.registeredActions}>
+        <PrimaryButton label="도감 보러 가기" onPress={onDex} />
+        <PrimaryButton label="홈화면으로 가기" variant="outline" onPress={onHome} />
+      </View>
+    </ScrollView>
   );
 }
 
@@ -870,25 +809,4 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     gap: CATCH.actionGap,
   },
-  // 인증샷 클릭 상태 (Figma 905:2605) — 사진 178x238
-  modalScrim: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-    backgroundColor: Brand.scrim,
-  },
-  verificationDialog: {
-    width: 214,
-    padding: 18,
-    borderRadius: 12,
-    backgroundColor: Brand.background,
-  },
-  verificationPhoto: {
-    width: 178,
-    height: 238,
-    borderRadius: 4,
-    backgroundColor: CATCH.previewBg,
-  },
-  verificationFacts: { marginTop: 16, gap: 12 },
 });

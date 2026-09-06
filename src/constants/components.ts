@@ -206,13 +206,19 @@ export const Components = {
       chevronSize: 20,
     },
   },
-  /** 홈 통계 카드 (도감 진행도 / 물고기 인증하기) */
+  /** 홈 통계 카드 (도감 진행도 / 물고기 인증하기, Figma 634:1244 · 634:1251) */
   statCard: {
     height: 140,
     radius: 16,
     padding: 16,
     /** 카드 안쪽 은은한 발광 — Figma의 inset shadow */
     innerGlow: Derived.cardInnerGlow,
+    /** 제목 하단(y44) ~ 수치(y68) */
+    valueTop: 24,
+    /** 수치 하단(y96) ~ 진행바(y108) */
+    barTop: 12,
+    /** 제목 하단(y44) ~ 스캔 아이콘(y63) */
+    iconTop: 19,
   },
   /** 도감 진행바 */
   progress: {
@@ -314,15 +320,21 @@ export const Components = {
       nameGap: 12,
     },
   },
-  /** 홈 화면에서 반복되는 섹션 배치 값 */
+  /** 홈 화면에서 반복되는 섹션 배치 값 (Figma 634:1177) */
   home: {
     heroHeight: 168,
     heroRadius: 16,
     heroPadding: 24,
+    /** 헤더 하단(y100) ~ 히어로(y104) */
+    heroTop: 4,
+    /** 히어로 슬라이드 안쪽 글로우 — 진한 슬라이드 / 연한 슬라이드 */
+    heroInnerGlow: Derived.heroInnerGlow,
+    heroInnerGlowSoft: Derived.heroSoftInnerGlow,
     labelGap: 2,
     blockGap: 20,
     cardGap: 12,
-    sectionTitleGap: 6,
+    /** 섹션 제목 우측(x165) ~ 낚싯대 아이콘(x173) */
+    sectionTitleGap: 8,
     sectionBottom: 12,
   },
   /** 실제 지도 SDK 연결 전후에 공통으로 유지되는 지도 오버레이 배치 값 */
@@ -336,7 +348,7 @@ export const Components = {
     markerLabelGap: 2,
   },
   /**
-   * 도감 화면 (Figma 도감2안 103:173).
+   * 도감 화면 (Figma 도감 메인 634:1294).
    * 화면 전체가 "수조" 은유다 — 뚜껑(에셋) + 테두리 띠 + 안쪽 물색 배경.
    */
   dex: {
@@ -356,8 +368,8 @@ export const Components = {
     barHeight: 22,
     barRadius: 17,
     barTrack: Palette.bluegray[300],
-    /** 트랙 안쪽에서 채움이 물러나는 여백 (Figma 249→252) */
-    barInset: 3,
+    /** 트랙 테두리(1) 안쪽 여백. 테두리까지 합쳐 채움이 3 물러난다 (Figma 249→252) */
+    barInset: 2,
     barFill: Derived.dexBarGradient,
     /** 트랙을 물색 카드에서 떼어 놓는 흰 테두리 */
     barBorder: Palette.line.white,
@@ -373,33 +385,38 @@ export const Components = {
     tileRadius: 4,
     tileBorder: Derived.dexTileBorder,
     tileFill: Derived.dexTileGradient,
-    /** 그림 칸 안 어종 일러스트 */
-    artWidth: 59,
-    artHeight: 55,
-    /** 미획득 카드의 그림 칸 배경 (Figma에 없는 상태 — 중립 회색으로 둔다) */
-    lockedTile: Palette.line.regular,
+    /** 그림 칸 안 어종 이미지 (Figma 80x80) */
+    artSize: 80,
+    /** 미획득 카드 — 같은 그림을 검은 실루엣으로 칠하고 40%만 보인다 (Figma 978:3087) */
+    silhouette: Palette.font.black,
+    silhouetteOpacity: 0.4,
 
     columnGap: 12,
     rowGap: 16,
 
-    /** 어종 상세 카드 (Figma 106:454 — 240x340 기준을 화면 폭에 맞춰 키운다) */
+    /** 어종 상세 카드 (Figma 665:3472) */
     detail: {
-      maxWidth: 300,
-      radius: 20,
-      padding: 16,
-      /** 그림 칸 가로:세로 (Figma 208x120) */
-      tileRatio: 208 / 120,
-      tileRadius: 8,
-      tileBorderWidth: 2,
-      tileBorder: Derived.dexDetailTileBorder,
-      /** 칩 */
+      width: 240,
+      radius: 17.778,
+      paddingX: 8,
+      paddingY: 20,
+      gap: 16,
+      /** 그림 칸(내보낸 배경 SVG)과 그 위에 얹는 어종 이미지 크기 */
+      tileWidth: 208,
+      tileHeight: 120,
+      artSize: 140,
+      /** 설명·칩·인증샷 묶음의 폭 */
+      contentWidth: 200,
+      /** 칩 (Figma Tag 665:3450) */
       chipHeight: 24,
-      chipRadius: 22,
+      chipPaddingX: 12,
+      chipRadius: 29,
       habitatChip: Derived.dexHabitatChip,
       catchChip: Derived.dexCatchChip,
       chipText: Palette.bluegray[400],
       /** 인증샷 4칸 */
       photoCount: 4,
+      photoSize: 44,
       photoGap: 8,
       photoRadius: 4,
       photoBg: Derived.neutral,

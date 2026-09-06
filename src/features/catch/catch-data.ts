@@ -10,6 +10,7 @@ import {
   createFixtureDexDataSource,
   recordFixtureCatch,
 } from '@/features/dex/dex-data';
+import type { FishDetail } from '@/features/dex/dex-data';
 
 /** POST /api/collections/classify 응답의 후보 한 종 (Top-3) */
 export interface ClassifyCandidate {
@@ -60,13 +61,8 @@ export interface SpeciesOption {
   name: string;
 }
 
-/** GET /api/fish/{id} 응답 중 등록 완료 카드가 쓰는 부분 (imageUrl·rarity는 생략) */
-export interface FishDetailResponse {
-  id: number;
-  name: string;
-  description: string;
-  habitat: string;
-}
+/** 등록 완료 카드도 도감 상세와 같은 응답을 쓴다. */
+export type FishDetailResponse = FishDetail;
 
 export interface CatchDataSource {
   /** 촬영 사진으로 어종 후보를 받는다 */
@@ -111,11 +107,11 @@ function rejectAfter(message: string, ms: number): Promise<never> {
   );
 }
 
-/** Figma 인증 3(689:2264)의 후보 3종. fishId는 도감 fixture의 id다 */
+/** 후보 3종. 이름과 fishId는 현재 도감 fixture의 실제 항목에 맞춘다. */
 const CANDIDATES: readonly ClassifyCandidate[] = [
-  { rank: 1, fishId: 1, name: '광어', imageUrl: null, confidence: 0.72, sizeCm: 20 },
-  { rank: 2, fishId: 11, name: '도다리', imageUrl: null, confidence: 0.18, sizeCm: 18 },
-  { rank: 3, fishId: 12, name: '가자미', imageUrl: null, confidence: 0.1, sizeCm: 22 },
+  { rank: 1, fishId: 7, name: '광어', imageUrl: null, confidence: 0.72, sizeCm: 20 },
+  { rank: 2, fishId: 2, name: '농어', imageUrl: null, confidence: 0.18, sizeCm: 18 },
+  { rank: 3, fishId: 5, name: '우럭', imageUrl: null, confidence: 0.1, sizeCm: 22 },
 ];
 
 const UNCERTAIN_GUIDE =
@@ -150,11 +146,18 @@ export function createFixtureCatchDataSource(
         await rejectAfter('도감 등록 fixture가 실패했습니다.', VERIFY_DELAY_MS);
       }
       // 서버였다면 verify가 DB를 바꾸는 자리 — 도감 fixture에 획득·횟수를 반영한다
-      const recorded = recordFixtureCatch(fishId);
+      const catchRecordId = Date.now();
+      const recorded = recordFixtureCatch(fishId, {
+        catchRecordId,
+        imageUrl: photoUri,
+        size,
+        location: location ?? null,
+        verifiedAt: new Date().toISOString(),
+      });
       if (!recorded) throw new Error('도감에 없는 어종입니다.');
       return resolveAfter(
         {
-          catchRecordId: Date.now(),
+          catchRecordId,
           fishId,
           fishName: recorded.name,
           // 서버는 업로드된 이미지 URL을 준다. fixture는 로컬 경로를 그대로 돌려준다
@@ -167,14 +170,9 @@ export function createFixtureCatchDataSource(
         VERIFY_DELAY_MS,
       );
     },
-    async getFish(fishId) {
-      const found = (await dex.getSpecies()).find((s) => s.id === fishId);
-      if (!found) throw new Error('어종 정보를 찾지 못했습니다.');
-      const { id, name, description, habitat } = found;
-      return { id, name, description, habitat };
-    },
+    getFish: dex.getFish,
     async listSpecies() {
-      return (await dex.getSpecies()).map(({ id, name }) => ({ id, name }));
+      return (await dex.getMyDex()).fishes.map(({ id, name }) => ({ id, name }));
     },
   };
 }

@@ -39,7 +39,10 @@ function mount(source) {
   };
   const { useCatchFlow } = load('src/features/catch/use-catch-flow.ts', {
     react,
-    '@/features/dex/use-dex-view-model': { toDexSpeciesDetail: (fish) => fish },
+    '@/features/dex/use-dex-view-model': load('src/features/dex/use-dex-view-model.ts', {
+      react,
+      '@/lib/use-section': {},
+    }),
   });
   return () => { cursor = 0; return useCatchFlow(source); };
 }
@@ -51,7 +54,7 @@ async function main() {
     listSpecies: async () => [{ id: 1, name: '광어' }],
     verify: async ({ fishId, size, photoUri }) => {
       calls += 1;
-      return { fishId, fishName: '광어', size, imageUrl: photoUri, catchCount: 1 };
+      return { catchRecordId: 1, fishId, fishName: '광어', size, imageUrl: photoUri, catchCount: 1 };
     },
     getFish: async () => { throw new Error('detail unavailable after successful save'); },
   };
@@ -92,6 +95,8 @@ async function main() {
   await pending;
   assert.equal(render().state.step, 'registered', 'detail failure must not repeat a successful save');
   assert.equal(render().registering, false);
+  assert.equal(render().state.detail.photos[0].imageUrl, 'photo');
+  assert.equal(render().state.detail.catchLabel, '잡은 횟수: 1회');
 
   const classified = deferred();
   source.classify = () => classified.promise;
@@ -119,6 +124,26 @@ async function main() {
   const query = new URL(requests[1].route, 'https://example.test').searchParams;
   assert.equal(query.get('location'), '서울 & 바다');
   assert.equal(await requests[1].body.get('image').text(), 'file:///catch.jpg');
+
+  const dex = load('src/features/dex/dex-data.ts', {
+    'expo-asset': { Asset: { fromModule: () => ({ uri: 'fixture-photo' }) } },
+    '@/assets/images/dex/species-card.png': 'fixture-photo',
+  });
+  const { createFixtureCatchDataSource } = load('src/features/catch/catch-data.ts', {
+    '@/features/dex/dex-data': dex,
+  });
+  const fixture = createFixtureCatchDataSource();
+  const catalog = await fixture.listSpecies();
+  const classifiedFixture = await fixture.classify('new-photo');
+  for (const candidate of classifiedFixture.candidates) {
+    assert.equal(catalog.find((fish) => fish.id === candidate.fishId)?.name, candidate.name);
+  }
+  const newCatch = await fixture.verify({ fishId: 3, size: 25, photoUri: 'new-photo', location: '제주' });
+  assert.equal(newCatch.firstCatch, true);
+  const record = await dex.createFixtureDexDataSource().getCatchRecord(3);
+  assert.equal(record.catchCount, 1);
+  assert.equal(record.recentCatches[0].imageUrl, 'new-photo');
+  assert.equal(record.recentCatches[0].location, '제주');
   console.log('catch checks passed: registration, cancellation, validation, web/native multipart');
 }
 

@@ -37,9 +37,6 @@ export type CatchStep =
   | {
       step: 'registered';
       detail: DexSpeciesDetailViewModel;
-      imageUrl: string;
-      sizeCm: number;
-      location: string;
     };
 
 export function useCatchFlow(dataSource: CatchDataSource) {
@@ -172,17 +169,27 @@ export function useCatchFlow(dataSource: CatchDataSource) {
       if (run !== registerRun.current) return;
       setState({
         step: 'registered',
-        detail: toDexSpeciesDetail({
-          id: verified.fishId,
-          name: verified.fishName,
-          description: fish?.description ?? '',
-          habitat: fish?.habitat ?? '',
-          collected: true,
-          catchCount: verified.catchCount,
-        }),
-        imageUrl: verified.imageUrl,
-        sizeCm: verified.size,
-        location: verified.location ?? location,
+        detail: toDexSpeciesDetail(
+          fish ?? {
+            id: verified.fishId,
+            name: verified.fishName,
+            description: '',
+            habitat: null,
+            imageUrl: null,
+            rarity: 'LOW',
+          },
+          {
+            habitat: fish?.habitat ?? null,
+            catchCount: verified.catchCount,
+            recentCatches: [{
+              catchRecordId: verified.catchRecordId,
+              imageUrl: verified.imageUrl,
+              size: verified.size,
+              location: verified.location ?? (location || null),
+              verifiedAt: new Date().toISOString(),
+            }],
+          },
+        ),
       });
     } catch {
       if (run !== registerRun.current) return;
