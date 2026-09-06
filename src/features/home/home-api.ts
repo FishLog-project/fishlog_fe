@@ -5,25 +5,15 @@ import type {
   SeasonalFish,
 } from '@/features/home/home-data';
 import { apiRequest } from '@/lib/api/client';
-import { toFail } from '@/lib/api/result';
 
-const UNAUTHORIZED = { reason: 'unauthorized' as const, message: '로그인이 필요해요.' };
-
-/** 실패는 result.ts의 Fail 객체로 reject 한다. 게스트·401은 reason 'unauthorized' */
+/** 게스트는 도감 진행도를 서버에 묻지 않고 바로 실패시킨다. 안내 문구는 화면이 토큰 유무로 고른다 */
 export function createApiFishLogDataSource(token: string | null): FishLogDataSource {
   return {
-    getSeasonalFish: () => get<SeasonalFish[]>('/api/banner/seasonal-fish'),
+    getSeasonalFish: () => apiRequest<SeasonalFish[]>('/api/banner/seasonal-fish'),
     getCollectionProgress: () =>
       token
-        ? get<CollectionProgress>('/api/collections/dex', token)
-        : Promise.reject({ ok: false, ...UNAUTHORIZED }),
-    getPopularSpots: (limit) =>
-      get<PopularSpot[]>('/api/spots/popular').then((spots) => spots.slice(0, limit)),
+        ? apiRequest<CollectionProgress>('/api/collections/dex', { token })
+        : Promise.reject(new Error('로그인이 필요해요.')),
+    getPopularSpots: () => apiRequest<PopularSpot[]>('/api/spots/popular'),
   };
-}
-
-function get<T>(path: string, token?: string): Promise<T> {
-  return apiRequest<T>(path, { token }).catch((e) => {
-    throw toFail(e, { 401: UNAUTHORIZED });
-  });
 }

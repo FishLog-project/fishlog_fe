@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useMemo } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Screen, ScreenHeader, ScreenState } from '@/components/common';
+import { Screen, ScreenHeader, ScreenState, SectionTitle } from '@/components/common';
 import { Brand, Components, Typography } from '@/constants/theme';
 import { useAuth } from '@/features/auth';
 import { createApiFishLogDataSource } from '@/features/home/home-api';
@@ -13,19 +13,10 @@ import { HeroCarousel } from '@/features/home/components/hero-carousel';
 import { useHomeViewModel } from '@/features/home/use-home-view-model';
 import { USE_FIXTURE } from '@/lib/data-source-mode';
 
-const HERO_LABEL = '오늘의 추천 어종';
-
-/** 슬라이드를 못 받았을 때 히어로 자리에 넣는 대체 문구 */
-const HERO_FALLBACK = {
-  loading: '오늘의 바다를 읽는 중…',
-  empty: '오늘은 추천 어종이 없어요',
-  error: '추천 어종을 불러오지 못했어요',
-} as const;
-
 /** 도감 진행도를 못 받았을 때 카드 본문 문구. 카드 자체가 버튼이라 안내와 동작이 함께 바뀐다 */
 const PROGRESS_FALLBACK = {
-  unauthorized: '로그인하면 도감 진행도를 볼 수 있어요',
-  unknown: '불러오지 못했어요 · 다시 시도',
+  login: '로그인하면 도감 진행도를 볼 수 있어요',
+  error: '불러오지 못했어요 · 다시 시도',
 } as const;
 
 export default function HomeScreen() {
@@ -41,44 +32,36 @@ export default function HomeScreen() {
     useHomeViewModel(dataSource);
   const { featuredSpecies, collectionProgress, recommendedSpots } = viewModel;
 
-  // 카드 전체가 버튼이라 본문에 버튼을 겹치지 않고, 실패 사유에 따라 카드의 동작을 바꾼다
-  const progressError = collectionProgress.status === 'error' ? collectionProgress.reason : null;
-  const onProgressPress =
-    progressError === 'unauthorized'
-      ? () => router.push('/auth/login')
-      : progressError === 'unknown'
-        ? retryCollectionProgress
-        : () => router.push('/log');
+  // 게스트는 도감 진행도 대신 로그인 안내를 본다 (fixture는 로그인 없이도 채워 준다)
+  const needsLogin = !USE_FIXTURE && token === null;
+  const progressMessage = needsLogin
+    ? PROGRESS_FALLBACK.login
+    : collectionProgress.status === 'error'
+      ? PROGRESS_FALLBACK.error
+      : null;
+  // 카드 전체가 버튼이라 본문에 버튼을 겹치지 않고, 상태에 따라 카드의 동작을 바꾼다
+  const onProgressPress = needsLogin
+    ? () => router.replace('/auth/login')
+    : collectionProgress.status === 'error'
+      ? retryCollectionProgress
+      : () => router.push('/log');
 
   return (
     <Screen scroll header={<ScreenHeader title="Fishlog" variant="brand" />}>
       <View style={styles.hero}>
-        {featuredSpecies.status === 'ready' ? (
-          <HeroCarousel
-            featured={featuredSpecies.data}
-            label={HERO_LABEL}
-            recommendedSpot={
-              recommendedSpots.status === 'ready' ? recommendedSpots.data[0] : undefined
-            }
-          />
-        ) : (
-          <View style={styles.heroFallback}>
-            <Text style={styles.heroFallbackLabel}>{HERO_LABEL}</Text>
-            <Text style={styles.heroFallbackTitle}>
-              {HERO_FALLBACK[featuredSpecies.status]}
-            </Text>
-          </View>
-        )}
+        <HeroCarousel featured={featuredSpecies} recommendedSpots={recommendedSpots} />
       </View>
 
       <View style={styles.statRow}>
         <StatCard
           title="도감 진행도"
-          accessibilityLabel={
-            progressError ? PROGRESS_FALLBACK[progressError] : '도감 진행도, 도감 화면으로 이동'
-          }
+          accessibilityLabel={progressMessage ?? '도감 진행도, 도감 화면으로 이동'}
           onPress={onProgressPress}>
-          {collectionProgress.status === 'ready' ? (
+          {progressMessage ? (
+            <View style={styles.statBody}>
+              <Text style={styles.statRetry}>{progressMessage}</Text>
+            </View>
+          ) : collectionProgress.status === 'ready' ? (
             <>
               <View style={styles.progressNumWrap}>
                 <Text style={styles.progressNum}>
@@ -100,14 +83,8 @@ export default function HomeScreen() {
                 />
               </View>
             </>
-          ) : collectionProgress.status === 'loading' ? (
-            <ActivityIndicator style={styles.statBody} color={Brand.primary} />
           ) : (
-            <View style={styles.statBody}>
-              <Text style={styles.statRetry}>
-                {PROGRESS_FALLBACK[progressError ?? 'unknown']}
-              </Text>
-            </View>
+            <ActivityIndicator style={styles.statBody} color={Brand.primary} />
           )}
         </StatCard>
 
@@ -126,7 +103,7 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.sectionHead}>
-        <Text style={styles.sectionTitle}>추천 낚시 스팟 Top 3</Text>
+        <SectionTitle>추천 낚시 스팟 Top 3</SectionTitle>
         <Image
           source={require('@/assets/images/home/fishing-rod.png')}
           style={styles.sectionIcon}
@@ -254,20 +231,6 @@ const ROW = Components.spotRow;
 
 const styles = StyleSheet.create({
   hero: { marginTop: HOME.heroTop },
-  /** 슬라이드가 없을 때의 히어로 자리 */
-  heroFallback: {
-    height: HOME.heroHeight,
-    borderRadius: HOME.heroRadius,
-    paddingLeft: HOME.heroPadding,
-    paddingTop: HOME.heroPadding,
-    backgroundColor: Brand.heroSurface[0],
-  },
-  heroFallbackLabel: { ...Typography.heroLabel, color: Brand.onPrimary },
-  heroFallbackTitle: {
-    ...Typography.heroTitle,
-    color: Brand.onPrimary,
-    marginTop: HOME.labelGap,
-  },
 
   // 통계 카드
   statRow: { flexDirection: 'row', gap: HOME.cardGap, marginTop: HOME.blockGap },
@@ -323,7 +286,6 @@ const styles = StyleSheet.create({
     marginTop: HOME.blockGap,
     marginBottom: HOME.sectionBottom,
   },
-  sectionTitle: { ...Typography.sectionTitle, color: Brand.textHeading },
   sectionIcon: { width: 20, height: 20 },
 
   spotList: { gap: ROW.rowGap },

@@ -82,13 +82,10 @@ Swagger에 `LoginResponse` 스키마가 **정의돼 있지 않다** (`POST /api/
 - [ ] `Typography` 스케일을 Figma 정의대로 확장하고 각 화면 텍스트가 토큰을 참조하도록 정리
       (리뷰어가 지적한 "Typography 항목 1개" 문제와 같은 작업이다. 4번 화면 정합성 작업과 함께 처리하는 게 효율적)
 
-### 3-2. 홈 히어로 캐러셀 인디케이터
+### 3-2. 홈 히어로 캐러셀 인디케이터 — 해결 ✅
 
-`assets/images/home/hero-card.png`(Figma `74:1819` 3배 추출)에 **하단 점 5개가 함께 구워져 있다.**
-원본이 `feGaussianBlur`로 glow를 만드는데 expo-image의 SVG 렌더러가 filter를 지원하지 않아 래스터로 대체한 결과다.
-
-- [ ] 캐러셀 구현 시 **인디케이터가 빠진 배경 에셋**을 디자이너에게 요청
-- [ ] 점 5개를 실제 View로 되살리고 페이지 연동
+점이 구워져 있던 `hero-card.png`는 지웠다. 히어로는 콘텐츠 슬라이드 3종(`hero-carousel.tsx`)이고
+글로우는 그라데이션으로 근사, 인디케이터는 View로 그려 페이지와 연동된다.
 
 ---
 
@@ -124,7 +121,7 @@ Swagger에 `LoginResponse` 스키마가 **정의돼 있지 않다** (`POST /api/
 ## 5. 확인이 필요한 디자인 불일치
 
 - [ ] **홈 도감 진행바** — Figma는 막대를 62.8%(137 중 86) 채워 뒀는데 텍스트는 "34/150종"(23%)이다. 디자인 자체가 안 맞는 상태.
-      현재는 숫자에서 폭을 유도하도록 구현했다 (`src/app/(tabs)/home/index.tsx`의 `DEX_PROGRESS`)
+      현재는 API 값(caughtCount/totalCount)에서 폭을 유도한다 (`use-home-view-model.ts`)
 - [ ] **탭바 높이** — Figma 52pt를 정확히 따르고 있으나, iPhone은 아래에 홈 인디케이터 34pt가 더 있어 여유로워 보인다.
       안드로이드 제스처 바는 24dp라 10dp 낮게 끝난다. 필요하면 `paddingBottom: Math.max(insets.bottom, 34)` 검토
 - [ ] **탭바 그림자** — 디자인엔 없으나 콘텐츠가 스크롤로 지나갈 때 경계가 필요해 `elevation: 8` 유지 중
@@ -163,12 +160,12 @@ Swagger에 `LoginResponse` 스키마가 **정의돼 있지 않다** (`POST /api/
 Swagger에 있으나 아직 화면/연동이 없는 API.
 
 - [ ] `GET /api/collections` 내 어종 인증 조회
-- [ ] `GET /api/collections/dex` 내 도감 조회 → 홈 "도감 진행도" 실데이터 연결
+- [x] `GET /api/collections/dex` 내 도감 조회 → 홈 "도감 진행도" (`home-api.ts`)
 - [ ] `GET /api/fish`, `GET /api/fish/{id}` 도감 목록·상세
 - [ ] `GET /api/rankings/completion`, `GET /api/rankings/size` 랭킹 탭
-- [ ] `GET /api/spots` 낚시 스팟 → 홈 "추천 낚시 스팟 Top 3" 실데이터 연결
+- [x] `GET /api/spots/popular` → 홈 "추천 낚시 스팟 Top 3", `GET /api/banner/seasonal-fish` → 히어로 (`home-api.ts`)
 - [ ] `PATCH /api/users/me/nickname`, `PATCH /api/users/me/password` 마이페이지 편집
 
 현재 목데이터 위치
-- `src/app/(tabs)/home/index.tsx` — `DEX_PROGRESS`, `SPOTS`
+- `src/features/home/home-data.ts` — 홈 fixture (`USE_FIXTURE`로 전환)
 - `src/app/(tabs)/log`, `ranking` — `PlaceholderScreen` (임시 컴포넌트, 실제 화면 들어오면 삭제)

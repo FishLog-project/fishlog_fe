@@ -10,7 +10,7 @@ export interface SeasonalFish {
   imageUrl: string | null;
 }
 
-/** GET /api/spots/popular. 거리는 BE에 없어 FE가 현재 위치로 계산한다 */
+/** GET /api/spots/popular. 거리는 BE에 없다 — 위치 기능이 붙기 전까지 distanceMeters는 비어 있다 */
 export interface PopularSpot {
   id: number;
   name: string;
@@ -32,7 +32,8 @@ export interface CollectionProgress {
 export interface FishLogDataSource {
   getSeasonalFish(): Promise<readonly SeasonalFish[]>;
   getCollectionProgress(): Promise<CollectionProgress>;
-  getPopularSpots(limit: number): Promise<readonly PopularSpot[]>;
+  /** 서버가 상위 3개만 준다 (3개 미만이면 있는 만큼) */
+  getPopularSpots(): Promise<readonly PopularSpot[]>;
 }
 
 /** partial-error는 스팟만 1회 실패한다 (오류→재시도 복구 흐름 확인용) */
@@ -109,13 +110,12 @@ export function createFixtureFishLogDataSource(
         caughtCount: scenario === 'empty' ? 0 : 7,
       });
     },
-    getPopularSpots(limit) {
+    getPopularSpots() {
       if (shouldFailPopularSpots) {
         shouldFailPopularSpots = false;
         return rejectAfter('추천 낚시 스팟 fixture를 불러오지 못했습니다.');
       }
-      const safeLimit = Math.max(0, Math.min(limit, popularSpots.length));
-      return resolveAfter(scenario === 'empty' ? [] : popularSpots.slice(0, safeLimit));
+      return resolveAfter(scenario === 'empty' ? [] : popularSpots);
     },
   };
 }
