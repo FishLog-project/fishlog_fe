@@ -132,6 +132,11 @@ async function main() {
   const { createFixtureCatchDataSource } = load('src/features/catch/catch-data.ts', {
     '@/features/dex/dex-data': dex,
   });
+  const { createFixtureFishLogDataSource } = load('src/features/home/home-data.ts', {
+    '@/features/dex/dex-data': dex,
+  });
+  const home = createFixtureFishLogDataSource();
+  const beforeProgress = await home.getCollectionProgress();
   const fixture = createFixtureCatchDataSource();
   const catalog = await fixture.listSpecies();
   const classifiedFixture = await fixture.classify('new-photo');
@@ -144,6 +149,14 @@ async function main() {
   assert.equal(record.catchCount, 1);
   assert.equal(record.recentCatches[0].imageUrl, 'new-photo');
   assert.equal(record.recentCatches[0].location, '제주');
+  const afterProgress = await home.getCollectionProgress();
+  assert.equal(afterProgress.caughtCount, beforeProgress.caughtCount + 1);
+  assert.equal(afterProgress.totalCount, beforeProgress.totalCount);
+  assert.deepEqual(afterProgress, await dex.createFixtureDexDataSource().getMyDex());
+  const emptyHome = createFixtureFishLogDataSource('empty');
+  assert.equal((await emptyHome.getCollectionProgress()).caughtCount, 0);
+  assert.deepEqual(await emptyHome.getSeasonalFish(), []);
+  assert.deepEqual(await emptyHome.getPopularSpots(), []);
   console.log('catch checks passed: registration, cancellation, validation, web/native multipart');
 }
 
