@@ -150,7 +150,7 @@ function toDetail([fish, record]: [FishDetail, CatchRecord]) {
  * 어종 상세 — 어종 정보(GET /api/fish/{id})와 내 인증 기록(GET /api/collections?fishId=)을
  * 함께 받아 합친다. 둘 중 하나만 실패해도 오류다.
  *
- * fishId가 바뀌어도 다시 받지 않는다. 쓰는 쪽이 key={fishId}로 컴포넌트를 새로 올린다.
+ * fishId나 로그인 세션이 바뀌면 이전 응답을 버리고 다시 받는다.
  */
 export function useDexDetailViewModel(dataSource: DexDataSource, fishId: number) {
   const source = useMemo(() => ({ dataSource, fishId }), [dataSource, fishId]);

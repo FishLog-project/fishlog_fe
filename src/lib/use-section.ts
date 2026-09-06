@@ -25,9 +25,14 @@ export function useSection<Source, T, ViewData>(
   load: SectionLoader<Source, T>,
   map: SectionMapper<T, ViewData>,
 ) {
-  const [state, setState] = useState<SectionState<ViewData>>({ status: 'loading' });
+  const [loaded, setLoaded] = useState<{
+    source: Source;
+    state: SectionState<ViewData>;
+  } | null>(null);
+  const state: SectionState<ViewData> =
+    loaded && loaded.source === source ? loaded.state : { status: 'loading' };
 
-  const refresh = useCallback(() => setState({ status: 'loading' }), []);
+  const refresh = useCallback(() => setLoaded(null), []);
 
   useEffect(() => {
     if (state.status !== 'loading') return;
@@ -39,12 +44,13 @@ export function useSection<Source, T, ViewData>(
       .then((value) => {
         if (stale) return;
         const viewData = map(value);
-        setState(
-          viewData === null ? { status: 'empty' } : { status: 'ready', data: viewData },
-        );
+        setLoaded({
+          source,
+          state: viewData === null ? { status: 'empty' } : { status: 'ready', data: viewData },
+        });
       })
       .catch(() => {
-        if (!stale) setState({ status: 'error' });
+        if (!stale) setLoaded({ source, state: { status: 'error' } });
       });
 
     return () => {

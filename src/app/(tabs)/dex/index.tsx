@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 
 import { Screen, ScreenHeader, ScreenState, SearchBar } from '@/components/common';
@@ -57,6 +57,9 @@ export default function DexScreen() {
   );
   const { state, results, query, setQuery, retry, isSearching } =
     useDexViewModel(dataSource);
+
+  // 다른 화면에서 인증한 기록을 돌아왔을 때 다시 불러온다.
+  useFocusEffect(useCallback(() => { retry(); }, [retry]));
 
   // 상세 카드를 연 어종. 잠금 카드는 눌리지 않으므로 획득한 어종만 들어온다.
   const [selectedId, setSelectedId] = useState<number | null>(null);

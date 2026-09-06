@@ -14,7 +14,7 @@ export interface DexEntry {
   name: string;
   imageUrl: string | null;
   rarity: Rarity;
-  habitat: string;
+  habitat: string | null;
   caught: boolean;
 }
 
@@ -28,7 +28,7 @@ export interface FishDetail {
   id: number;
   name: string;
   description: string;
-  habitat: string;
+  habitat: string | null;
   imageUrl: string | null;
   rarity: Rarity;
   /** 서버에 없는 값이라 아는 어종만 채운다 */
@@ -47,7 +47,7 @@ export interface RecentCatch {
 
 /** recentCatches는 서버가 최신순 최대 4건으로 잘라 준다 */
 export interface CatchRecord {
-  habitat: string;
+  habitat: string | null;
   catchCount: number;
   recentCatches: readonly RecentCatch[];
 }
