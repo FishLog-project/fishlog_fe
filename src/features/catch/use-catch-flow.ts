@@ -40,8 +40,6 @@ export type CatchStep =
       imageUrl: string;
       sizeCm: number;
       location: string;
-      /** 도감에 없는 어종(기타어종)은 서버가 받지 않아 기기에만 남는다 */
-      unsupported: boolean;
     };
 
 export function useCatchFlow(dataSource: CatchDataSource) {
@@ -133,6 +131,9 @@ export function useCatchFlow(dataSource: CatchDataSource) {
     if (
       state.step !== 'result' ||
       state.sizeCm === null ||
+      !Number.isFinite(state.sizeCm) ||
+      state.sizeCm <= 0 ||
+      state.sizeCm > 1000 ||
       state.fishName.trim() === '' ||
       registeringRef.current
     )
@@ -148,28 +149,14 @@ export function useCatchFlow(dataSource: CatchDataSource) {
     try {
       let fishId = state.fishId;
       if (fishId === null) {
-        const species = await dataSource.listSpecies().catch(() => []);
+        const species = await dataSource.listSpecies();
         if (run !== registerRun.current) return;
         fishId = species.find((s) => s.name === name)?.id ?? null;
       }
 
-      // 도감 밖 어종은 서버 verify가 받을 fishId가 없다 — 화면 흐름만 끝까지 간다
+      // 서버가 받지 못하는 어종은 저장 완료로 표시하지 않고 입력을 보존한다.
       if (fishId === null) {
-        setState({
-          step: 'registered',
-          detail: toDexSpeciesDetail({
-            id: 0,
-            name,
-            description: '',
-            habitat: '',
-            collected: true,
-            catchCount: 1,
-          }),
-          imageUrl: photoUri,
-          sizeCm: size,
-          location,
-          unsupported: true,
-        });
+        setRegistrationError('도감에 없는 어종이에요. 입력한 어종명을 확인해 주세요.');
         return;
       }
 
@@ -196,7 +183,6 @@ export function useCatchFlow(dataSource: CatchDataSource) {
         imageUrl: verified.imageUrl,
         sizeCm: verified.size,
         location: verified.location ?? location,
-        unsupported: false,
       });
     } catch {
       if (run !== registerRun.current) return;
@@ -209,8 +195,9 @@ export function useCatchFlow(dataSource: CatchDataSource) {
     }
   }, [dataSource, state]);
 
-  /** 처음으로. 진행 중인 분석·등록 응답은 버린다 */
+  /** 처음으로. 분석은 취소할 수 있지만 서버 저장 중에는 사진과 결과를 유지한다. */
   const retake = useCallback(() => {
+    if (registeringRef.current) return;
     analysisRun.current += 1;
     registerRun.current += 1;
     registeringRef.current = false;

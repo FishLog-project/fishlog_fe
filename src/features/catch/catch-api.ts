@@ -1,4 +1,5 @@
 import { File } from 'expo-file-system';
+import { Platform } from 'react-native';
 
 import type {
   CatchDataSource,
@@ -19,11 +20,12 @@ export function createApiCatchDataSource(token: string | null): CatchDataSource 
       : Promise.reject({ ok: false, ...UNAUTHORIZED });
 
   return {
-    classify: (photoUri) => authed<ClassifyResponse>('/api/collections/classify', imageForm(photoUri)),
-    verify: ({ fishId, size, photoUri, location }) => {
+    classify: async (photoUri) =>
+      authed<ClassifyResponse>('/api/collections/classify', await imageForm(photoUri)),
+    verify: async ({ fishId, size, photoUri, location }) => {
       const query = new URLSearchParams({ fishId: String(fishId), size: String(size) });
       if (location) query.set('location', location);
-      return authed<VerifyResponse>(`/api/collections/verify?${query}`, imageForm(photoUri));
+      return authed<VerifyResponse>(`/api/collections/verify?${query}`, await imageForm(photoUri));
     },
     getFish: (fishId) => request<FishDetailResponse>(`/api/fish/${fishId}`),
     listSpecies: () =>
@@ -33,9 +35,11 @@ export function createApiCatchDataSource(token: string | null): CatchDataSource 
   };
 }
 
-function imageForm(uri: string) {
+async function imageForm(uri: string) {
   const form = new FormData();
-  form.append('image', new File(uri), 'catch.jpg');
+  // Expo File은 웹에서 지원되지 않는다. 카메라/사진 선택기의 data·blob URI를 Blob으로 읽는다.
+  const image = Platform.OS === 'web' ? await fetch(uri).then((res) => res.blob()) : new File(uri);
+  form.append('image', image, 'catch.jpg');
   return form;
 }
 

@@ -3,6 +3,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { usePreventRemove } from 'expo-router/react-navigation';
 import { useMemo, useRef, useState } from 'react';
 import { Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -65,6 +66,8 @@ export default function CatchScreen() {
   );
   const flow = useCatchFlow(dataSource);
   const { state, registering } = flow;
+  // 헤더뿐 아니라 Android 뒤로가기와 iOS 뒤로 스와이프도 저장 완료까지 막는다.
+  usePreventRemove(registering, () => {});
 
   const leaveRegistered = () => router.replace('/home');
   const onBack =
@@ -118,7 +121,7 @@ export default function CatchScreen() {
       ) : state.step === 'error' ? (
         <>
           <AnalyzingStep />
-          <NoMatchDialog visible reason="failed" onRetake={flow.retake} onManual={flow.startManual} />
+          <NoMatchDialog visible reason={state.reason} onRetake={flow.retake} onManual={flow.startManual} />
         </>
       ) : state.step === 'result' ? (
         <ResultStep
@@ -318,7 +321,7 @@ function AnalyzingStep() {
         contentFit="cover"
         accessibilityLabel="물고기 분석 중"
       />
-      <StepCopy lines={['AI가 어종과 크기를 분석하고 있어요', '잠시만 기다려 주세요']} />
+      <StepCopy lines={['AI가 어종을 분석하고 있어요', '잠시만 기다려 주세요']} />
     </View>
   );
 }
@@ -363,7 +366,7 @@ function CandidateStep({
                 pressed && styles.pressed,
               ]}
               accessibilityRole="radio"
-              accessibilityState={{ selected }}
+              accessibilityState={{ checked: selected }}
               accessibilityLabel={candidate.name}
               onPress={() => onSelect(candidate.fishId)}>
               <Text style={styles.candidateName}>{candidate.name}</Text>
@@ -392,7 +395,8 @@ function CandidateStep({
 
       <NoMatchDialog
         visible={dialog !== 'none'}
-        reason={dialog === 'uncertain' ? 'failed' : 'no-match'}
+        reason={dialog === 'uncertain' ? 'uncertain' : 'no-match'}
+        guide={dialog === 'uncertain' ? result.guide : undefined}
         onRetake={onRetake}
         onManual={onManual}
         onCancel={() => setDialog('none')}
@@ -405,12 +409,14 @@ function CandidateStep({
 function NoMatchDialog({
   visible,
   reason,
+  guide,
   onRetake,
   onManual,
   onCancel,
 }: {
   visible: boolean;
-  reason: 'no-match' | 'failed';
+  reason: 'no-match' | 'failed' | 'empty' | 'uncertain';
+  guide?: string;
   onRetake: () => void;
   onManual: () => void;
   onCancel?: () => void;
@@ -419,10 +425,13 @@ function NoMatchDialog({
     <AppDialog
       visible={visible}
       title={
-        reason === 'no-match'
+        reason === 'failed'
+          ? '물고기를 분석하지 못했어요.\n잠시 후 다시 시도해 주세요.'
+          : reason === 'no-match'
           ? '해당하는 어종이 없을 경우,\n재촬영 또는 직접 입력 가능해요.'
           : '사진이 흐리거나\n도감에 존재하지 않는 어종이에요.'
       }
+      message={guide || undefined}
       buttonLabel="다시 촬영하기"
       onConfirm={onRetake}
       secondaryLabel="직접 입력하기"
@@ -797,11 +806,12 @@ const styles = StyleSheet.create({
     marginTop: 36,
     alignSelf: 'center',
     backgroundColor: CATCH.previewBg,
+    borderRadius: 4,
     overflow: 'hidden',
   },
   factsCard: {
     width: 264,
-    height: 120,
+    minHeight: 120,
     marginTop: 36,
     alignSelf: 'center',
     paddingHorizontal: 16,
@@ -811,7 +821,7 @@ const styles = StyleSheet.create({
     backgroundColor: DEX.cardBg,
     boxShadow: `0px 0px 5.8px ${DEX.detail.glow}`,
   },
-  factRow: { height: 20, flexDirection: 'row', alignItems: 'center' },
+  factRow: { minHeight: 20, flexDirection: 'row', alignItems: 'center' },
   factLabel: { ...Typography.listItem, color: Brand.textAccent },
   factValue: {
     ...Typography.itemTitle,
