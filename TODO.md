@@ -181,3 +181,26 @@ Swagger에 있으나 아직 화면/연동이 없는 API.
 - `src/features/home/home-data.ts` — 홈 fixture (`USE_FIXTURE`로 전환)
 - `src/features/dex/dex-data.ts` — 도감 fixture (`createFixtureDexDataSource`, 기본 화면은 API 사용)
 - `src/app/(tabs)/ranking` — `PlaceholderScreen` (임시 컴포넌트, 실제 화면 들어오면 삭제)
+
+---
+
+## 8. #13 관광 시설 API 준비 — 화면 연결·운영 검증 대기
+
+2026-09-06 확인: [BE PR #82](https://github.com/FishLog-project/fishlog_be/pull/82)는 dev에 병합됐다.
+`GET /api/tours/nearby`는 공개 API이며 `type=음식점|관광지|숙박`, `lat`, `lng`를 받는다.
+`radius` 기본 5km, `page` 기본 1, 페이지당 30건이고 `hasNext`를 반환한다.
+운영 `https://api.fishlog.xyz/v3/api-docs`에는 아직 경로가 없고, 실제 요청은 401이었다.
+
+- [x] `src/features/map/`에 dev 계약 기반 API·fixture·ViewModel 및 이전 요청 무시 처리 준비
+- [x] 대표 이미지와 썸네일을 사진 2장으로 중복 취급하지 않도록 매핑, 누락·잘못된 좌표 폴백
+- [x] `node scripts/check-tour-data.cjs`로 쿼리·nullable 매핑·요청 전환/재시도·위치 요청 순서 검증
+- [ ] [#4](https://github.com/FishLog-project/fishlog_fe/issues/4) 지도 UI 완료 후 필터·현재 위치/지도 중심·마커·목록·상세에 연결
+- [ ] `expo-location` 권한 문구/config plugin과 거부 시 수동 탐색을 #4에서 연결하고 기기에서 검증
+- [ ] 현재 어댑터는 첫 30건만 조회한다. #4 조회 흐름 확정 후 `page`/`hasNext`와 지도 영역의 반경을 연결
+- [ ] BE 운영 배포 뒤 필터별 실응답·오류 복구 및 iOS/Android 검증
+
+응답은 `title`, `firstImage`(대표), `firstImage2`(같은 이미지의 썸네일), `addr1`, `addr2`, `mapX`, `mapY`뿐이다.
+사진·주소·좌표는 null일 수 있다. 장소 ID, 상세 API, 추가 사진, 네이버 플레이스 ID/URL, 카카오맵 URL은 없다.
+Figma의 사진 3장·정확한 외부 장소 상세 링크는 현재 계약으로 채울 수 없어 별도 계약 확인이 필요하다.
+시설 UI 기준은 `634:1651`/`634:1711`(필터), `634:1576`(목록), `966:2635`/`1008:2840`(상세)이다.
+이 준비 코드는 아직 지도 화면에서 호출하지 않으며, #13 완료 또는 실제 API 연결 완료를 뜻하지 않는다.
