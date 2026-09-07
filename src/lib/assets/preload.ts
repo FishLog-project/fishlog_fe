@@ -26,14 +26,11 @@ const CRITICAL_IMAGES = [
 
 const DEFERRED_IMAGES = [
   // 지도
-  require('@/assets/images/map/map-placeholder.png'),
   require('@/assets/images/map/grid.svg'),
   require('@/assets/images/map/sea-info.svg'),
   require('@/assets/images/map/fishing-disabled.svg'),
   require('@/assets/images/map/fish-scan.svg'),
   require('@/assets/images/map/my-location.svg'),
-  require('@/assets/images/map/current-location.svg'),
-  require('@/assets/images/map/marker.svg'),
 
   // 프로필·랭킹
   require('@/assets/images/profile/camera-button-40.svg'),

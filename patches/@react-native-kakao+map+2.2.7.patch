@@ -1,0 +1,191 @@
+diff --git a/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapPackage.kt b/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapPackage.kt
+index c3a003d..d9ab736 100644
+--- a/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapPackage.kt
++++ b/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapPackage.kt
+@@ -5,8 +5,12 @@ import com.facebook.react.bridge.NativeModule
+ import com.facebook.react.bridge.ReactApplicationContext
+ import com.facebook.react.module.model.ReactModuleInfo
+ import com.facebook.react.module.model.ReactModuleInfoProvider
++import com.facebook.react.uimanager.ViewManager
+ 
+ class RNCKakaoMapPackage : TurboReactPackage() {
++  override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager<*, *>> =
++    listOf(RNCKakaoMapViewManager())
++
+   override fun getModule(
+     name: String,
+     reactContext: ReactApplicationContext,
+diff --git a/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapView.kt b/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapView.kt
+new file mode 100644
+index 0000000..9a201d4
+--- /dev/null
++++ b/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapView.kt
+@@ -0,0 +1,102 @@
++﻿package net.mjstudio.rnkakao.map
++
++import android.widget.FrameLayout
++import com.facebook.react.bridge.LifecycleEventListener
++import com.facebook.react.uimanager.ThemedReactContext
++import com.kakao.vectormap.KakaoMap
++import com.kakao.vectormap.KakaoMapReadyCallback
++import com.kakao.vectormap.LatLng
++import com.kakao.vectormap.MapLifeCycleCallback
++import com.kakao.vectormap.MapType
++import com.kakao.vectormap.MapView
++import com.kakao.vectormap.PoiScale
++import com.kakao.vectormap.camera.CameraAnimation
++import com.kakao.vectormap.camera.CameraUpdateFactory
++
++internal data class CameraProps(val latitude: Double, val longitude: Double, val zoomLevel: Int)
++
++internal class RNCKakaoMapView(private val reactContext: ThemedReactContext) : FrameLayout(reactContext), LifecycleEventListener {
++  private val nativeMapView = MapView(reactContext)
++  private var kakaoMap: KakaoMap? = null
++  private var camera: CameraProps? = null
++  var cameraAnimationDuration = 0
++
++  var poiEnabled = true
++    set(value) { field = value; kakaoMap?.setPoiVisible(value) }
++  var poiClickable = true
++    set(value) { field = value; kakaoMap?.setPoiClickable(value) }
++  var language = "ko"
++    set(value) { field = value; kakaoMap?.setPoiLanguage(value) }
++  var poiScale = PoiScale.REGULAR
++    set(value) { field = value; kakaoMap?.setPoiScale(value) }
++  var mapType = MapType.NORMAL
++    set(value) { field = value; kakaoMap?.changeMapType(value) }
++  var buildingScale = 1f
++    set(value) { field = value; kakaoMap?.setBuildingHeightScale(value) }
++  var cameraMinLevel = 1
++    set(value) { field = value; kakaoMap?.setCameraMinLevel(value) }
++  var cameraMaxLevel = 20
++    set(value) { field = value; kakaoMap?.setCameraMaxLevel(value) }
++  var showScaleBar = false
++    set(value) { field = value; if (value) kakaoMap?.scaleBar?.show() else kakaoMap?.scaleBar?.hide() }
++  var showCompass = false
++    set(value) { field = value; if (value) kakaoMap?.compass?.show() else kakaoMap?.compass?.hide() }
++
++  init {
++    addView(nativeMapView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
++    reactContext.addLifecycleEventListener(this)
++    nativeMapView.start(
++      object : MapLifeCycleCallback() {
++        override fun onMapDestroy() = Unit
++        override fun onMapError(error: Exception) = Unit
++      },
++      object : KakaoMapReadyCallback() {
++        override fun onMapReady(map: KakaoMap) {
++          kakaoMap = map
++          applyMapOptions(map)
++          camera?.let(::moveCamera)
++        }
++
++        override fun getPosition(): LatLng = camera?.let { LatLng.from(it.latitude, it.longitude) } ?: super.getPosition()
++        override fun getZoomLevel(): Int = camera?.zoomLevel ?: super.getZoomLevel()
++      },
++    )
++  }
++
++  fun setCamera(value: CameraProps) {
++    camera = value
++    moveCamera(value)
++  }
++
++  private fun moveCamera(value: CameraProps) {
++    val update = CameraUpdateFactory.newCenterPosition(LatLng.from(value.latitude, value.longitude), value.zoomLevel)
++    kakaoMap?.let { map ->
++      if (cameraAnimationDuration > 0) map.moveCamera(update, CameraAnimation.from(cameraAnimationDuration))
++      else map.moveCamera(update)
++    }
++  }
++
++  private fun applyMapOptions(map: KakaoMap) {
++    map.setPoiVisible(poiEnabled)
++    map.setPoiClickable(poiClickable)
++    map.setPoiLanguage(language)
++    map.setPoiScale(poiScale)
++    map.changeMapType(mapType)
++    map.setBuildingHeightScale(buildingScale)
++    map.setCameraMinLevel(cameraMinLevel)
++    map.setCameraMaxLevel(cameraMaxLevel)
++    if (showScaleBar) map.scaleBar?.show() else map.scaleBar?.hide()
++    if (showCompass) map.compass?.show() else map.compass?.hide()
++  }
++
++  override fun onHostResume() = nativeMapView.resume()
++  override fun onHostPause() = nativeMapView.pause()
++  override fun onHostDestroy() = destroy()
++
++  fun destroy() {
++    reactContext.removeLifecycleEventListener(this)
++    nativeMapView.finish()
++    kakaoMap = null
++  }
++}
++
+diff --git a/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapViewManager.kt b/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapViewManager.kt
+new file mode 100644
+index 0000000..019024e
+--- /dev/null
++++ b/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapViewManager.kt
+@@ -0,0 +1,43 @@
++﻿package net.mjstudio.rnkakao.map
++
++import com.facebook.react.bridge.ReadableArray
++import com.facebook.react.bridge.ReadableMap
++import com.facebook.react.uimanager.BaseViewManagerDelegate
++import com.facebook.react.uimanager.ThemedReactContext
++import com.facebook.react.uimanager.ViewManagerDelegate
++import com.facebook.react.uimanager.SimpleViewManager
++import com.facebook.react.viewmanagers.RNCKakaoMapViewManagerDelegate
++import com.facebook.react.viewmanagers.RNCKakaoMapViewManagerInterface
++import com.kakao.vectormap.MapType
++import com.kakao.vectormap.PoiScale
++
++internal class RNCKakaoMapViewManager : SimpleViewManager<RNCKakaoMapView>(), RNCKakaoMapViewManagerInterface<RNCKakaoMapView> {
++  private val delegate: ViewManagerDelegate<RNCKakaoMapView> = RNCKakaoMapViewManagerDelegate(this)
++
++  override fun getName() = "RNCKakaoMapView"
++  override fun getDelegate(): ViewManagerDelegate<RNCKakaoMapView> = delegate
++  override fun createViewInstance(context: ThemedReactContext) = RNCKakaoMapView(context)
++  override fun onDropViewInstance(view: RNCKakaoMapView) { view.destroy(); super.onDropViewInstance(view) }
++
++  override fun setBuildingScale(view: RNCKakaoMapView, value: Double) { view.buildingScale = value.toFloat() }
++  override fun setOverlays(view: RNCKakaoMapView, value: ReadableArray?) = Unit
++  override fun setPoiEnabled(view: RNCKakaoMapView, value: Boolean) { view.poiEnabled = value }
++  override fun setPoiClickable(view: RNCKakaoMapView, value: Boolean) { view.poiClickable = value }
++  override fun setPoiScale(view: RNCKakaoMapView, value: String?) { view.poiScale = runCatching { PoiScale.valueOf(value?.uppercase() ?: "REGULAR") }.getOrDefault(PoiScale.REGULAR) }
++  override fun setLanguage(view: RNCKakaoMapView, value: String?) { view.language = value ?: "ko" }
++  override fun setBaseMapType(view: RNCKakaoMapView, value: String?) { view.mapType = if (value.equals("skyview", true)) MapType.SKYVIEW else MapType.NORMAL }
++  override fun setCamera(view: RNCKakaoMapView, value: ReadableMap?) { value?.toCamera()?.let(view::setCamera) }
++  override fun setInitialCamera(view: RNCKakaoMapView, value: ReadableMap?) { value?.toCamera()?.let(view::setCamera) }
++  override fun setCameraMinLevel(view: RNCKakaoMapView, value: Double) { view.cameraMinLevel = value.toInt() }
++  override fun setCameraMaxLevel(view: RNCKakaoMapView, value: Double) { view.cameraMaxLevel = value.toInt() }
++  override fun setCameraAnimationDuration(view: RNCKakaoMapView, value: Double) { view.cameraAnimationDuration = value.toInt() }
++  override fun setIsShowScaleBar(view: RNCKakaoMapView, value: Boolean) { view.showScaleBar = value }
++  override fun setIsShowCompass(view: RNCKakaoMapView, value: Boolean) { view.showCompass = value }
++
++  private fun ReadableMap.toCamera() = CameraProps(
++    latitude = getDouble("lat"),
++    longitude = getDouble("lng"),
++    zoomLevel = if (hasKey("zoomLevel")) getDouble("zoomLevel").toInt() else 15,
++  )
++}
++
+diff --git a/node_modules/@react-native-kakao/map/src/index.ts b/node_modules/@react-native-kakao/map/src/index.ts
+index 1cc6a4d..e143fee 100644
+--- a/node_modules/@react-native-kakao/map/src/index.ts
++++ b/node_modules/@react-native-kakao/map/src/index.ts
+@@ -10,12 +10,6 @@ const LINKING_ERROR =
+   '- You rebuilt the app after installing the package\n' +
+   '- You are not using Expo Go\n';
+ 
+-const isTurboModuleEnabled = global.__turboModuleProxy != null;
+-
+-if (!isTurboModuleEnabled) {
+-  throw new Error('The package @react-native-kakao/map only supports fabric');
+-}
+-
+ const Module = require('./spec/NativeKakaoMap').default;
+ 
+ const Native: Spec = Module

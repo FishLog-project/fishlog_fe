@@ -1,9 +1,9 @@
 import { Image } from 'expo-image';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Screen, ScreenHeader, SearchBar } from '@/components/common';
-import { Brand, Components, Layout, Typography } from '@/constants/theme';
+import { Brand, Components, Layout } from '@/constants/theme';
 
 const MAP = Components.map;
 
@@ -14,16 +14,6 @@ const MAP_ACTIONS = [
   { icon: require('@/assets/images/map/fish-scan.svg'), label: '어종 탐색' },
 ] as const;
 
-const SPOTS = [
-  { name: '땡땡저수지', left: '31%', top: '40%' },
-  { name: '청명호', left: '72%', top: '67%' },
-  { name: '하늘연못', left: '27%', top: '79%' },
-] as const;
-
-/**
- * 지도 화면의 카카오 지도 연결 전 UI.
- * 실제 SDK 연결 시 mapCanvas의 정적 이미지만 지도 뷰로 교체한다.
- */
 export default function MapScreen() {
   const [query, setQuery] = useState('');
 
@@ -39,11 +29,12 @@ export default function MapScreen() {
       </View>
 
       <View style={styles.mapCanvas}>
+        {/* Temporary static map while the native map integration is being fixed. */}
         <Image
           source={require('@/assets/images/map/map-placeholder.png')}
           style={StyleSheet.absoluteFill}
           contentFit="cover"
-          contentPosition="center"
+          accessibilityLabel="임시 지도 이미지"
         />
         <View pointerEvents="none" style={styles.mapShade} />
 
@@ -53,19 +44,11 @@ export default function MapScreen() {
           ))}
         </View>
 
-        {SPOTS.map((spot) => (
-          <MapMarker key={spot.name} {...spot} />
-        ))}
-
-        <Image
-          source={require('@/assets/images/map/current-location.svg')}
-          style={styles.currentMarker}
-          contentFit="contain"
-        />
-
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="현재 위치로 이동"
+          disabled
+          accessibilityState={{ disabled: true }}
           style={({ pressed }) => [styles.locationButton, pressed && styles.pressed]}>
           <Image
             source={require('@/assets/images/map/my-location.svg')}
@@ -86,19 +69,6 @@ function MapAction({ icon, label }: (typeof MAP_ACTIONS)[number]) {
       style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}>
       <Image source={icon} style={styles.actionIcon} contentFit="contain" />
     </Pressable>
-  );
-}
-
-function MapMarker({ name, left, top }: (typeof SPOTS)[number]) {
-  return (
-    <View pointerEvents="none" style={[styles.marker, { left, top }]}>
-      <Text style={styles.markerLabel}>{name}</Text>
-      <Image
-        source={require('@/assets/images/map/marker.svg')}
-        style={styles.markerImage}
-        contentFit="contain"
-      />
-    </View>
   );
 }
 
@@ -161,25 +131,5 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.22,
     shadowRadius: 4,
     elevation: 5,
-  },
-  marker: {
-    position: 'absolute',
-    alignItems: 'center',
-    transform: [{ translateX: -32 }, { translateY: -10 }],
-  },
-  markerLabel: {
-    ...Typography.badge,
-    marginBottom: MAP.markerLabelGap,
-    color: Brand.textStrong,
-    fontSize: 12,
-    lineHeight: 20,
-  },
-  markerImage: { width: 34, height: 46 },
-  currentMarker: {
-    position: 'absolute',
-    left: '62%',
-    top: '41%',
-    width: 67,
-    height: 67,
   },
 });
