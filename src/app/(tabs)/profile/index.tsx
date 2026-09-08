@@ -87,13 +87,13 @@ export default function ProfileScreen() {
               onChangeImage={imageUpload.pickAndUpload}
             />
             <ProfileQuickMenu
-              onOpenLog={() => router.push('/log')}
+              onOpenLog={() => router.push('/dex')}
               onOpenRanking={() => router.push('/ranking')}
             />
           </View>
 
           <SettingsSection label="기록">
-            <SettingsListItem label="낚시 인증 기록 조회" onPress={() => router.push('/log')} />
+            <SettingsListItem label="낚시 인증 기록 조회" onPress={() => router.push('/dex')} />
           </SettingsSection>
 
           <SettingsSection label="설정">

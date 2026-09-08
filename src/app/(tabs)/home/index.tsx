@@ -44,7 +44,7 @@ export default function HomeScreen() {
     ? () => router.replace('/auth/login')
     : collectionProgress.status === 'error'
       ? retryCollectionProgress
-      : () => router.push('/log');
+      : () => router.push('/dex');
 
   return (
     <Screen scroll header={<ScreenHeader title="Fishlog" variant="brand" />}>

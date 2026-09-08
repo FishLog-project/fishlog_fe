@@ -40,6 +40,16 @@
 - [ ] 디자인 확정 후 파일 통째로 교체
 - [ ] 회원탈퇴 확인 UI — 지금은 iOS `Alert.prompt`, 안드로이드는 인라인 입력으로 분기해 둠
 
+
+### 1-3. 도감 어종 상세
+
+최종 Figma의 상세 카드(665:3472), 인증샷 뷰어(1019:2928),
+미획득 카드(978:3089)를 반영했다. 획득 카드만 상세를 열고,
+미획득 카드는 실루엣 + "???"로 표시한다.
+
+- [ ] 어종별 이미지 콘텐츠: API가 `imageUrl: null`이면 Figma 예시 그림 사용
+- [ ] 최대 크기: 서버 필드가 없어 값이 제공될 때만 표시
+
 ---
 
 ## 2. 백엔드 확인 필요
@@ -159,13 +169,15 @@ Swagger에 `LoginResponse` 스키마가 **정의돼 있지 않다** (`POST /api/
 
 Swagger에 있으나 아직 화면/연동이 없는 API.
 
-- [ ] `GET /api/collections` 내 어종 인증 조회
+- [x] `GET /api/collections?fishId=` 내 어종 인증 조회 → 상세 카드·인증샷 뷰어
 - [x] `GET /api/collections/dex` 내 도감 조회 → 홈 "도감 진행도" (`home-api.ts`)
-- [ ] `GET /api/fish`, `GET /api/fish/{id}` 도감 목록·상세
+- [x] `GET /api/collections/dex` → 도감 목록·진행도 연결
+- [x] `GET /api/fish/{id}` → 어종 상세 카드 연결
 - [ ] `GET /api/rankings/completion`, `GET /api/rankings/size` 랭킹 탭
 - [x] `GET /api/spots/popular` → 홈 "추천 낚시 스팟 Top 3", `GET /api/banner/seasonal-fish` → 히어로 (`home-api.ts`)
 - [ ] `PATCH /api/users/me/nickname`, `PATCH /api/users/me/password` 마이페이지 편집
 
 현재 목데이터 위치
 - `src/features/home/home-data.ts` — 홈 fixture (`USE_FIXTURE`로 전환)
-- `src/app/(tabs)/log`, `ranking` — `PlaceholderScreen` (임시 컴포넌트, 실제 화면 들어오면 삭제)
+- `src/features/dex/dex-data.ts` — 도감 fixture (`createFixtureDexDataSource`, 기본 화면은 API 사용)
+- `src/app/(tabs)/ranking` — `PlaceholderScreen` (임시 컴포넌트, 실제 화면 들어오면 삭제)
