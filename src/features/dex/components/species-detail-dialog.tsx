@@ -147,7 +147,7 @@ export function SpeciesDetailCard({ species }: { species: DexSpeciesDetailViewMo
             return photo ? (
               <Pressable
                 key={photo.catchRecordId}
-                accessibilityRole="imagebutton"
+                accessibilityRole="button"
                 accessibilityLabel={`인증 사진 ${i + 1} 크게 보기`}
                 onPress={() => setViewing(photo)}>
                 <Image source={photo.imageUrl} style={styles.photo} contentFit="cover" />

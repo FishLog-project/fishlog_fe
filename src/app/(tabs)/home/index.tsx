@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Screen, ScreenHeader, ScreenState, SectionTitle } from '@/components/common';
@@ -31,6 +31,9 @@ export default function HomeScreen() {
   const { viewModel, retryCollectionProgress, retryRecommendedSpots } =
     useHomeViewModel(dataSource);
   const { featuredSpecies, collectionProgress, recommendedSpots } = viewModel;
+
+  // 인증을 마치고 돌아오면 도감 집계만 다시 읽는다.
+  useFocusEffect(useCallback(() => { retryCollectionProgress(); }, [retryCollectionProgress]));
 
   // 게스트는 도감 진행도 대신 로그인 안내를 본다 (fixture는 로그인 없이도 채워 준다)
   const needsLogin = !USE_FIXTURE && token === null;

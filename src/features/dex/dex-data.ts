@@ -131,6 +131,20 @@ function getRecords() {
   return records;
 }
 
+/** 인증 fixture도 도감과 같은 기록을 갱신한다. */
+export function recordFixtureCatch(fishId: number, photo: RecentCatch) {
+  const fish = fishes.find((entry) => entry.id === fishId);
+  if (!fish) return null;
+  const previous = getRecords().get(fishId);
+  const catchCount = (previous?.catchCount ?? 0) + 1;
+  records = new Map(getRecords()).set(fishId, {
+    habitat: fish.habitat,
+    catchCount,
+    recentCatches: [photo, ...(previous?.recentCatches ?? [])].slice(0, 4),
+  });
+  return { name: fish.name, firstCatch: catchCount === 1, catchCount };
+}
+
 function getEntries(): readonly DexEntry[] {
   const catches = getRecords();
   return fishes.map((fish) => ({

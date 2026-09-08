@@ -48,6 +48,9 @@ export function PrimaryButton({
     return (
       <Pressable
         disabled
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityState={{ disabled: true, busy: Boolean(loading) }}
         style={[styles.base, outline ? [styles.outline, styles.faded] : styles.disabled]}>
         {content}
       </Pressable>
@@ -58,6 +61,8 @@ export function PrimaryButton({
     return (
       <Pressable
         onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={label}
         style={({ pressed }) => [styles.base, styles.outline, pressed && styles.pressed]}>
         {content}
       </Pressable>
@@ -67,6 +72,8 @@ export function PrimaryButton({
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
       style={({ pressed }) => [styles.base, pressed && styles.pressed]}>
       <LinearGradient
         colors={[...Components.button.gradient]}

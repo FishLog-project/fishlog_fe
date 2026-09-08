@@ -3,6 +3,8 @@
  * 타입은 BE 응답 DTO를 그대로 따른다 — 서버 구현이 응답을 변환 없이 넘길 수 있게.
  */
 
+import { createFixtureDexDataSource } from '@/features/dex/dex-data';
+
 /** GET /api/banner/seasonal-fish */
 export interface SeasonalFish {
   fishId: number;
@@ -98,18 +100,13 @@ export function createFixtureFishLogDataSource(
   scenario: HomeFixtureScenario = 'ready',
 ): FishLogDataSource {
   let shouldFailPopularSpots = scenario === 'partial-error';
+  const dex = createFixtureDexDataSource(scenario === 'empty' ? 'empty' : 'ready');
 
   return {
     getSeasonalFish() {
       return resolveAfter(scenario === 'empty' ? [] : seasonalFish);
     },
-    getCollectionProgress() {
-      // BE 시드 24종 기준 예시값
-      return resolveAfter({
-        totalCount: 24,
-        caughtCount: scenario === 'empty' ? 0 : 7,
-      });
-    },
+    getCollectionProgress: dex.getMyDex,
     getPopularSpots() {
       if (shouldFailPopularSpots) {
         shouldFailPopularSpots = false;
