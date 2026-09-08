@@ -1,53 +1,70 @@
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Screen, ScreenHeader, ScreenState } from '@/components/common';
+import { Screen, ScreenHeader, ScreenState, SectionTitle } from '@/components/common';
 import { Brand, Components, Typography } from '@/constants/theme';
+import { useAuth } from '@/features/auth';
+import { createApiFishLogDataSource } from '@/features/home/home-api';
 import { createFixtureFishLogDataSource } from '@/features/home/home-data';
 import { HeroCarousel } from '@/features/home/components/hero-carousel';
 import { useHomeViewModel } from '@/features/home/use-home-view-model';
+import { USE_FIXTURE } from '@/lib/data-source-mode';
 
-const HERO_LABEL = '오늘의 추천 어종';
-
-/** 슬라이드를 못 받았을 때 히어로 자리에 넣는 대체 문구 */
-const HERO_FALLBACK = {
-  loading: '오늘의 바다를 읽는 중…',
-  empty: '오늘은 추천 어종이 없어요',
-  error: '추천 어종을 불러오지 못했어요',
+/** 도감 진행도를 못 받았을 때 카드 본문 문구. 카드 자체가 버튼이라 안내와 동작이 함께 바뀐다 */
+const PROGRESS_FALLBACK = {
+  login: '로그인하면 도감 진행도를 볼 수 있어요',
+  error: '불러오지 못했어요 · 다시 시도',
 } as const;
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { token } = useAuth();
   // 렌더마다 새로 만들면 useSection 의존성이 흔들려 무한 재요청이 된다.
-  // 빈/오류 화면을 확인하려면 인자를 'empty' | 'partial-error'로 바꾼다.
-  const dataSource = useMemo(() => createFixtureFishLogDataSource(), []);
+  // fixture의 빈/오류 화면은 인자를 'empty' | 'partial-error'로 바꿔 확인한다.
+  const dataSource = useMemo(
+    () => (USE_FIXTURE ? createFixtureFishLogDataSource() : createApiFishLogDataSource(token)),
+    [token],
+  );
   const { viewModel, retryCollectionProgress, retryRecommendedSpots } =
     useHomeViewModel(dataSource);
   const { featuredSpecies, collectionProgress, recommendedSpots } = viewModel;
 
+  // 인증을 마치고 돌아오면 도감 집계만 다시 읽는다.
+  useFocusEffect(useCallback(() => { retryCollectionProgress(); }, [retryCollectionProgress]));
+
+  // 게스트는 도감 진행도 대신 로그인 안내를 본다 (fixture는 로그인 없이도 채워 준다)
+  const needsLogin = !USE_FIXTURE && token === null;
+  const progressMessage = needsLogin
+    ? PROGRESS_FALLBACK.login
+    : collectionProgress.status === 'error'
+      ? PROGRESS_FALLBACK.error
+      : null;
+  // 카드 전체가 버튼이라 본문에 버튼을 겹치지 않고, 상태에 따라 카드의 동작을 바꾼다
+  const onProgressPress = needsLogin
+    ? () => router.replace('/auth/login')
+    : collectionProgress.status === 'error'
+      ? retryCollectionProgress
+      : () => router.push('/dex');
+
   return (
     <Screen scroll header={<ScreenHeader title="Fishlog" variant="brand" />}>
-      {featuredSpecies.status === 'ready' ? (
-        <HeroCarousel slides={featuredSpecies.data} label={HERO_LABEL} />
-      ) : (
-        <View style={styles.heroFallback}>
-          <Text style={styles.heroFallbackLabel}>{HERO_LABEL}</Text>
-          <Text style={styles.heroFallbackTitle}>
-            {HERO_FALLBACK[featuredSpecies.status]}
-          </Text>
-        </View>
-      )}
+      <View style={styles.hero}>
+        <HeroCarousel featured={featuredSpecies} recommendedSpots={recommendedSpots} />
+      </View>
 
-      {/* 통계 카드 2개 */}
       <View style={styles.statRow}>
         <StatCard
           title="도감 진행도"
-          accessibilityLabel="도감 진행도, 도감 화면으로 이동"
-          onPress={() => router.push('/log')}>
-          {collectionProgress.status === 'ready' ? (
+          accessibilityLabel={progressMessage ?? '도감 진행도, 도감 화면으로 이동'}
+          onPress={onProgressPress}>
+          {progressMessage ? (
+            <View style={styles.statBody}>
+              <Text style={styles.statRetry}>{progressMessage}</Text>
+            </View>
+          ) : collectionProgress.status === 'ready' ? (
             <>
               <View style={styles.progressNumWrap}>
                 <Text style={styles.progressNum}>
@@ -69,16 +86,8 @@ export default function HomeScreen() {
                 />
               </View>
             </>
-          ) : collectionProgress.status === 'loading' ? (
-            <ActivityIndicator style={styles.statBody} color={Brand.primary} />
           ) : (
-            <Pressable
-              style={styles.statBody}
-              accessibilityRole="button"
-              accessibilityLabel="도감 진행도 다시 불러오기"
-              onPress={retryCollectionProgress}>
-              <Text style={styles.statRetry}>불러오지 못했어요 · 다시 시도</Text>
-            </Pressable>
+            <ActivityIndicator style={styles.statBody} color={Brand.primary} />
           )}
         </StatCard>
 
@@ -96,9 +105,8 @@ export default function HomeScreen() {
         </StatCard>
       </View>
 
-      {/* 추천 낚시 스팟 Top 3 */}
       <View style={styles.sectionHead}>
-        <Text style={styles.sectionTitle}>추천 낚시 스팟 Top 3</Text>
+        <SectionTitle>추천 낚시 스팟 Top 3</SectionTitle>
         <Image
           source={require('@/assets/images/home/fishing-rod.png')}
           style={styles.sectionIcon}
@@ -113,14 +121,22 @@ export default function HomeScreen() {
               key={s.id}
               style={({ pressed }) => [styles.spotRow, pressed && styles.pressed]}
               accessibilityRole="button"
-              accessibilityLabel={`${s.rank}위 ${s.name}, ${s.distance}, ${s.species}. 지도에서 보기`}
+              accessibilityLabel={`${s.rank}위 ${s.name}, ${[s.distance, s.species]
+                .filter(Boolean)
+                .join(', ')}. 지도에서 보기`}
               onPress={() => router.push('/map')}>
               <RankPin rank={s.rank} />
               <View style={styles.spotText}>
-                <Text style={styles.spotName}>{s.name}</Text>
-                <Text style={styles.spotInfo}>
-                  {s.distance}
-                  <Text style={styles.spotInfoDivider}>{'  I  '}</Text>
+                <Text numberOfLines={1} style={styles.spotName}>
+                  {s.name}
+                </Text>
+                <Text numberOfLines={1} style={styles.spotInfo}>
+                  {s.distance ? (
+                    <>
+                      {s.distance}
+                      <Text style={styles.spotInfoDivider}>{'  I  '}</Text>
+                    </>
+                  ) : null}
                   {s.species}
                 </Text>
               </View>
@@ -152,7 +168,7 @@ export default function HomeScreen() {
   );
 }
 
-/** 도감/인증 통계 카드 (헤더 + 화살표 + 내용). 카드 전체가 이동 버튼이다 */
+/** 카드 전체가 이동 버튼이다 */
 function StatCard({
   title,
   accessibilityLabel,
@@ -190,7 +206,7 @@ function StatCard({
   );
 }
 
-/** 순위 핀 — 핀 모양 + 안쪽 흰 원 + 순위 숫자를 겹쳐 올린다 */
+/** 핀 모양 + 안쪽 흰 원 + 순위 숫자를 겹쳐 올린다 */
 function RankPin({ rank }: { rank: number }) {
   return (
     <View style={styles.pin}>
@@ -211,28 +227,16 @@ function RankPin({ rank }: { rank: number }) {
   );
 }
 
+const HOME = Components.home;
 const CARD = Components.statCard;
 const BAR = Components.progress;
 const ROW = Components.spotRow;
 
 const styles = StyleSheet.create({
-  /** 슬라이드가 없을 때의 히어로 자리 (캐러셀과 같은 크기·여백) */
-  heroFallback: {
-    height: 168,
-    borderRadius: 16,
-    paddingLeft: 24,
-    paddingTop: 24,
-    backgroundColor: Brand.primary,
-  },
-  heroFallbackLabel: { ...Typography.heroLabel, color: Brand.onPrimary },
-  heroFallbackTitle: {
-    ...Typography.heroTitle,
-    color: Brand.onPrimary,
-    marginTop: 2,
-  },
+  hero: { marginTop: HOME.heroTop },
 
   // 통계 카드
-  statRow: { flexDirection: 'row', gap: 12, marginTop: 20 },
+  statRow: { flexDirection: 'row', gap: HOME.cardGap, marginTop: HOME.blockGap },
   /** flex는 바깥 Pressable이 갖고, 그라데이션은 그 안을 채운다 */
   statCardPress: { flex: 1 },
   pressed: { opacity: 0.85 },
@@ -241,7 +245,6 @@ const styles = StyleSheet.create({
     height: CARD.height,
     borderRadius: CARD.radius,
     padding: CARD.padding,
-    justifyContent: 'space-between',
     // Figma의 inset shadow. RN 0.76+ 새 아키텍처에서 지원한다.
     boxShadow: `inset 0px 0px 8.4px ${CARD.innerGlow}`,
   },
@@ -253,10 +256,15 @@ const styles = StyleSheet.create({
   statTitle: { ...Typography.cardTitle, color: Brand.primaryDark },
   statChevron: { width: 20, height: 20 },
 
-  progressNumWrap: { flexDirection: 'row', alignItems: 'baseline' },
+  progressNumWrap: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginTop: CARD.valueTop,
+  },
   progressNum: { ...Typography.statNumber, color: Brand.primary },
   progressDenom: { ...Typography.statUnit, color: Brand.primary },
   progressTrack: {
+    marginTop: CARD.barTop,
     height: BAR.height,
     borderRadius: BAR.radius,
     backgroundColor: BAR.track,
@@ -266,22 +274,21 @@ const styles = StyleSheet.create({
   },
   progressFill: { height: '100%', borderRadius: BAR.radius },
 
-  /** 로딩·오류일 때 카드 본문 자리를 채우는 중앙 정렬 영역 */
+  /** 로딩·오류일 때 카드 본문 자리 */
   statBody: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   statRetry: { ...Typography.itemMeta, color: Brand.textMuted, textAlign: 'center' },
 
-  scanWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  scanWrap: { marginTop: CARD.iconTop, alignItems: 'center' },
   scanImage: { width: 73.733, height: 56 },
 
   // 스팟 섹션
   sectionHead: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginTop: 20,
-    marginBottom: 12,
+    gap: HOME.sectionTitleGap,
+    marginTop: HOME.blockGap,
+    marginBottom: HOME.sectionBottom,
   },
-  sectionTitle: { ...Typography.sectionTitle, color: Brand.textHeading },
   sectionIcon: { width: 20, height: 20 },
 
   spotList: { gap: ROW.rowGap },
@@ -295,7 +302,7 @@ const styles = StyleSheet.create({
     gap: ROW.contentGap,
   },
   pin: { width: ROW.pinSize, height: ROW.pinSize },
-  /** 핀 머리 안쪽 흰 원. Figma inset[20% 27.5% 35% 27.5%] 기준 */
+  /** Figma inset[20% 27.5% 35% 27.5%] */
   pinInner: {
     position: 'absolute',
     left: '27.5%',
@@ -309,7 +316,7 @@ const styles = StyleSheet.create({
   spotText: { flex: 1 },
   spotName: { ...Typography.itemTitle, color: Brand.textStrong },
   spotInfo: { ...Typography.itemMeta, color: Brand.textMuted },
-  /** 거리와 어종 사이 구분자만 회색 + Light */
+  /** 구분자만 회색 + Light */
   spotInfoDivider: { ...Typography.itemMetaDivider, color: Brand.textDisabled },
   spotChevron: { width: ROW.chevronSize, height: ROW.chevronSize },
 });

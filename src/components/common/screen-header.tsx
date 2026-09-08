@@ -12,6 +12,8 @@ type ScreenHeaderProps = {
   showBack?: boolean;
   /** 뒤로가기 기본 동작(router.back) 대신 쓸 핸들러 */
   onBack?: () => void;
+  /** 저장 등 취소하면 안 되는 작업 중 뒤로가기를 잠근다 */
+  backDisabled?: boolean;
   /** 우측 슬롯 (설정 버튼 등) */
   right?: ReactNode;
 };
@@ -27,6 +29,7 @@ export function ScreenHeader({
   variant = 'default',
   showBack = false,
   onBack,
+  backDisabled = false,
   right,
 }: ScreenHeaderProps) {
   const router = useRouter();
@@ -38,7 +41,10 @@ export function ScreenHeader({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="뒤로 가기"
+            accessibilityState={{ disabled: backDisabled }}
+            disabled={backDisabled}
             hitSlop={12}
+            style={backDisabled && styles.backDisabled}
             onPress={onBack ?? (() => router.back())}>
             <Ionicons name="chevron-back" size={26} color={Brand.textStrong} />
           </Pressable>
@@ -71,6 +77,7 @@ const styles = StyleSheet.create({
   /** 좌우 슬롯을 같은 폭으로 잡아야 가운데 타이틀이 실제로 가운데에 온다 */
   side: { width: 40, justifyContent: 'center' },
   sideRight: { alignItems: 'flex-end' },
+  backDisabled: { opacity: 0.35 },
   fill: { flex: 1 },
   title: {
     flex: 1,

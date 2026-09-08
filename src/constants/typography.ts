@@ -157,6 +157,57 @@ export const Typography = {
     lineHeight: 28,
     letterSpacing: -0.4,
   },
+  /** 카드 안 작은 설명 — 도감 "도감 완성도" (Figma 103:195) */
+  cardCaption: {
+    fontFamily: Fonts.medium,
+    fontWeight: '500',
+    fontSize: 13,
+    lineHeight: 24,
+    letterSpacing: -0.26,
+  },
+  /** 막대·배지 안에 얹는 가장 작은 수치 — 도감 완성도 "99%" (Figma 103:224) */
+  microLabel: {
+    fontFamily: Fonts.bold,
+    fontWeight: '700',
+    fontSize: 10,
+    lineHeight: 16,
+    letterSpacing: -0.2,
+  },
+  /**
+   * 단계 안내 문구 — 인증 플로우의 "잡은 물고기가 잘 보이게 촬영해 주세요" (Figma 634:3121).
+   * 디자인은 Pretendard SemiBold지만 앱 기본 서체가 SUITE라 SUITE로 맞춘다.
+   */
+  stepTitle: {
+    fontFamily: Fonts.semiBold,
+    fontWeight: '600',
+    fontSize: 20,
+    lineHeight: 28,
+    letterSpacing: -0.4,
+  },
+  /** 어종 상세 카드 제목 — "개복치" (Figma 634:1445) */
+  detailTitle: {
+    fontFamily: Fonts.bold,
+    fontWeight: '700',
+    fontSize: 18,
+    lineHeight: 24,
+    letterSpacing: -0.36,
+  },
+  /** 어종 상세 설명 · "최대 크기 300cm" (Figma 634:1448 · 665:3435) */
+  detailBody: {
+    fontFamily: Fonts.medium,
+    fontWeight: '500',
+    fontSize: 12,
+    lineHeight: 16,
+    letterSpacing: -0.24,
+  },
+  /** 칩 안의 문구 — "주요 서식지: 바다" (Figma 665:3440) */
+  chipLabel: {
+    fontFamily: Fonts.medium,
+    fontWeight: '500',
+    fontSize: 11,
+    lineHeight: 16,
+    letterSpacing: -0.22,
+  },
   /** 순위 배지 숫자 — 스팟 핀 안의 1·2·3 (Figma 72:1218) */
   badge: {
     fontFamily: Fonts.extraBold,

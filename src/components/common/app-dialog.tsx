@@ -16,6 +16,9 @@ type Props = {
   loading?: boolean;
   cancelLabel?: string;
   onCancel?: () => void;
+  /** 있으면 확인·보조·취소 세 버튼을 세로로 쌓는다 */
+  secondaryLabel?: string;
+  onSecondary?: () => void;
 };
 
 /** 앱 공통 단일 액션 팝업 — 딤 배경 + 흰색 라운드 카드 + PrimaryButton. */
@@ -30,7 +33,10 @@ export function AppDialog({
   loading,
   cancelLabel = '취소',
   onCancel,
+  secondaryLabel,
+  onSecondary,
 }: Props) {
+  const stacked = Boolean(onSecondary);
   return (
     <Modal
       visible={visible}
@@ -51,25 +57,47 @@ export function AppDialog({
             </View>
             {children}
           </View>
-          <View style={[styles.actions, onCancel && styles.actionsRow]}>
-            {onCancel ? (
-              <View style={styles.actionButton}>
+          <View style={[styles.actions, onCancel && !stacked && styles.actionsRow]}>
+            {stacked ? (
+              <>
                 <PrimaryButton
-                  label={cancelLabel}
-                  variant="outline"
-                  onPress={onCancel}
-                  disabled={loading}
+                  label={buttonLabel}
+                  onPress={onConfirm}
+                  disabled={confirmDisabled}
+                  loading={loading}
                 />
-              </View>
-            ) : null}
-            <View style={onCancel && styles.actionButton}>
-              <PrimaryButton
-                label={buttonLabel}
-                onPress={onConfirm}
-                disabled={confirmDisabled}
-                loading={loading}
-              />
-            </View>
+                <PrimaryButton label={secondaryLabel ?? ''} onPress={onSecondary} disabled={loading} />
+                {onCancel ? (
+                  <PrimaryButton
+                    label={cancelLabel}
+                    variant="outline"
+                    onPress={onCancel}
+                    disabled={loading}
+                  />
+                ) : null}
+              </>
+            ) : (
+              <>
+                {onCancel ? (
+                  <View style={styles.actionButton}>
+                    <PrimaryButton
+                      label={cancelLabel}
+                      variant="outline"
+                      onPress={onCancel}
+                      disabled={loading}
+                    />
+                  </View>
+                ) : null}
+                <View style={onCancel && styles.actionButton}>
+                  <PrimaryButton
+                    label={buttonLabel}
+                    onPress={onConfirm}
+                    disabled={confirmDisabled}
+                    loading={loading}
+                  />
+                </View>
+              </>
+            )}
           </View>
         </View>
       </KeyboardAvoidingView>

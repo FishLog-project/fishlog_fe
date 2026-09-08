@@ -30,7 +30,7 @@ export function SearchBar({
         placeholderTextColor={Components.searchBar.placeholder}
         {...rest}
       />
-      <Ionicons name="search" size={18} color={Components.searchBar.active} />
+      <Ionicons name="search" size={24} color={Components.searchBar.active} />
     </View>
   );
 }
@@ -42,8 +42,9 @@ const styles = StyleSheet.create({
     height: Components.searchBar.height,
     borderRadius: Components.searchBar.radius,
     backgroundColor: Components.searchBar.bg,
-    paddingHorizontal: 18,
-    gap: 8,
+    paddingLeft: 24,
+    paddingRight: 16,
+    gap: 12,
   },
   input: {
     flex: 1,

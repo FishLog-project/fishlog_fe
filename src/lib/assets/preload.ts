@@ -15,7 +15,9 @@ const CRITICAL_IMAGES = [
   require('@/assets/images/tabs/profile-inactive.svg'),
 
   // 홈
-  require('@/assets/images/home/hero-card.png'),
+  require('@/assets/images/home/featured-flatfish.png'),
+  require('@/assets/images/home/featured-flatfish-shadow.png'),
+  require('@/assets/images/home/unowned-fish.png'),
   require('@/assets/images/home/scan-fish.svg'),
   require('@/assets/images/home/fishing-rod.png'),
   require('@/assets/images/home/chevron-20.svg'),
@@ -25,6 +27,10 @@ const CRITICAL_IMAGES = [
 ] as const;
 
 const DEFERRED_IMAGES = [
+  // 홈 — 추천 스팟 슬라이드는 세 번째라 첫 화면엔 안 보인다
+  require('@/assets/images/home/recommended-spot-marine.jpg'),
+  require('@/assets/images/home/recommended-spot-inland.jpg'),
+
   // 지도
   require('@/assets/images/map/grid.svg'),
   require('@/assets/images/map/sea-info.svg'),
