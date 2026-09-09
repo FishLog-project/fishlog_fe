@@ -1,20 +1,17 @@
-import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, StyleSheet, Text } from 'react-native';
 
 import { Brand, Components, Typography } from '@/constants/theme';
 import type { DexSpeciesViewModel } from '@/features/dex/use-dex-view-model';
+import { FishArtwork } from '@/features/dex/fish-art';
 
 const DEX = Components.dex;
-
-/** 서버 이미지(imageUrl)가 아직 없을 때 쓰는 기본 그림 — Figma 목록 카드의 예시 이미지(978:3064) */
-const FALLBACK_ART = require('@/assets/images/dex/species-card.png');
 
 /**
  * 도감 격자 한 칸 (Figma Collection/MiniCard 978:3090 · 미획득 978:3089).
  *
  * 획득 카드는 물색 그라데이션 칸에 어종 그림 + 이름,
- * 미획득 카드는 같은 틀에 같은 그림을 검은 실루엣으로 옅게 깔고 이름을 "???"로 가린다.
+ * 미획득 카드는 서버가 내려준 그림자를 표시하고 이름을 "???"로 가린다.
  */
 export function SpeciesCard({
   species,
@@ -40,12 +37,11 @@ export function SpeciesCard({
         end={{ x: 0.07, y: 0.24 }}
         locations={[0.129, 0.978]}
         style={styles.tile}>
-        <Image
-          source={species.imageUrl ?? FALLBACK_ART}
-          style={[styles.art, !species.caught && styles.artLocked]}
+        <FishArtwork
+          imageUrl={species.imageUrl}
+          locked={!species.caught}
+          style={styles.art}
           contentFit="contain"
-          // 실루엣은 서버가 아니라 화면 효과다 — 같은 그림을 단색으로 칠한다
-          tintColor={species.caught ? undefined : DEX.silhouette}
         />
       </LinearGradient>
       <Text numberOfLines={1} style={styles.name}>
@@ -83,7 +79,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   art: { width: DEX.artSize, height: DEX.artSize, maxWidth: '100%', maxHeight: '100%' },
-  artLocked: { opacity: DEX.silhouetteOpacity },
 
   name: {
     ...Typography.cardTitle,

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 
 import type {
   CatchRecord,
+  CustomCatchRecord,
   DexDataSource,
   DexEntry,
   FishDetail,
@@ -12,6 +13,8 @@ import { useSection } from '@/lib/use-section';
 
 export interface DexSpeciesViewModel {
   id: number;
+  name: string;
+  custom?: boolean;
   /** 잠금 카드는 이름을 감춘다 — 화면이 아니라 여기서 결정한다 */
   label: string;
   /** null이면 화면이 기본 그림을 쓴다 */
@@ -28,6 +31,7 @@ export interface DexSpeciesViewModel {
 
 export interface DexSpeciesDetailViewModel {
   name: string;
+  custom?: boolean;
   /** "최대 크기 300cm". 서버가 값을 안 주면 null이고 그 줄을 그리지 않는다 */
   maxSizeLabel: string | null;
   /** null이면 화면이 기본 그림을 쓴다 */
@@ -36,7 +40,7 @@ export interface DexSpeciesDetailViewModel {
   /** 기타어종은 서식지가 없어 null */
   habitatLabel: string | null;
   /** "잡은 횟수: 3회" */
-  catchLabel: string;
+  catchLabel: string | null;
   photos: readonly RecentCatch[];
 }
 
@@ -63,6 +67,8 @@ function toDexSpecies(entry: DexEntry): DexSpeciesViewModel {
 
   return {
     id: entry.id,
+    name: entry.name,
+    custom: entry.custom,
     label: entry.caught ? entry.name : LOCKED_LABEL,
     imageUrl: entry.imageUrl,
     caught: entry.caught,
@@ -133,17 +139,34 @@ export function toDexSpeciesDetail(
   };
 }
 
+/** 수기 어종에는 종 설명·최대 크기가 없다. 사진과 사용자 기록만 합친다. */
+export function toCustomSpeciesDetail(record: CustomCatchRecord): DexSpeciesDetailViewModel {
+  return {
+    name: record.name,
+    custom: true,
+    maxSizeLabel: null,
+    imageUrl: record.imageUrl ?? null,
+    description: '',
+    habitatLabel: record.habitat ? `주요 서식지: ${record.habitat}` : null,
+    catchLabel: `잡은 횟수: ${record.catchCount}회`,
+    photos: record.recentCatches,
+  };
+}
+
 interface DetailSource {
   dataSource: DexDataSource;
   fishId: number;
+  custom: boolean;
 }
 
-function loadDetail({ dataSource, fishId }: DetailSource) {
-  return Promise.all([dataSource.getFish(fishId), dataSource.getCatchRecord(fishId)]);
-}
-
-function toDetail([fish, record]: [FishDetail, CatchRecord]) {
+async function loadDetail({ dataSource, fishId, custom }: DetailSource) {
+  if (custom) return toCustomSpeciesDetail(await dataSource.getCustomFish(fishId));
+  const [fish, record] = await Promise.all([dataSource.getFish(fishId), dataSource.getCatchRecord(fishId)]);
   return toDexSpeciesDetail(fish, record);
+}
+
+function toDetail(detail: DexSpeciesDetailViewModel) {
+  return detail;
 }
 
 /**
@@ -152,7 +175,7 @@ function toDetail([fish, record]: [FishDetail, CatchRecord]) {
  *
  * fishId나 로그인 세션이 바뀌면 이전 응답을 버리고 다시 받는다.
  */
-export function useDexDetailViewModel(dataSource: DexDataSource, fishId: number) {
-  const source = useMemo(() => ({ dataSource, fishId }), [dataSource, fishId]);
+export function useDexDetailViewModel(dataSource: DexDataSource, fishId: number, custom = false) {
+  const source = useMemo(() => ({ dataSource, fishId, custom }), [dataSource, fishId, custom]);
   return useSection(source, loadDetail, toDetail);
 }
