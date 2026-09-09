@@ -27,6 +27,7 @@ import { useCatchFlow } from '@/features/catch/use-catch-flow';
 import type { CatchStep } from '@/features/catch/use-catch-flow';
 import { SpeciesDetailCard } from '@/features/dex/components/species-detail-dialog';
 import type { DexSpeciesDetailViewModel } from '@/features/dex/use-dex-view-model';
+import { FishArtwork } from '@/features/dex/fish-art';
 import { USE_FIXTURE } from '@/lib/data-source-mode';
 
 const CATCH = Components.catch;
@@ -367,8 +368,8 @@ function CandidateStep({
               accessibilityLabel={candidate.name}
               onPress={() => onSelect(candidate.fishId)}>
               <Text style={styles.candidateName}>{candidate.name}</Text>
-              <Image
-                source={candidate.imageUrl ?? CANDIDATE_ART}
+              <FishArtwork
+                imageUrl={candidate.imageUrl}
                 style={styles.candidateImage}
                 contentFit="contain"
               />
@@ -472,7 +473,7 @@ function ResultStep({
   const draftValid =
     editing === 'location' ||
     (editing === 'name' && draft.trim() !== '') ||
-    (editing === 'size' && Number.isFinite(parsedSize) && parsedSize > 0 && parsedSize <= 1000);
+    (editing === 'size' && Number.isFinite(parsedSize) && parsedSize > 0 && parsedSize <= 300);
 
   const openEditor = (field: EditableFact) => {
     setDraft(
@@ -559,7 +560,7 @@ function ResultStep({
       <AppDialog
         visible={editing !== null}
         title={editing === 'size' ? '크기' : editing === 'name' ? '어종' : '잡은 위치'}
-        message={editing === 'size' ? 'cm 단위로 입력해 주세요' : undefined}
+        message={editing === 'size' ? '0보다 크고 300 이하의 cm 단위로 입력해 주세요' : undefined}
         buttonLabel="저장하기"
         confirmDisabled={!draftValid}
         onConfirm={save}
