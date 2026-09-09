@@ -23,6 +23,11 @@ function initializeKakaoMap(nativeAppKey: string) {
 
 type MapStatus = 'initializing' | 'ready' | 'error';
 
+type Coordinate = { lat: number; lng: number };
+
+/** nonce 는 같은 좌표로 다시 이동시킬 때만 쓰는 갱신 토큰이다. */
+type CameraState = Coordinate & { zoomLevel: number; nonce?: number };
+
 type FishlogKakaoMapProps = {
   recenterSignal: number;
 };
@@ -31,7 +36,8 @@ export function FishlogKakaoMap({ recenterSignal }: FishlogKakaoMapProps) {
   const nativeAppKey = Constants.expoConfig?.extra?.kakaoNativeAppKey;
   const hasNativeAppKey = typeof nativeAppKey === 'string' && nativeAppKey.length > 0;
   const [status, setStatus] = useState<MapStatus>(hasNativeAppKey ? 'initializing' : 'error');
-  const [camera, setCamera] = useState(DEFAULT_CAMERA);
+  const [camera, setCamera] = useState<CameraState>(DEFAULT_CAMERA);
+  const [currentLocation, setCurrentLocation] = useState<Coordinate | undefined>(undefined);
 
   useEffect(() => {
     let active = true;
@@ -63,11 +69,15 @@ export function FishlogKakaoMap({ recenterSignal }: FishlogKakaoMapProps) {
       });
       if (!active) return;
 
-      setCamera({
+      const coordinate: Coordinate = {
         lat: location.coords.latitude,
         lng: location.coords.longitude,
-        zoomLevel: CURRENT_LOCATION_ZOOM,
-      });
+      };
+
+      setCurrentLocation(coordinate);
+      // nonce 를 함께 넘긴다. 사용자가 지도를 옮긴 뒤 버튼을 눌러도 좌표가 이전과 같으면
+      // Fabric 이 prop 변화를 값으로 비교해 걸러내므로, 이 값이 바뀌어야 카메라가 다시 이동한다.
+      setCamera({ ...coordinate, zoomLevel: CURRENT_LOCATION_ZOOM, nonce: recenterSignal });
     };
 
     moveToCurrentLocation().catch(() => {
@@ -101,6 +111,7 @@ export function FishlogKakaoMap({ recenterSignal }: FishlogKakaoMapProps) {
     <KakaoMapView
       style={StyleSheet.absoluteFill}
       camera={camera}
+      currentLocation={currentLocation}
       cameraMinLevel={1}
       cameraMaxLevel={20}
       language="ko"

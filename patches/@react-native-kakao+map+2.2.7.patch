@@ -17,12 +17,16 @@ index c3a003d..d9ab736 100644
      reactContext: ReactApplicationContext,
 diff --git a/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapView.kt b/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapView.kt
 new file mode 100644
-index 0000000..9a201d4
+index 0000000..46b1b2d
 --- /dev/null
 +++ b/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapView.kt
-@@ -0,0 +1,102 @@
+@@ -0,0 +1,163 @@
 +﻿package net.mjstudio.rnkakao.map
 +
++import android.graphics.Bitmap
++import android.graphics.Canvas
++import android.graphics.Color
++import android.graphics.Paint
 +import android.widget.FrameLayout
 +import com.facebook.react.bridge.LifecycleEventListener
 +import com.facebook.react.uimanager.ThemedReactContext
@@ -35,13 +39,21 @@ index 0000000..9a201d4
 +import com.kakao.vectormap.PoiScale
 +import com.kakao.vectormap.camera.CameraAnimation
 +import com.kakao.vectormap.camera.CameraUpdateFactory
++import com.kakao.vectormap.label.Label
++import com.kakao.vectormap.label.LabelOptions
++import com.kakao.vectormap.label.LabelStyle
++import com.kakao.vectormap.label.LabelStyles
 +
 +internal data class CameraProps(val latitude: Double, val longitude: Double, val zoomLevel: Int)
++
++internal data class LatLngProps(val latitude: Double, val longitude: Double)
 +
 +internal class RNCKakaoMapView(private val reactContext: ThemedReactContext) : FrameLayout(reactContext), LifecycleEventListener {
 +  private val nativeMapView = MapView(reactContext)
 +  private var kakaoMap: KakaoMap? = null
 +  private var camera: CameraProps? = null
++  private var currentLocation: LatLngProps? = null
++  private var currentLocationLabel: Label? = null
 +  var cameraAnimationDuration = 0
 +
 +  var poiEnabled = true
@@ -78,6 +90,7 @@ index 0000000..9a201d4
 +          kakaoMap = map
 +          applyMapOptions(map)
 +          camera?.let(::moveCamera)
++          applyCurrentLocation()
 +        }
 +
 +        override fun getPosition(): LatLng = camera?.let { LatLng.from(it.latitude, it.longitude) } ?: super.getPosition()
@@ -89,6 +102,53 @@ index 0000000..9a201d4
 +  fun setCamera(value: CameraProps) {
 +    camera = value
 +    moveCamera(value)
++  }
++
++  fun setCurrentLocation(value: LatLngProps?) {
++    currentLocation = value
++    applyCurrentLocation()
++  }
++
++  /** 현재 위치 라벨을 지도에 올린다. 이미 올라와 있으면 위치만 옮긴다. */
++  private fun applyCurrentLocation() {
++    val map = kakaoMap ?: return
++    val position = currentLocation
++
++    if (position == null) {
++      currentLocationLabel?.remove()
++      currentLocationLabel = null
++      return
++    }
++
++    val point = LatLng.from(position.latitude, position.longitude)
++    currentLocationLabel?.let {
++      it.moveTo(point)
++      return
++    }
++
++    val labelManager = map.labelManager ?: return
++    val layer = labelManager.layer ?: return
++    val styles = labelManager.addLabelStyles(LabelStyles.from(LabelStyle.from(createLocationDot()))) ?: return
++    currentLocationLabel = layer.addLabel(LabelOptions.from(point).setStyles(styles))
++  }
++
++  /** 드로어블 리소스 없이 현재 위치 점을 그린다. 색은 Fishlog 메인 블루(#00A0F0). */
++  private fun createLocationDot(): Bitmap {
++    val density = resources.displayMetrics.density
++    val size = (24 * density).toInt().coerceAtLeast(1)
++    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
++    val canvas = Canvas(bitmap)
++    val center = size / 2f
++    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
++
++    paint.color = Color.argb(56, 0, 160, 240)
++    canvas.drawCircle(center, center, center, paint)
++    paint.color = Color.WHITE
++    canvas.drawCircle(center, center, 7f * density, paint)
++    paint.color = Color.rgb(0, 160, 240)
++    canvas.drawCircle(center, center, 5f * density, paint)
++
++    return bitmap
 +  }
 +
 +  private fun moveCamera(value: CameraProps) {
@@ -119,16 +179,17 @@ index 0000000..9a201d4
 +  fun destroy() {
 +    reactContext.removeLifecycleEventListener(this)
 +    nativeMapView.finish()
++    currentLocationLabel = null
 +    kakaoMap = null
 +  }
 +}
 +
 diff --git a/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapViewManager.kt b/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapViewManager.kt
 new file mode 100644
-index 0000000..019024e
+index 0000000..017a0e7
 --- /dev/null
 +++ b/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapViewManager.kt
-@@ -0,0 +1,43 @@
+@@ -0,0 +1,54 @@
 +﻿package net.mjstudio.rnkakao.map
 +
 +import com.facebook.react.bridge.ReadableArray
@@ -158,12 +219,21 @@ index 0000000..019024e
 +  override fun setLanguage(view: RNCKakaoMapView, value: String?) { view.language = value ?: "ko" }
 +  override fun setBaseMapType(view: RNCKakaoMapView, value: String?) { view.mapType = if (value.equals("skyview", true)) MapType.SKYVIEW else MapType.NORMAL }
 +  override fun setCamera(view: RNCKakaoMapView, value: ReadableMap?) { value?.toCamera()?.let(view::setCamera) }
++  override fun setCurrentLocation(view: RNCKakaoMapView, value: ReadableMap?) { view.setCurrentLocation(value?.toLatLng()) }
 +  override fun setInitialCamera(view: RNCKakaoMapView, value: ReadableMap?) { value?.toCamera()?.let(view::setCamera) }
 +  override fun setCameraMinLevel(view: RNCKakaoMapView, value: Double) { view.cameraMinLevel = value.toInt() }
 +  override fun setCameraMaxLevel(view: RNCKakaoMapView, value: Double) { view.cameraMaxLevel = value.toInt() }
 +  override fun setCameraAnimationDuration(view: RNCKakaoMapView, value: Double) { view.cameraAnimationDuration = value.toInt() }
 +  override fun setIsShowScaleBar(view: RNCKakaoMapView, value: Boolean) { view.showScaleBar = value }
 +  override fun setIsShowCompass(view: RNCKakaoMapView, value: Boolean) { view.showCompass = value }
++
++  private fun ReadableMap.toLatLng(): LatLngProps? {
++    if (!hasKey("lat") || !hasKey("lng")) return null
++    val lat = getDouble("lat")
++    val lng = getDouble("lng")
++    if (lat == NULL_NUMBER || lng == NULL_NUMBER) return null
++    return LatLngProps(lat, lng)
++  }
 +
 +  private fun ReadableMap.toCamera() = CameraProps(
 +    latitude = getDouble("lat"),
@@ -172,6 +242,183 @@ index 0000000..019024e
 +  )
 +}
 +
++/** JS util/Const.ts 의 nullNumber. codegen 이 값을 채우지 않은 필드를 뜻한다. */
++private const val NULL_NUMBER = -123123123.0
+diff --git a/node_modules/@react-native-kakao/map/lib/commonjs/component/KakaoMapView.js b/node_modules/@react-native-kakao/map/lib/commonjs/component/KakaoMapView.js
+index e7fbf55..96f48e2 100644
+--- a/node_modules/@react-native-kakao/map/lib/commonjs/component/KakaoMapView.js
++++ b/node_modules/@react-native-kakao/map/lib/commonjs/component/KakaoMapView.js
+@@ -20,6 +20,7 @@ const KakaoMapView = exports.KakaoMapView = /*#__PURE__*/(0, _react.forwardRef)(
+   language,
+   overlays,
+   camera: cameraProp,
++  currentLocation: currentLocationProp,
+   cameraMinLevel = _Const.Const.nullNumber,
+   cameraMaxLevel = _Const.Const.nullNumber,
+   cameraAnimationDuration = 0,
+@@ -35,10 +36,17 @@ const KakaoMapView = exports.KakaoMapView = /*#__PURE__*/(0, _react.forwardRef)(
+       ...cameraProp
+     };
+   }, [cameraProp]);
++  const currentLocation = (0, _react.useMemo)(() => {
++    return {
++      ..._Util.nullCamera,
++      ...currentLocationProp
++    };
++  }, [currentLocationProp]);
+   return /*#__PURE__*/React.createElement(_RNCKakaoMapViewNativeComponent.default, _extends({
+     baseMapType: baseMapType,
+     buildingScale: buildingScale,
+     camera: camera,
++    currentLocation: currentLocation,
+     cameraMinLevel: cameraMinLevel,
+     cameraMaxLevel: cameraMaxLevel,
+     cameraAnimationDuration: cameraAnimationDuration,
+diff --git a/node_modules/@react-native-kakao/map/lib/commonjs/util/Util.js b/node_modules/@react-native-kakao/map/lib/commonjs/util/Util.js
+index ca954f2..a56096d 100644
+--- a/node_modules/@react-native-kakao/map/lib/commonjs/util/Util.js
++++ b/node_modules/@react-native-kakao/map/lib/commonjs/util/Util.js
+@@ -10,6 +10,7 @@ const nullCamera = exports.nullCamera = {
+   lng: _Const.Const.nullNumber,
+   tilt: _Const.Const.nullNumber,
+   rotation: _Const.Const.nullNumber,
+-  zoomLevel: _Const.Const.nullNumber
++  zoomLevel: _Const.Const.nullNumber,
++  nonce: _Const.Const.nullNumber
+ };
+ //# sourceMappingURL=Util.js.map
+\ No newline at end of file
+diff --git a/node_modules/@react-native-kakao/map/lib/module/component/KakaoMapView.js b/node_modules/@react-native-kakao/map/lib/module/component/KakaoMapView.js
+index 3c1776b..fe397cd 100644
+--- a/node_modules/@react-native-kakao/map/lib/module/component/KakaoMapView.js
++++ b/node_modules/@react-native-kakao/map/lib/module/component/KakaoMapView.js
+@@ -13,6 +13,7 @@ const KakaoMapView = /*#__PURE__*/forwardRef(({
+   language,
+   overlays,
+   camera: cameraProp,
++  currentLocation: currentLocationProp,
+   cameraMinLevel = Const.nullNumber,
+   cameraMaxLevel = Const.nullNumber,
+   cameraAnimationDuration = 0,
+@@ -28,10 +29,17 @@ const KakaoMapView = /*#__PURE__*/forwardRef(({
+       ...cameraProp
+     };
+   }, [cameraProp]);
++  const currentLocation = useMemo(() => {
++    return {
++      ...nullCamera,
++      ...currentLocationProp
++    };
++  }, [currentLocationProp]);
+   return /*#__PURE__*/React.createElement(NativeKakaoMapComponent, _extends({
+     baseMapType: baseMapType,
+     buildingScale: buildingScale,
+     camera: camera,
++    currentLocation: currentLocation,
+     cameraMinLevel: cameraMinLevel,
+     cameraMaxLevel: cameraMaxLevel,
+     cameraAnimationDuration: cameraAnimationDuration,
+diff --git a/node_modules/@react-native-kakao/map/lib/module/util/Util.js b/node_modules/@react-native-kakao/map/lib/module/util/Util.js
+index 6a6cd98..1f79d7a 100644
+--- a/node_modules/@react-native-kakao/map/lib/module/util/Util.js
++++ b/node_modules/@react-native-kakao/map/lib/module/util/Util.js
+@@ -4,6 +4,7 @@ export const nullCamera = {
+   lng: Const.nullNumber,
+   tilt: Const.nullNumber,
+   rotation: Const.nullNumber,
+-  zoomLevel: Const.nullNumber
++  zoomLevel: Const.nullNumber,
++  nonce: Const.nullNumber
+ };
+ //# sourceMappingURL=Util.js.map
+\ No newline at end of file
+diff --git a/node_modules/@react-native-kakao/map/lib/typescript/src/component/KakaoMapView.d.ts b/node_modules/@react-native-kakao/map/lib/typescript/src/component/KakaoMapView.d.ts
+index e6cacbe..b3788e2 100644
+--- a/node_modules/@react-native-kakao/map/lib/typescript/src/component/KakaoMapView.d.ts
++++ b/node_modules/@react-native-kakao/map/lib/typescript/src/component/KakaoMapView.d.ts
+@@ -6,6 +6,10 @@ interface KakaoMapProps extends ViewProps {
+     overlays?: ('hill_shading' | 'roadview_line' | 'bicycle_road' | 'hybrid')[];
+     camera?: Camera;
+     initialCamera?: Camera;
++    currentLocation?: {
++        lat: number;
++        lng: number;
++    };
+     cameraMinLevel?: number;
+     cameraMaxLevel?: number;
+     cameraAnimationDuration?: number;
+diff --git a/node_modules/@react-native-kakao/map/lib/typescript/src/spec/RNCKakaoMapViewNativeComponent.d.ts b/node_modules/@react-native-kakao/map/lib/typescript/src/spec/RNCKakaoMapViewNativeComponent.d.ts
+index af0146e..9afbf12 100644
+--- a/node_modules/@react-native-kakao/map/lib/typescript/src/spec/RNCKakaoMapViewNativeComponent.d.ts
++++ b/node_modules/@react-native-kakao/map/lib/typescript/src/spec/RNCKakaoMapViewNativeComponent.d.ts
+@@ -7,6 +7,8 @@ interface Camera {
+     tilt?: Double;
+     rotation?: Double;
+     zoomLevel?: Double;
++    /** 같은 좌표로 다시 카메라를 옮길 때 쓰는 갱신 토큰. */
++    nonce?: Double;
+ }
+ interface Props extends ViewProps {
+     buildingScale?: Double;
+@@ -18,6 +20,7 @@ interface Props extends ViewProps {
+     baseMapType?: string;
+     camera?: Camera;
+     initialCamera?: Camera;
++    currentLocation?: Camera;
+     cameraMinLevel?: Double;
+     cameraMaxLevel?: Double;
+     cameraAnimationDuration?: Double;
+diff --git a/node_modules/@react-native-kakao/map/lib/typescript/src/type/type.d.ts b/node_modules/@react-native-kakao/map/lib/typescript/src/type/type.d.ts
+index f598be9..279517c 100644
+--- a/node_modules/@react-native-kakao/map/lib/typescript/src/type/type.d.ts
++++ b/node_modules/@react-native-kakao/map/lib/typescript/src/type/type.d.ts
+@@ -4,5 +4,7 @@ export interface Camera {
+     tilt?: number;
+     rotation?: number;
+     zoomLevel?: number;
++    /** 같은 좌표로 다시 카메라를 옮길 때 쓰는 갱신 토큰. */
++    nonce?: number;
+ }
+ //# sourceMappingURL=type.d.ts.map
+\ No newline at end of file
+diff --git a/node_modules/@react-native-kakao/map/src/component/KakaoMapView.tsx b/node_modules/@react-native-kakao/map/src/component/KakaoMapView.tsx
+index 53c719e..c1330e2 100644
+--- a/node_modules/@react-native-kakao/map/src/component/KakaoMapView.tsx
++++ b/node_modules/@react-native-kakao/map/src/component/KakaoMapView.tsx
+@@ -12,6 +12,8 @@ interface KakaoMapProps extends ViewProps {
+   overlays?: ('hill_shading' | 'roadview_line' | 'bicycle_road' | 'hybrid')[];
+   camera?: Camera;
+   initialCamera?: Camera;
++  /** 현재 위치 표시용 좌표. 없으면 마커를 지운다. */
++  currentLocation?: { lat: number; lng: number };
+   cameraMinLevel?: number;
+   cameraMaxLevel?: number;
+   cameraAnimationDuration?: number;
+@@ -38,6 +40,7 @@ const KakaoMapView = forwardRef(
+       language,
+       overlays,
+       camera: cameraProp,
++      currentLocation: currentLocationProp,
+       cameraMinLevel = Const.nullNumber,
+       cameraMaxLevel = Const.nullNumber,
+       cameraAnimationDuration = 0,
+@@ -57,11 +60,16 @@ const KakaoMapView = forwardRef(
+       return { ...nullCamera, ...cameraProp };
+     }, [cameraProp]);
+ 
++    const currentLocation: Camera = useMemo(() => {
++      return { ...nullCamera, ...currentLocationProp };
++    }, [currentLocationProp]);
++
+     return (
+       <NativeKakaoMapComponent
+         baseMapType={baseMapType}
+         buildingScale={buildingScale}
+         camera={camera}
++        currentLocation={currentLocation}
+         cameraMinLevel={cameraMinLevel}
+         cameraMaxLevel={cameraMaxLevel}
+         cameraAnimationDuration={cameraAnimationDuration}
 diff --git a/node_modules/@react-native-kakao/map/src/index.ts b/node_modules/@react-native-kakao/map/src/index.ts
 index 1cc6a4d..e143fee 100644
 --- a/node_modules/@react-native-kakao/map/src/index.ts
@@ -189,3 +436,49 @@ index 1cc6a4d..e143fee 100644
  const Module = require('./spec/NativeKakaoMap').default;
  
  const Native: Spec = Module
+diff --git a/node_modules/@react-native-kakao/map/src/spec/RNCKakaoMapViewNativeComponent.ts b/node_modules/@react-native-kakao/map/src/spec/RNCKakaoMapViewNativeComponent.ts
+index 85a6f84..ea85fe3 100644
+--- a/node_modules/@react-native-kakao/map/src/spec/RNCKakaoMapViewNativeComponent.ts
++++ b/node_modules/@react-native-kakao/map/src/spec/RNCKakaoMapViewNativeComponent.ts
+@@ -9,6 +9,10 @@ interface Camera {
+   tilt?: Double;
+   rotation?: Double;
+   zoomLevel?: Double;
++  /** 같은 좌표로 다시 카메라를 옮길 때 쓰는 갱신 토큰. Fabric 은 prop 을 값으로 비교하므로
++   *  값이 그대로면 네이티브까지 전달되지 않는다. 사용자가 지도를 옮긴 뒤 원래 좌표로
++   *  되돌리려면 이 값을 바꿔야 한다. 네이티브는 값 자체를 쓰지 않는다. */
++  nonce?: Double;
+ }
+ interface Props extends ViewProps {
+   buildingScale?: Double;
+@@ -20,6 +24,7 @@ interface Props extends ViewProps {
+   baseMapType?: string;
+   camera?: Camera;
+   initialCamera?: Camera;
++  currentLocation?: Camera;
+   cameraMinLevel?: Double;
+   cameraMaxLevel?: Double;
+   cameraAnimationDuration?: Double;
+diff --git a/node_modules/@react-native-kakao/map/src/type/type.ts b/node_modules/@react-native-kakao/map/src/type/type.ts
+index bd55a4d..4ad0604 100644
+--- a/node_modules/@react-native-kakao/map/src/type/type.ts
++++ b/node_modules/@react-native-kakao/map/src/type/type.ts
+@@ -4,4 +4,8 @@ export interface Camera {
+   tilt?: number;
+   rotation?: number;
+   zoomLevel?: number;
++  /** 같은 좌표로 다시 카메라를 옮길 때 쓰는 갱신 토큰. Fabric 은 prop 을 값으로 비교하므로
++   *  값이 그대로면 네이티브까지 전달되지 않는다. 사용자가 지도를 옮긴 뒤 원래 좌표로
++   *  되돌리려면 이 값을 바꿔야 한다. 네이티브는 값 자체를 쓰지 않는다. */
++  nonce?: number;
+ }
+diff --git a/node_modules/@react-native-kakao/map/src/util/Util.ts b/node_modules/@react-native-kakao/map/src/util/Util.ts
+index 2234ec4..870546c 100644
+--- a/node_modules/@react-native-kakao/map/src/util/Util.ts
++++ b/node_modules/@react-native-kakao/map/src/util/Util.ts
+@@ -8,4 +8,5 @@ export const nullCamera: Required<Camera> = {
+   tilt: Const.nullNumber,
+   rotation: Const.nullNumber,
+   zoomLevel: Const.nullNumber,
++  nonce: Const.nullNumber,
+ };

@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Screen, ScreenHeader, SearchBar } from '@/components/common';
 import { Brand, Components, Layout } from '@/constants/theme';
+import { FishlogKakaoMap } from '@/features/map/kakao-map';
 
 const MAP = Components.map;
 
@@ -16,6 +17,7 @@ const MAP_ACTIONS = [
 
 export default function MapScreen() {
   const [query, setQuery] = useState('');
+  const [recenterSignal, setRecenterSignal] = useState(0);
 
   return (
     <Screen edgeToEdge header={<ScreenHeader title="지도" />}>
@@ -29,13 +31,7 @@ export default function MapScreen() {
       </View>
 
       <View style={styles.mapCanvas}>
-        {/* Temporary static map while the native map integration is being fixed. */}
-        <Image
-          source={require('@/assets/images/map/map-placeholder.png')}
-          style={StyleSheet.absoluteFill}
-          contentFit="cover"
-          accessibilityLabel="임시 지도 이미지"
-        />
+        <FishlogKakaoMap recenterSignal={recenterSignal} />
         <View pointerEvents="none" style={styles.mapShade} />
 
         <View style={styles.actionColumn}>
@@ -47,8 +43,7 @@ export default function MapScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="현재 위치로 이동"
-          disabled
-          accessibilityState={{ disabled: true }}
+          onPress={() => setRecenterSignal((signal) => signal + 1)}
           style={({ pressed }) => [styles.locationButton, pressed && styles.pressed]}>
           <Image
             source={require('@/assets/images/map/my-location.svg')}
