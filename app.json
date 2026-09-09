@@ -43,6 +43,12 @@
         }
       ],
       "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "내 주변 음식점·관광지·숙박 시설을 찾기 위해 현재 위치를 사용해요."
+        }
+      ],
       "expo-image",
       "expo-status-bar",
       "expo-web-browser",

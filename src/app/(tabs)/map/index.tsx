@@ -4,11 +4,12 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Screen, ScreenHeader, SearchBar } from '@/components/common';
 import { Brand, Components, Layout, Typography } from '@/constants/theme';
+import { TourFacilities } from '@/features/map/tour-facilities';
 
 const MAP = Components.map;
 
 const MAP_ACTIONS = [
-  { icon: require('@/assets/images/map/grid.svg'), label: '격자로 보기' },
+  { icon: require('@/assets/images/map/grid.svg'), label: '주변 시설' },
   { icon: require('@/assets/images/map/sea-info.svg'), label: '해양 정보 보기' },
   { icon: require('@/assets/images/map/fishing-disabled.svg'), label: '낚시 금지 구역 보기' },
   { icon: require('@/assets/images/map/fish-scan.svg'), label: '어종 탐색' },
@@ -26,6 +27,7 @@ const SPOTS = [
  */
 export default function MapScreen() {
   const [query, setQuery] = useState('');
+  const [facilitiesOpen, setFacilitiesOpen] = useState(false);
 
   return (
     <Screen edgeToEdge header={<ScreenHeader title="지도" />}>
@@ -48,22 +50,24 @@ export default function MapScreen() {
         <View pointerEvents="none" style={styles.mapShade} />
 
         <View style={styles.actionColumn}>
-          {MAP_ACTIONS.map((action) => (
-            <MapAction key={action.label} {...action} />
-          ))}
+          {MAP_ACTIONS.map((action, index) => !facilitiesOpen || index === 0 ? (
+            <MapAction key={action.label} {...action}
+              selected={index === 0 && facilitiesOpen}
+              onPress={index === 0 ? () => setFacilitiesOpen((open) => !open) : undefined} />
+          ) : null)}
         </View>
 
-        {SPOTS.map((spot) => (
+        {!facilitiesOpen && SPOTS.map((spot) => (
           <MapMarker key={spot.name} {...spot} />
         ))}
 
-        <Image
+        {!facilitiesOpen && <Image
           source={require('@/assets/images/map/current-location.svg')}
           style={styles.currentMarker}
           contentFit="contain"
-        />
+        />}
 
-        <Pressable
+        {!facilitiesOpen && <Pressable
           accessibilityRole="button"
           accessibilityLabel="현재 위치로 이동"
           style={({ pressed }) => [styles.locationButton, pressed && styles.pressed]}>
@@ -72,19 +76,25 @@ export default function MapScreen() {
             style={styles.actionIcon}
             contentFit="contain"
           />
-        </Pressable>
+        </Pressable>}
+        {facilitiesOpen ? <TourFacilities /> : null}
       </View>
     </Screen>
   );
 }
 
-function MapAction({ icon, label }: (typeof MAP_ACTIONS)[number]) {
+function MapAction({ icon, label, onPress, selected }: (typeof MAP_ACTIONS)[number] & {
+  onPress?: () => void;
+  selected?: boolean;
+}) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}>
-      <Image source={icon} style={styles.actionIcon} contentFit="contain" />
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={({ pressed }) => [styles.actionButton, selected && styles.actionSelected, pressed && styles.pressed]}>
+      <Image source={icon} style={styles.actionIcon} tintColor={selected ? Brand.onPrimary : undefined} contentFit="contain" />
     </Pressable>
   );
 }
@@ -145,6 +155,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   actionIcon: { width: MAP.actionIconSize, height: MAP.actionIconSize },
+  actionSelected: { backgroundColor: Brand.primary },
   pressed: { opacity: 0.72 },
   locationButton: {
     position: 'absolute',
