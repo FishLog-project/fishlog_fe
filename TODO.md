@@ -173,6 +173,9 @@ Swagger에 있으나 아직 화면/연동이 없는 API.
 - [x] `GET /api/collections/dex` 내 도감 조회 → 홈 "도감 진행도" (`home-api.ts`)
 - [x] `GET /api/collections/dex` → 도감 목록·진행도 연결
 - [x] `GET /api/fish/{id}` → 어종 상세 카드 연결
+- [x] `POST /api/collections/custom`, `GET /api/collections/custom/dex`, `GET /api/collections/custom?customFishId=` → 수기 등록·도감 목록·상세 연결 (검증 경계는 9번)
+- [ ] `GET /api/banner/popular-spots` 해양·내륙 각 1곳 → 홈 히어로 추천 스팟 슬라이드 (2026-09-09 배포. 현재는 `/api/spots/popular` 1위만 사용)
+- [ ] `GET /api/collections/records` 내 인증 기록 전체 → 기록 목록 화면 (화면 미정)
 - [ ] `GET /api/rankings/completion`, `GET /api/rankings/size` 랭킹 탭
 - [x] `GET /api/spots/popular` → 홈 "추천 낚시 스팟 Top 3", `GET /api/banner/seasonal-fish` → 히어로 (`home-api.ts`)
 - [ ] `PATCH /api/users/me/nickname`, `PATCH /api/users/me/password` 마이페이지 편집
@@ -181,3 +184,30 @@ Swagger에 있으나 아직 화면/연동이 없는 API.
 - `src/features/home/home-data.ts` — 홈 fixture (`USE_FIXTURE`로 전환)
 - `src/features/dex/dex-data.ts` — 도감 fixture (`createFixtureDexDataSource`, 기본 화면은 API 사용)
 - `src/app/(tabs)/ranking` — `PlaceholderScreen` (임시 컴포넌트, 실제 화면 들어오면 삭제)
+
+---
+
+---
+
+## 9. 인증·도감 QA 후속 수정
+
+2026-09-08 확인: 기타어종·어종 이미지는 [FE PR #16의 후속 항목](https://github.com/FishLog-project/fishlog_fe/pull/16)에 기록되어 있다.
+백엔드 [#83](https://github.com/FishLog-project/fishlog_be/issues/83)(기타어종), [#88](https://github.com/FishLog-project/fishlog_be/issues/88)(에셋)는 완료됐다.
+등록 후 전부 실루엣인 증상의 별도 FE 버그 이슈는 없고, #3/#5의 일반 완료 조건에만 관련 검증이 있다.
+
+- [x] 일반 도감에서 찾지 못한 어종명은 custom API로 등록. 이름·사진·크기·위치 보존, 중복 저장 방지
+- [x] 수기 어종은 기본 그림으로 도감에 표시. 일반 `fishId`와 `customFishId`가 같아도 목록 key·상세 조회 분리
+- [x] 수기 어종의 실제 사진·등록 날짜·누적 횟수 조회. 등록 후 상세 실패는 저장 성공 유지, 알 수 없는 횟수는 숨김
+- [x] 기본 24종은 서버 `imageUrl`을 인증 후보·도감·홈에서 사용. 미제공·로드 실패 때만 기본 그림으로 대체
+- [x] 로딩 중 도감 재조회가 무시되던 공통 훅 수정. 이전 응답·오류가 최신 인증 상태를 덮어쓰지 않음
+- [x] 수집 카드의 tint 제거, 미수집 카드의 실루엣 유지. iOS의 같은 마운트 카드에서 잠금→컬러 전환 확인
+- [x] 타입·린트·catch/dex/tour 검사·실제 React 갱신 검사·3개 플랫폼 export
+- [x] 웹 통제 응답으로 수기 등록→검색→상세·사진, 일반 인증→도감 0/24→1/24→홈 갱신 확인
+- [ ] 제보 당시 실계정으로 verify 응답과 같은 세션의 `/dex` `caught` 대조, 실제 서버 저장·실기기 카메라/업로드 검증
+- [ ] 새 수정 PR·dev 병합 (현재 로컬 작업만 완료)
+
+수기 어종은 기본 24종과 함께 표시하지만, 백엔드 정책에 따라 일반 도감 완성도·랭킹에는 포함하지 않는다.
+2026-09-09 운영 배포 확인: `/api/fish/{id}` 24종과 `/api/banner/seasonal-fish` 모두 `imageUrl`을 내려주고
+`https://api.fishlog.xyz/images/fish/*.png`는 인증 없이 200으로 열린다 (512x512 PNG). 앱은 이 주소를 그대로 쓴다.
+앱에 남긴 그림은 공용 기본 그림 `assets/images/fish/basic_image.png` 한 장뿐이다.
+웹의 등록 요청은 가로채 검증했고 운영 POST·GitHub 이슈 변경은 하지 않았다.
