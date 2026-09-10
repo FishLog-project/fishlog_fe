@@ -150,10 +150,16 @@ async function main() {
   for (const token of [null, '']) {
     const guest = apiModule.createApiDexDataSource(token);
     const before = requests.length;
-    for (const request of [() => guest.getMyDex(), () => guest.getCatchRecord(1), () => guest.getCustomFish(1)]) {
+    for (const request of [() => guest.getCatchRecord(1), () => guest.getCustomFish(1)]) {
       await assert.rejects(request, (error) => error.reason === 'unauthorized');
     }
     assert.equal(requests.length, before, 'guest private reads must stop before the API boundary');
+    const shadowDex = await guest.getMyDex();
+    assert.equal(shadowDex.fishes.length, normal.fishes.length, 'guest sees the shadow dex without custom species');
+    assert.equal(shadowDex.caughtCount, normal.caughtCount);
+    assert.equal(requests.length, before + 1, 'guest must not request the authenticated custom dex');
+    assert.equal(requests.at(-1).route, '/api/collections/dex');
+    assert.equal(requests.at(-1).token, undefined, 'guest dex must go out without an Authorization header');
   }
   for (failurePath of ['/api/collections/dex', '/api/collections/custom/dex']) {
     await assert.rejects(() => api.getMyDex(), (error) => error.reason === 'unauthorized');
