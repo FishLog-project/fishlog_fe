@@ -5,6 +5,7 @@ import type {
   SpotCategory,
   SpotDataSource,
   SpotDetail,
+  SpotFish,
   SpotForecast,
   SpotSummary,
 } from '@/features/map/spot-data';
@@ -41,8 +42,8 @@ export interface SpotDetailViewModel {
   /** 낚시 금지 구역이면 화면이 경고를 띄운다 */
   prohibited: boolean;
   viewCountLabel: string;
-  /** 시안은 4칸까지 보여준다 (634:1563~1566) */
-  majorFishes: readonly string[];
+  /** 시안은 4칸까지 보여준다 (634:1563~1566). 서버가 사진 URL 도 준다 */
+  majorFishes: readonly SpotFish[];
   /** "9월 9일 수요일" (Figma 1125:2937). 예보가 없으면 null */
   forecastDateLabel: string | null;
   /** 서버 예보가 오전인지 오후인지. 시안의 전환 컨트롤 초기값으로 쓴다 */
@@ -146,9 +147,14 @@ function toInlandRows(inland: InlandDetail): readonly SpotLabelValue[] | null {
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'] as const;
 
-/** "20260909" → "9월 9일 수요일". 형식이 어긋나면 null 이라 화면이 그 줄을 그리지 않는다 */
+/**
+ * "2026-09-10" → "9월 10일 목요일".
+ *
+ * 실제 응답은 하이픈이 있는 형식이지만 Swagger 예시는 YYYYMMDD 라 둘 다 받는다.
+ * 형식이 어긋나면 null 이고, 화면은 그 줄을 그리지 않는다.
+ */
 function toDateLabel(predcYmd: string): string | null {
-  const matched = /^(\d{4})(\d{2})(\d{2})$/.exec(predcYmd);
+  const matched = /^(\d{4})-?(\d{2})-?(\d{2})$/.exec(predcYmd);
   if (!matched) return null;
 
   const [, year, month, day] = matched;
@@ -159,11 +165,11 @@ function toDateLabel(predcYmd: string): string | null {
 }
 
 /**
- * ⚠️ predcNoonSeCd 의 코드값 의미가 Swagger 에 없다.
- *    관측된 '1'을 오전으로 두고, 나머지는 오후로 본다. BE 확인 후 좁힐 것.
+ * 실제 응답은 "오전"/"오후" 한글 문자열이다 (Swagger 는 코드값처럼 기술돼 있다).
+ * 둘 다 아니면 오전으로 둔다 — 전환 컨트롤의 초기값일 뿐이라 화면이 깨지지는 않는다.
  */
 function toNoonSegment(predcNoonSeCd: string): NoonSegment {
-  return predcNoonSeCd === '1' ? 'am' : 'pm';
+  return predcNoonSeCd.includes('오후') ? 'pm' : 'am';
 }
 
 export function toSpotDetailViewModel(detail: SpotDetail): SpotDetailViewModel {

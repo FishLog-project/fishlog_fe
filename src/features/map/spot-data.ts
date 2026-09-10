@@ -20,11 +20,23 @@ export interface SpotSummary {
   isFavorite: boolean;
 }
 
+/**
+ * 주요 어종 한 마리.
+ *
+ * ⚠️ Swagger 는 majorFishes 를 string[] 로 기술하지만 실제 응답은 객체 배열이다.
+ *    사진(imageUrl)까지 내려주므로 시안의 어종 사진 칸을 그대로 채울 수 있다.
+ */
+export interface SpotFish {
+  fishId: number;
+  name: string;
+  imageUrl: string | null;
+}
+
 /** 해양 스팟에만 있다. 내륙이면 null */
 export interface SpotForecast {
-  /** 예보 날짜 (YYYYMMDD) */
+  /** 예보 날짜. 실제 응답은 "2026-09-10" 형식이다 (Swagger 예시와 다름) */
   predcYmd: string;
-  /** 오전/오후 구분 코드 */
+  /** 실제 응답은 "오전"/"오후" 한글 문자열이다 (Swagger 의 코드값 아님) */
   predcNoonSeCd: string;
   /** 낚시 지수 등급 */
   totalIndex: string;
@@ -70,7 +82,7 @@ export interface SpotDetail {
   prohibit: boolean;
   category: SpotCategory;
   viewCount: number;
-  majorFishes: readonly string[];
+  majorFishes: readonly SpotFish[];
   forecast: SpotForecast | null;
   inlandDetail: InlandDetail | null;
 }
@@ -82,7 +94,7 @@ export interface SpotDataSource {
 
 export type SpotFixtureScenario = 'ready' | 'empty' | 'error';
 
-/** [이름, 위도, 경도, 분류, 조회수, 주요어종…] */
+/** [이름, 위도, 경도, 분류, 조회수, 주요어종 이름] — 사진은 fixture 에 없어 null 이다 */
 const SEED: readonly (readonly [string, number, number, SpotCategory, number, string[]])[] = [
   ['영흥도 방파제', 37.2415, 126.4869, '해양', 1820, ['우럭', '광어', '농어']],
   ['오이도 선착장', 37.3479, 126.6899, '해양', 940, ['숭어', '전갱이']],
@@ -115,11 +127,15 @@ function buildDetail(index: number): SpotDetail {
     prohibit: index === 3,
     category,
     viewCount,
-    majorFishes,
+    majorFishes: majorFishes.map((name, fishIndex) => ({
+      fishId: fishIndex + 1,
+      name,
+      imageUrl: null,
+    })),
     forecast: marine
       ? {
-          predcYmd: '20260909',
-          predcNoonSeCd: '1',
+          predcYmd: '2026-09-09',
+          predcNoonSeCd: '오후',
           totalIndex: '보통',
           tdlvHrCn: '5물',
           minWvhgt: 0.3,

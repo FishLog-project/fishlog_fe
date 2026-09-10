@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useState } from 'react';
 import {
   Modal,
@@ -12,7 +13,7 @@ import {
 
 import { ScreenState, SegmentControl } from '@/components/common';
 import { Brand, Components, Fonts, Typography } from '@/constants/theme';
-import type { SpotDataSource } from '@/features/map/spot-data';
+import type { SpotDataSource, SpotFish } from '@/features/map/spot-data';
 import {
   useSpotDetailViewModel,
   type NoonSegment,
@@ -184,7 +185,7 @@ function SpotDetailBody({
         ) : null}
 
         <Section title="주요 어종">
-          <FishTiles names={spot.majorFishes} />
+          <FishTiles fishes={spot.majorFishes} />
         </Section>
 
         {marine ? (
@@ -217,19 +218,30 @@ function SpotDetailBody({
   );
 }
 
-/** 시안은 4칸 고정이다 (634:1563~1566). 어종이 적으면 빈 칸으로 자리를 지킨다 */
-function FishTiles({ names }: { names: readonly string[] }) {
-  const tiles = Array.from({ length: 4 }, (_, index) => names[index] ?? null);
+/**
+ * 주요 어종 칸 (Figma 634:1563~1566).
+ *
+ * 시안이 4칸 고정이라 어종이 적어도 빈 칸으로 자리를 지킨다.
+ * 서버가 사진(imageUrl)을 주면 사진을, 없으면 이름을 보여준다.
+ */
+function FishTiles({ fishes }: { fishes: readonly SpotFish[] }) {
+  const tiles = Array.from({ length: 4 }, (_, index): SpotFish | null => fishes[index] ?? null);
 
   return (
     <View style={styles.fishRow}>
-      {tiles.map((name, index) => (
+      {tiles.map((fish, index) => (
         // 칸 수가 4로 고정이고 순서도 서버 순서를 그대로 따르므로 index 가 안정적인 key 다
         <View key={index} style={styles.fishTile}>
-          {/* ⚠️ 시안은 어종 사진 칸이지만 서버는 이름만 준다 (majorFishes: string[]) */}
-          {name ? (
+          {fish?.imageUrl ? (
+            <Image
+              source={{ uri: fish.imageUrl }}
+              style={styles.fishImage}
+              contentFit="contain"
+              accessibilityLabel={fish.name}
+            />
+          ) : fish ? (
             <Text style={styles.fishName} numberOfLines={2}>
-              {name}
+              {fish.name}
             </Text>
           ) : null}
         </View>
@@ -334,6 +346,7 @@ const styles = StyleSheet.create({
     borderRadius: SHEET.fishTileRadius,
     backgroundColor: SHEET.fishTileBg,
   },
+  fishImage: { width: '100%', height: '100%' },
   fishName: { ...Typography.chipLabel, color: Brand.textMuted, textAlign: 'center' },
   summaryCard: {
     minHeight: SHEET.summaryHeight,
