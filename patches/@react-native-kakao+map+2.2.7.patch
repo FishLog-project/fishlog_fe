@@ -17,19 +17,24 @@ index c3a003d..d9ab736 100644
      reactContext: ReactApplicationContext,
 diff --git a/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapView.kt b/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapView.kt
 new file mode 100644
-index 0000000..46b1b2d
+index 0000000..dfc2a6f
 --- /dev/null
 +++ b/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapView.kt
-@@ -0,0 +1,163 @@
+@@ -0,0 +1,278 @@
 +﻿package net.mjstudio.rnkakao.map
 +
 +import android.graphics.Bitmap
 +import android.graphics.Canvas
 +import android.graphics.Color
 +import android.graphics.Paint
++import android.graphics.Path
 +import android.widget.FrameLayout
 +import com.facebook.react.bridge.LifecycleEventListener
++import com.facebook.react.bridge.Arguments
++import com.facebook.react.bridge.WritableMap
 +import com.facebook.react.uimanager.ThemedReactContext
++import com.facebook.react.uimanager.UIManagerHelper
++import com.facebook.react.uimanager.events.Event
 +import com.kakao.vectormap.KakaoMap
 +import com.kakao.vectormap.KakaoMapReadyCallback
 +import com.kakao.vectormap.LatLng
@@ -40,6 +45,8 @@ index 0000000..46b1b2d
 +import com.kakao.vectormap.camera.CameraAnimation
 +import com.kakao.vectormap.camera.CameraUpdateFactory
 +import com.kakao.vectormap.label.Label
++import com.kakao.vectormap.label.LabelLayer
++import com.kakao.vectormap.label.LabelLayerOptions
 +import com.kakao.vectormap.label.LabelOptions
 +import com.kakao.vectormap.label.LabelStyle
 +import com.kakao.vectormap.label.LabelStyles
@@ -48,12 +55,29 @@ index 0000000..46b1b2d
 +
 +internal data class LatLngProps(val latitude: Double, val longitude: Double)
 +
++internal data class SpotProps(val id: Int, val latitude: Double, val longitude: Double)
++
++/** 마커를 눌렀을 때 JS 로 올려 보내는 이벤트. onSpotPress 로 도착한다. */
++internal class SpotPressEvent(surfaceId: Int, viewId: Int, private val spotId: Int) :
++  Event<SpotPressEvent>(surfaceId, viewId) {
++  override fun getEventName() = EVENT_NAME
++
++  override fun getEventData(): WritableMap = Arguments.createMap().apply { putInt("id", spotId) }
++
++  companion object {
++    const val EVENT_NAME = "topSpotPress"
++  }
++}
++
 +internal class RNCKakaoMapView(private val reactContext: ThemedReactContext) : FrameLayout(reactContext), LifecycleEventListener {
 +  private val nativeMapView = MapView(reactContext)
 +  private var kakaoMap: KakaoMap? = null
 +  private var camera: CameraProps? = null
 +  private var currentLocation: LatLngProps? = null
 +  private var currentLocationLabel: Label? = null
++  private var spots: List<SpotProps> = emptyList()
++  private var spotLayer: LabelLayer? = null
++  private var spotStyles: LabelStyles? = null
 +  var cameraAnimationDuration = 0
 +
 +  var poiEnabled = true
@@ -88,9 +112,15 @@ index 0000000..46b1b2d
 +      object : KakaoMapReadyCallback() {
 +        override fun onMapReady(map: KakaoMap) {
 +          kakaoMap = map
++          spotLayer = null
++          spotStyles = null
 +          applyMapOptions(map)
 +          camera?.let(::moveCamera)
++          map.setOnLabelClickListener { _, _, label ->
++            (label.tag as? Int)?.let(::emitSpotPress)
++          }
 +          applyCurrentLocation()
++          applySpots()
 +        }
 +
 +        override fun getPosition(): LatLng = camera?.let { LatLng.from(it.latitude, it.longitude) } ?: super.getPosition()
@@ -107,6 +137,87 @@ index 0000000..46b1b2d
 +  fun setCurrentLocation(value: LatLngProps?) {
 +    currentLocation = value
 +    applyCurrentLocation()
++  }
++
++  fun setSpots(value: List<SpotProps>) {
++    spots = value
++    applySpots()
++  }
++
++  /**
++   * 낚시 스팟 마커를 다시 그린다.
++   *
++   * 현재 위치와 레이어를 분리한다 — 목록이 바뀔 때마다 removeAll 로 지우는데,
++   * 같은 레이어를 쓰면 현재 위치 마커까지 함께 지워지기 때문이다.
++   * 각 라벨의 tag 에 스팟 id 를 넣어 두고, 클릭 때 그 값을 그대로 올려 보낸다.
++   */
++  private fun applySpots() {
++    val map = kakaoMap ?: return
++    val labelManager = map.labelManager ?: return
++
++    val layer =
++      spotLayer
++        ?: labelManager
++          .addLayer(LabelLayerOptions.from(SPOT_LAYER_ID).apply { clickable = true })
++          ?.also { spotLayer = it }
++        ?: return
++
++    layer.removeAll()
++    if (spots.isEmpty()) return
++
++    // 마커 아이콘은 목록이 바뀔 때마다 다시 그릴 필요가 없다 (검색 한 글자마다 호출된다)
++    val styles =
++      spotStyles
++        ?: labelManager
++          .addLabelStyles(
++            LabelStyles.from(SPOT_STYLE_ID, LabelStyle.from(createSpotPin()).setAnchorPoint(0.5f, 1f)),
++          )
++          ?.also { spotStyles = it }
++        ?: return
++
++    layer.addLabels(
++      spots.map { spot ->
++        LabelOptions
++          .from(LatLng.from(spot.latitude, spot.longitude))
++          .setStyles(styles)
++          .setClickable(true)
++          .setTag(spot.id)
++      },
++    )
++  }
++
++  private fun emitSpotPress(spotId: Int) {
++    val dispatcher = UIManagerHelper.getEventDispatcherForReactTag(reactContext, id) ?: return
++    dispatcher.dispatchEvent(SpotPressEvent(UIManagerHelper.getSurfaceId(reactContext), id, spotId))
++  }
++
++  /** 기본 마커 — 커스텀 디자인이 나오기 전까지 쓰는 물방울 핀이다. */
++  private fun createSpotPin(): Bitmap {
++    val density = resources.displayMetrics.density
++    val width = (22 * density).toInt().coerceAtLeast(1)
++    val height = (30 * density).toInt().coerceAtLeast(1)
++    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
++    val canvas = Canvas(bitmap)
++    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
++    val centerX = width / 2f
++    val headRadius = 9f * density
++    val headCenterY = headRadius + 1f * density
++
++    paint.color = Color.rgb(0, 121, 202)
++    canvas.drawPath(
++      Path().apply {
++        moveTo(centerX, height.toFloat())
++        lineTo(centerX - 6f * density, headCenterY + headRadius * 0.6f)
++        lineTo(centerX + 6f * density, headCenterY + headRadius * 0.6f)
++        close()
++      },
++      paint,
++    )
++    canvas.drawCircle(centerX, headCenterY, headRadius, paint)
++    paint.color = Color.WHITE
++    canvas.drawCircle(centerX, headCenterY, headRadius - 3.5f * density, paint)
++
++    return bitmap
 +  }
 +
 +  /** 현재 위치 라벨을 지도에 올린다. 이미 올라와 있으면 위치만 옮긴다. */
@@ -180,16 +291,20 @@ index 0000000..46b1b2d
 +    reactContext.removeLifecycleEventListener(this)
 +    nativeMapView.finish()
 +    currentLocationLabel = null
++    spotLayer = null
++    spotStyles = null
 +    kakaoMap = null
 +  }
 +}
 +
++private const val SPOT_LAYER_ID = "fishlog-spots"
++private const val SPOT_STYLE_ID = "fishlog-spot-pin"
 diff --git a/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapViewManager.kt b/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapViewManager.kt
 new file mode 100644
-index 0000000..017a0e7
+index 0000000..b031f64
 --- /dev/null
 +++ b/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapViewManager.kt
-@@ -0,0 +1,54 @@
+@@ -0,0 +1,69 @@
 +﻿package net.mjstudio.rnkakao.map
 +
 +import com.facebook.react.bridge.ReadableArray
@@ -211,6 +326,10 @@ index 0000000..017a0e7
 +  override fun createViewInstance(context: ThemedReactContext) = RNCKakaoMapView(context)
 +  override fun onDropViewInstance(view: RNCKakaoMapView) { view.destroy(); super.onDropViewInstance(view) }
 +
++  /** onSpotPress 는 뷰 자신에게만 올라가는 direct event 다. */
++  override fun getExportedCustomDirectEventTypeConstants(): MutableMap<String, Any> =
++    mutableMapOf(SpotPressEvent.EVENT_NAME to mutableMapOf("registrationName" to "onSpotPress"))
++
 +  override fun setBuildingScale(view: RNCKakaoMapView, value: Double) { view.buildingScale = value.toFloat() }
 +  override fun setOverlays(view: RNCKakaoMapView, value: ReadableArray?) = Unit
 +  override fun setPoiEnabled(view: RNCKakaoMapView, value: Boolean) { view.poiEnabled = value }
@@ -220,12 +339,23 @@ index 0000000..017a0e7
 +  override fun setBaseMapType(view: RNCKakaoMapView, value: String?) { view.mapType = if (value.equals("skyview", true)) MapType.SKYVIEW else MapType.NORMAL }
 +  override fun setCamera(view: RNCKakaoMapView, value: ReadableMap?) { value?.toCamera()?.let(view::setCamera) }
 +  override fun setCurrentLocation(view: RNCKakaoMapView, value: ReadableMap?) { view.setCurrentLocation(value?.toLatLng()) }
++  override fun setSpots(view: RNCKakaoMapView, value: ReadableArray?) { view.setSpots(value?.toSpots() ?: emptyList()) }
 +  override fun setInitialCamera(view: RNCKakaoMapView, value: ReadableMap?) { value?.toCamera()?.let(view::setCamera) }
 +  override fun setCameraMinLevel(view: RNCKakaoMapView, value: Double) { view.cameraMinLevel = value.toInt() }
 +  override fun setCameraMaxLevel(view: RNCKakaoMapView, value: Double) { view.cameraMaxLevel = value.toInt() }
 +  override fun setCameraAnimationDuration(view: RNCKakaoMapView, value: Double) { view.cameraAnimationDuration = value.toInt() }
 +  override fun setIsShowScaleBar(view: RNCKakaoMapView, value: Boolean) { view.showScaleBar = value }
 +  override fun setIsShowCompass(view: RNCKakaoMapView, value: Boolean) { view.showCompass = value }
++
++  private fun ReadableArray.toSpots(): List<SpotProps> {
++    val result = mutableListOf<SpotProps>()
++    for (index in 0 until size()) {
++      val item = getMap(index) ?: continue
++      if (!item.hasKey("id") || !item.hasKey("lat") || !item.hasKey("lng")) continue
++      result.add(SpotProps(item.getDouble("id").toInt(), item.getDouble("lat"), item.getDouble("lng")))
++    }
++    return result
++  }
 +
 +  private fun ReadableMap.toLatLng(): LatLngProps? {
 +    if (!hasKey("lat") || !hasKey("lng")) return null
@@ -333,7 +463,7 @@ index 6a6cd98..1f79d7a 100644
  //# sourceMappingURL=Util.js.map
 \ No newline at end of file
 diff --git a/node_modules/@react-native-kakao/map/lib/typescript/src/component/KakaoMapView.d.ts b/node_modules/@react-native-kakao/map/lib/typescript/src/component/KakaoMapView.d.ts
-index e6cacbe..b3788e2 100644
+index e6cacbe..e4d3a2d 100644
 --- a/node_modules/@react-native-kakao/map/lib/typescript/src/component/KakaoMapView.d.ts
 +++ b/node_modules/@react-native-kakao/map/lib/typescript/src/component/KakaoMapView.d.ts
 @@ -6,6 +6,10 @@ interface KakaoMapProps extends ViewProps {
@@ -347,6 +477,23 @@ index e6cacbe..b3788e2 100644
      cameraMinLevel?: number;
      cameraMaxLevel?: number;
      cameraAnimationDuration?: number;
+@@ -16,6 +20,16 @@ interface KakaoMapProps extends ViewProps {
+     language?: 'ko' | 'en';
+     isShowScaleBar?: boolean;
+     isShowCompass?: boolean;
++    spots?: ReadonlyArray<{
++        id: number;
++        lat: number;
++        lng: number;
++    }>;
++    onSpotPress?: (event: {
++        nativeEvent: {
++            id: number;
++        };
++    }) => void;
+ }
+ interface KakaoMapRef {
+ }
 diff --git a/node_modules/@react-native-kakao/map/lib/typescript/src/spec/RNCKakaoMapViewNativeComponent.d.ts b/node_modules/@react-native-kakao/map/lib/typescript/src/spec/RNCKakaoMapViewNativeComponent.d.ts
 index af0146e..9afbf12 100644
 --- a/node_modules/@react-native-kakao/map/lib/typescript/src/spec/RNCKakaoMapViewNativeComponent.d.ts
@@ -382,7 +529,7 @@ index f598be9..279517c 100644
  //# sourceMappingURL=type.d.ts.map
 \ No newline at end of file
 diff --git a/node_modules/@react-native-kakao/map/src/component/KakaoMapView.tsx b/node_modules/@react-native-kakao/map/src/component/KakaoMapView.tsx
-index 53c719e..c1330e2 100644
+index 53c719e..da62ccc 100644
 --- a/node_modules/@react-native-kakao/map/src/component/KakaoMapView.tsx
 +++ b/node_modules/@react-native-kakao/map/src/component/KakaoMapView.tsx
 @@ -12,6 +12,8 @@ interface KakaoMapProps extends ViewProps {
@@ -394,7 +541,19 @@ index 53c719e..c1330e2 100644
    cameraMinLevel?: number;
    cameraMaxLevel?: number;
    cameraAnimationDuration?: number;
-@@ -38,6 +40,7 @@ const KakaoMapView = forwardRef(
+@@ -24,6 +26,11 @@ interface KakaoMapProps extends ViewProps {
+ 
+   isShowScaleBar?: boolean;
+   isShowCompass?: boolean;
++
++  /** 지도에 찍을 낚시 스팟 마커 */
++  spots?: ReadonlyArray<{ id: number; lat: number; lng: number }>;
++  /** 마커를 눌렀을 때. nativeEvent.id 가 스팟 id 다 */
++  onSpotPress?: (event: { nativeEvent: { id: number } }) => void;
+ }
+ interface KakaoMapRef {}
+ 
+@@ -38,6 +45,7 @@ const KakaoMapView = forwardRef(
        language,
        overlays,
        camera: cameraProp,
@@ -402,7 +561,7 @@ index 53c719e..c1330e2 100644
        cameraMinLevel = Const.nullNumber,
        cameraMaxLevel = Const.nullNumber,
        cameraAnimationDuration = 0,
-@@ -57,11 +60,16 @@ const KakaoMapView = forwardRef(
+@@ -57,11 +65,16 @@ const KakaoMapView = forwardRef(
        return { ...nullCamera, ...cameraProp };
      }, [cameraProp]);
  
@@ -437,10 +596,20 @@ index 1cc6a4d..e143fee 100644
  
  const Native: Spec = Module
 diff --git a/node_modules/@react-native-kakao/map/src/spec/RNCKakaoMapViewNativeComponent.ts b/node_modules/@react-native-kakao/map/src/spec/RNCKakaoMapViewNativeComponent.ts
-index 85a6f84..ea85fe3 100644
+index 85a6f84..c430214 100644
 --- a/node_modules/@react-native-kakao/map/src/spec/RNCKakaoMapViewNativeComponent.ts
 +++ b/node_modules/@react-native-kakao/map/src/spec/RNCKakaoMapViewNativeComponent.ts
-@@ -9,6 +9,10 @@ interface Camera {
+@@ -1,5 +1,8 @@
+ import type { ViewProps } from 'react-native';
+-import type { Double } from 'react-native/Libraries/Types/CodegenTypes';
++import type {
++  DirectEventHandler,
++  Double,
++} from 'react-native/Libraries/Types/CodegenTypes';
+ import codegenNativeCommands from 'react-native/Libraries/Utilities/codegenNativeCommands';
+ import codegenNativeComponent from 'react-native/Libraries/Utilities/codegenNativeComponent';
+ 
+@@ -9,7 +12,22 @@ interface Camera {
    tilt?: Double;
    rotation?: Double;
    zoomLevel?: Double;
@@ -449,9 +618,21 @@ index 85a6f84..ea85fe3 100644
 +   *  되돌리려면 이 값을 바꿔야 한다. 네이티브는 값 자체를 쓰지 않는다. */
 +  nonce?: Double;
  }
++/** 지도에 찍을 낚시 스팟 마커 한 개 */
++interface SpotMarker {
++  id: Double;
++  lat: Double;
++  lng: Double;
++}
++
++interface SpotPressEvent {
++  id: Double;
++}
++
  interface Props extends ViewProps {
    buildingScale?: Double;
-@@ -20,6 +24,7 @@ interface Props extends ViewProps {
+   overlays?: ReadonlyArray<string>;
+@@ -20,12 +38,16 @@ interface Props extends ViewProps {
    baseMapType?: string;
    camera?: Camera;
    initialCamera?: Camera;
@@ -459,6 +640,15 @@ index 85a6f84..ea85fe3 100644
    cameraMinLevel?: Double;
    cameraMaxLevel?: Double;
    cameraAnimationDuration?: Double;
+ 
+   isShowScaleBar?: boolean;
+   isShowCompass?: boolean;
++
++  spots?: ReadonlyArray<SpotMarker>;
++  onSpotPress?: DirectEventHandler<SpotPressEvent>;
+ }
+ 
+ // type ComponentType = HostComponent<Props>;
 diff --git a/node_modules/@react-native-kakao/map/src/type/type.ts b/node_modules/@react-native-kakao/map/src/type/type.ts
 index bd55a4d..4ad0604 100644
 --- a/node_modules/@react-native-kakao/map/src/type/type.ts

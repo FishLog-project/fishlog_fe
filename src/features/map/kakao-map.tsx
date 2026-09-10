@@ -14,6 +14,9 @@ const DEFAULT_CAMERA = {
 
 const CURRENT_LOCATION_ZOOM = 15;
 
+/** 기본값을 매 렌더 새로 만들지 않도록 모듈 상수로 둔다 */
+const EMPTY_SPOTS: readonly SpotMarker[] = [];
+
 let kakaoMapInitialization: Promise<unknown> | undefined;
 
 function initializeKakaoMap(nativeAppKey: string) {
@@ -28,11 +31,24 @@ type Coordinate = { lat: number; lng: number };
 /** nonce 는 같은 좌표로 다시 이동시킬 때만 쓰는 갱신 토큰이다. */
 type CameraState = Coordinate & { zoomLevel: number; nonce?: number };
 
+export interface SpotMarker {
+  id: number;
+  lat: number;
+  lng: number;
+}
+
 type FishlogKakaoMapProps = {
   recenterSignal: number;
+  /** 지도에 찍을 낚시 스팟. 아직 목록을 못 받았으면 빈 배열을 넘긴다 */
+  spots?: readonly SpotMarker[];
+  onSpotPress?: (spotId: number) => void;
 };
 
-export function FishlogKakaoMap({ recenterSignal }: FishlogKakaoMapProps) {
+export function FishlogKakaoMap({
+  recenterSignal,
+  spots = EMPTY_SPOTS,
+  onSpotPress,
+}: FishlogKakaoMapProps) {
   const nativeAppKey = Constants.expoConfig?.extra?.kakaoNativeAppKey;
   const hasNativeAppKey = typeof nativeAppKey === 'string' && nativeAppKey.length > 0;
   const [status, setStatus] = useState<MapStatus>(hasNativeAppKey ? 'initializing' : 'error');
@@ -112,6 +128,8 @@ export function FishlogKakaoMap({ recenterSignal }: FishlogKakaoMapProps) {
       style={StyleSheet.absoluteFill}
       camera={camera}
       currentLocation={currentLocation}
+      spots={spots}
+      onSpotPress={(event) => onSpotPress?.(event.nativeEvent.id)}
       cameraMinLevel={1}
       cameraMaxLevel={20}
       language="ko"

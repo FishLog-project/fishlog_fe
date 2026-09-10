@@ -346,6 +346,55 @@ export const Components = {
     actionSize: 40,
     actionIconSize: 24,
     markerLabelGap: 2,
+
+    /**
+     * 해양 정보 스트립 (Figma 지도 해양 정보 634:1495).
+     * 해양 정보 FAB을 켜면 지도 위쪽에 뜨는 흰 카드다.
+     */
+    seaStrip: {
+      top: 20,
+      radius: 12,
+      paddingX: 16,
+      paddingY: 10,
+      /** 항목·구분선 사이 */
+      gap: 13,
+      itemWidth: 28,
+      dividerHeight: 29,
+      labelGap: 2,
+    },
+
+    /**
+     * 스팟 상세 시트 (Figma 스팟 선택시 634:1537 / 상세 634:1611 / 1125:2937).
+     * 좌표는 390x844 시안 기준이고, 높이는 화면 비율로 환산해 쓴다.
+     */
+    sheet: {
+      radius: 16,
+      shadowOffsetY: -3,
+      shadowBlur: 21.2,
+      shadowOpacity: 0.12,
+      paddingX: 28,
+      paddingTop: 28,
+      paddingBottom: 32,
+      /** 접힘 366/844, 펼침 740/844 */
+      collapsedRatio: 0.434,
+      expandedRatio: 0.877,
+      /** 섹션 제목과 그 내용 사이 */
+      titleGap: 8,
+      /** 섹션과 섹션 사이 */
+      sectionGap: 16,
+      headerGap: 20,
+      closeSize: 28,
+      favoriteSize: 24,
+      /** 주요 어종 칸 — 4개가 한 줄에 들어간다 */
+      fishTile: 74,
+      fishTileRadius: 4,
+      fishTileGap: 12,
+      fishTileBg: Palette.blue[100],
+      /** 해양 정보 간단요약 카드 */
+      summaryHeight: 57,
+      summaryRadius: 4,
+      summaryBg: Palette.blue[100],
+    },
   },
   /**
    * 도감 화면 (Figma 도감 메인 634:1294).
