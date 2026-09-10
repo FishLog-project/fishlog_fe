@@ -15,6 +15,7 @@ import { fetch as expoFetch } from 'expo/fetch';
 
 export const API_BASE_URL = 'https://api.fishlog.xyz';
 const REQUEST_TIMEOUT_MS = 30_000;
+const UPLOAD_TIMEOUT_MS = 120_000;
 
 /** 한 로그인 세션에 묶인 요청. 토큰 회전은 허용하지만 계정 전환은 허용하지 않는다. */
 export type ApiSession = {
@@ -86,7 +87,7 @@ export async function apiRequest<T = unknown>(
     const controller = new AbortController();
     const abort = () => controller.abort();
     signal?.addEventListener('abort', abort, { once: true });
-    const timer = setTimeout(abort, REQUEST_TIMEOUT_MS);
+    const timer = setTimeout(abort, multipart ? UPLOAD_TIMEOUT_MS : REQUEST_TIMEOUT_MS);
     let res: { ok: boolean; status: number };
     let parsed: unknown;
     try {
