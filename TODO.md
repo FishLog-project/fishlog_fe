@@ -181,3 +181,39 @@ Swagger에 있으나 아직 화면/연동이 없는 API.
 - `src/features/home/home-data.ts` — 홈 fixture (`USE_FIXTURE`로 전환)
 - `src/features/dex/dex-data.ts` — 도감 fixture (`createFixtureDexDataSource`, 기본 화면은 API 사용)
 - `src/app/(tabs)/ranking` — `PlaceholderScreen` (임시 컴포넌트, 실제 화면 들어오면 삭제)
+
+---
+
+## 8. #13 관광 시설 API — 현재 위치 기반 목록·상세 연결
+
+2026-09-06 확인: [BE PR #82](https://github.com/FishLog-project/fishlog_be/pull/82)는 dev에 병합됐다.
+`GET /api/tours/nearby`는 공개 API이며 `type=음식점|관광지|숙박`, `lat`, `lng`를 받는다.
+`radius` 기본 5km, `page` 기본 1, 페이지당 30건이고 `hasNext`를 반환한다.
+2026-09-08 운영 GET은 세 분류 모두 200으로 확인했다.
+검증 좌표 `lat=37.4&lng=126.6`의 결과는 음식점 24곳, 관광지 6곳, 숙박 0곳이었다.
+
+- [x] `src/features/map/`에 dev 계약 기반 API·fixture·ViewModel 및 이전 요청 무시 처리 준비
+- [x] 대표 이미지와 썸네일을 사진 2장으로 중복 취급하지 않도록 매핑, 누락·잘못된 좌표 폴백
+- [x] 지도 → 주변 시설 → 음식점/관광지/숙박 선택 → 현재 위치 `lat`/`lng`를 실제 API에 전달 → 목록·상세 표시
+- [x] `expo-location` 권한 문구/config plugin, 위치 거부·실패 안내 및 다시 조회 연결
+- [x] 분류·좌표 변경 시 이전 목록·상세 숨김, 로딩·빈 결과·API 오류 재시도, 주소·사진·거리 누락 표시
+- [x] 관광공사 사진의 지원되는 HTTPS 주소 사용, 이미지 로드 실패 시 대체 표시
+- [x] `node scripts/check-tour-data.cjs`로 실제 어댑터·훅·시설 UI의 쿼리/좌표 검증·요청 전환·상세·재시도 흐름 확인
+- [x] 브라우저에서 운영 응답 기반 세 분류·목록·상세, 통제된 API 오류·사진 실패·위치 권한 거부/복구, 새 좌표 재조회 확인
+- [x] iOS Expo Go 시뮬레이터에서 실제 API 목록 24곳·상세 사진 렌더링 확인 (시뮬레이션 좌표, 디버거로 컴포넌트 버튼 콜백 실행)
+- [ ] 실제 iOS/Android 기기의 위치 권한·터치·GPS 동작 확인 (시뮬레이터/웹 검증과 별도)
+- [ ] [#4](https://github.com/FishLog-project/fishlog_fe/issues/4) 지도 SDK 담당 범위: 지도 중심·시설 마커·권한 거부 시 수동 탐색 연결
+- [ ] 현재 어댑터는 기본 반경 5km의 첫 30건만 조회한다. #4 조회 흐름 확정 후 `page`/`hasNext`와 지도 영역의 반경 연결
+
+웹에서 운영 API를 직접 호출하면 localhost Origin에 대해 CORS 403이므로 백엔드 허용 Origin 설정이 필요하다.
+브라우저 화면 검증만 읽기 전용 중계로 실제 응답을 전달했고, iOS 시뮬레이터는 중계 없이 직접 API를 호출했다.
+위치 새로고침은 Expo 웹의 무기한 위치 캐시를 사용하지 않는다.
+
+응답은 `title`, `firstImage`(대표), `firstImage2`(같은 이미지의 썸네일), `addr1`, `addr2`, `mapX`, `mapY`뿐이다.
+사진·주소·좌표는 null일 수 있다. 장소 ID, 상세 API, 추가 사진, 네이버 플레이스 ID/URL, 카카오맵 URL은 없다.
+Figma의 사진 3장·정확한 외부 장소 상세 링크는 현재 계약으로 채울 수 없어 별도 계약 확인이 필요하다.
+시설 UI 기준은 `634:1651`/`634:1711`(필터), `634:1576`(목록), `966:2635`/`1008:2840`(상세)이다.
+화면 연결은 로컬 `feat/13-tour-display`에서 구현했으며 dev 병합·PR #17 상태 변경은 하지 않았다.
+
+---
+
