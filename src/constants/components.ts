@@ -109,10 +109,10 @@ export const Components = {
    * gap/padding으로만 쓴다 (자식에 marginTop을 붙이지 않는다).
    */
   authLogin: {
-    /** safe-area 상단 ~ 로고 (y151 - 상태바 44, 늘린 줄 높이만큼 보정) */
-    logoTop: 102,
-    /** 로고 ~ 입력 묶음 (y325) */
-    formTop: 136,
+    /** safe-area 상단 ~ 로고 (y189.26 - 상태바 44) */
+    logoTop: 145.26,
+    /** 환영 문구 끝(y273) ~ 입력 묶음(y325) */
+    formTop: 52,
     /** 입력 사이 */
     fieldGap: 16,
     /** 입력 묶음 ~ 버튼 ~ 링크 (y481, y565) */
