@@ -90,6 +90,10 @@ export interface SpotDetail {
 export interface SpotDataSource {
   getSpots(): Promise<readonly SpotSummary[]>;
   getSpot(spotId: number): Promise<SpotDetail>;
+  /** POST /api/spots/{spotId}/favorite — idempotent. 로그인 필요 */
+  addFavorite(spotId: number): Promise<void>;
+  /** DELETE /api/spots/{spotId}/favorite — idempotent. 로그인 필요 */
+  removeFavorite(spotId: number): Promise<void>;
 }
 
 export type SpotFixtureScenario = 'ready' | 'empty' | 'error';
@@ -112,8 +116,15 @@ const spots: readonly SpotSummary[] = SEED.map(([name, lat, lot, category], inde
   lat,
   lot,
   category,
-  isFavorite: index % 3 === 0,
+  isFavorite: false,
 }));
+
+/** 찜은 서버 상태라 fixture 에서도 호출 사이에 유지돼야 한다 */
+const favorites = new Set<number>([1]);
+
+function withFavorites(list: readonly SpotSummary[]): readonly SpotSummary[] {
+  return list.map((spot) => ({ ...spot, isFavorite: favorites.has(spot.id) }));
+}
 
 function buildDetail(index: number): SpotDetail {
   const [name, lat, lot, category, viewCount, majorFishes] = SEED[index];
@@ -137,7 +148,7 @@ function buildDetail(index: number): SpotDetail {
           predcYmd: '2026-09-09',
           predcNoonSeCd: '오후',
           totalIndex: '보통',
-          tdlvHrCn: '5물',
+          tdlvHrCn: '중조기',
           minWvhgt: 0.3,
           maxWvhgt: 0.8,
           minWtem: 21.4,
@@ -170,13 +181,21 @@ export function createFixtureSpotDataSource(
   const fail = () => Promise.reject(new Error('fixture: spot error'));
 
   if (scenario === 'error') {
-    return { getSpots: fail, getSpot: fail };
+    return { getSpots: fail, getSpot: fail, addFavorite: fail, removeFavorite: fail };
   }
 
   const empty = scenario === 'empty';
 
   return {
-    getSpots: () => Promise.resolve(empty ? [] : spots),
+    getSpots: () => Promise.resolve(empty ? [] : withFavorites(spots)),
+    addFavorite: (spotId) => {
+      favorites.add(spotId);
+      return Promise.resolve();
+    },
+    removeFavorite: (spotId) => {
+      favorites.delete(spotId);
+      return Promise.resolve();
+    },
     getSpot: (spotId) => {
       const index = spotId - 1;
       if (index < 0 || index >= SEED.length) return fail();

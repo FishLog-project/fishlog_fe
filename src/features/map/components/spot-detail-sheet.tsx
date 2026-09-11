@@ -11,44 +11,43 @@ import {
   View,
 } from 'react-native';
 
-import { ScreenState, SegmentControl } from '@/components/common';
+import { ScreenState } from '@/components/common';
 import { Brand, Components, Fonts, Typography } from '@/constants/theme';
 import type { SpotDataSource, SpotFish } from '@/features/map/spot-data';
 import {
   useSpotDetailViewModel,
-  type NoonSegment,
+  useSpotFavorite,
+  type FishingIndexViewModel,
   type SpotDetailViewModel,
   type SpotLabelValue,
+  type TideViewModel,
 } from '@/features/map/use-spot-view-model';
 
 const SHEET = Components.map.sheet;
 
-const NOON_OPTIONS: readonly { value: NoonSegment; label: string }[] = [
-  { value: 'am', label: '오전' },
-  { value: 'pm', label: '오후' },
-];
-
 /**
- * 스팟 상세 시트 (Figma 스팟 선택시 634:1537 · 상세 634:1611 · 1125:2937).
+ * 스팟 상세 시트.
  *
- * 시안이 접힘(366)과 펼침(740) 두 장으로 나뉘어 있어 이름 영역을 누르면 전환한다.
- * 접힘은 주요 어종 + 해양 정보 간단요약까지, 펼침은 오늘의 낚시 정보·해양 환경·
- * 물때 정보까지 보여준다.
+ * 접힘  해양 634:1537 · 내륙 1176:3265
+ * 펼침  해양 1125:2937 · 내륙 1176:3145
  *
- * ⚠️ 펼침 시안의 각 섹션 내용은 아직 회색 박스라 확정되지 않았다.
- *    지금은 서버가 주는 값(GET /api/spots/{spotId})으로 채워 두었고,
- *    시안이 나오면 각 Section 안쪽만 갈아 끼우면 된다.
+ * 시안이 접힘/펼침 두 장으로 나뉘어 있어 이름 영역을 누르면 전환한다.
+ * 해양이면 낚시 지수·물때·해양 환경을, 내륙이면 담수 환경을 보여준다 —
+ * 서버가 forecast 와 inlandDetail 중 한쪽만 채워 주기 때문이다.
  */
 export function SpotDetailSheet({
   dataSource,
   spotId,
   isFavorite = false,
+  onFavoriteChange,
   onClose,
 }: {
   dataSource: SpotDataSource;
   spotId: number | null;
-  /** 목록(GET /api/spots)이 주는 값. 상세 응답에는 없다 */
+  /** 목록(GET /api/spots)이 주는 초기값. 토글은 시트 안에서 관리한다 */
   isFavorite?: boolean;
+  /** 찜이 서버에 반영됐을 때. 지도 목록의 낡은 값을 덮어쓰는 데 쓴다 */
+  onFavoriteChange?: (spotId: number, isFavorite: boolean) => void;
   onClose: () => void;
 }) {
   return (
@@ -66,6 +65,7 @@ export function SpotDetailSheet({
             dataSource={dataSource}
             spotId={spotId}
             isFavorite={isFavorite}
+            onFavoriteChange={onFavoriteChange}
             onClose={onClose}
           />
         ) : null}
@@ -78,29 +78,35 @@ function SpotDetailLoader({
   dataSource,
   spotId,
   isFavorite,
+  onFavoriteChange,
   onClose,
 }: {
   dataSource: SpotDataSource;
   spotId: number;
   isFavorite: boolean;
+  onFavoriteChange?: (spotId: number, isFavorite: boolean) => void;
   onClose: () => void;
 }) {
   const { height } = useWindowDimensions();
   const [state, retry] = useSpotDetailViewModel(dataSource, spotId);
   const [expanded, setExpanded] = useState(false);
+  const favorite = useSpotFavorite(dataSource, spotId, isFavorite, onFavoriteChange);
 
   const sheetHeight = height * (expanded ? SHEET.expandedRatio : SHEET.collapsedRatio);
 
   return (
     <View accessibilityViewIsModal style={[styles.sheet, { height: sheetHeight }]}>
       {state.status === 'ready' ? (
-        <SpotDetailBody
-          spot={state.data}
-          isFavorite={isFavorite}
-          expanded={expanded}
-          onToggleExpand={() => setExpanded((value) => !value)}
-          onClose={onClose}
-        />
+        <>
+          <SheetHeader
+            spot={state.data}
+            favorite={favorite}
+            expanded={expanded}
+            onToggleExpand={() => setExpanded((value) => !value)}
+            onClose={onClose}
+          />
+          <SpotDetailBody spot={state.data} expanded={expanded} favoriteFailure={favorite.failure} />
+        </>
       ) : (
         <View style={styles.stateWrap}>
           <ScreenState
@@ -113,116 +119,160 @@ function SpotDetailLoader({
   );
 }
 
-function SpotDetailBody({
+function SheetHeader({
   spot,
-  isFavorite,
+  favorite,
   expanded,
   onToggleExpand,
   onClose,
 }: {
   spot: SpotDetailViewModel;
-  isFavorite: boolean;
+  favorite: ReturnType<typeof useSpotFavorite>;
   expanded: boolean;
   onToggleExpand: () => void;
   onClose: () => void;
 }) {
-  const [noon, setNoon] = useState<NoonSegment>(spot.forecastNoon ?? 'am');
-  const marine = spot.forecastRows !== null;
-
   return (
-    <>
-      <View style={styles.header}>
-        {/*
-          ⚠️ 즐겨찾기 토글 API가 없다 (목록 응답의 isFavorite은 읽기 전용).
-             엔드포인트가 생기기 전까지는 상태 표시만 한다.
-        */}
+    <View style={styles.header}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ selected: favorite.isFavorite, disabled: favorite.pending }}
+        accessibilityLabel={favorite.isFavorite ? '찜 해제' : '찜하기'}
+        onPress={favorite.toggle}
+        hitSlop={10}
+        style={({ pressed }) => (pressed ? styles.pressed : undefined)}>
         <Ionicons
-          name={isFavorite ? 'heart' : 'heart-outline'}
+          name={favorite.isFavorite ? 'heart' : 'heart-outline'}
           size={SHEET.favoriteSize}
           color={Brand.primary}
-          accessibilityLabel={isFavorite ? '즐겨찾기한 낚시터' : '즐겨찾기하지 않은 낚시터'}
         />
+      </Pressable>
 
-        <Pressable
-          style={styles.titleBlock}
-          accessibilityRole="button"
-          accessibilityState={{ expanded }}
-          accessibilityLabel={expanded ? '상세 접기' : '상세 펼치기'}
-          onPress={onToggleExpand}>
-          <Text style={styles.name} numberOfLines={1}>
-            {spot.name}
-          </Text>
-          {/* 서버에 주소가 없어 지금은 분류·조회수로 대신한다 */}
-          <Text style={styles.address} numberOfLines={1}>
-            {spot.addressLabel ?? `${spot.categoryLabel} · ${spot.viewCountLabel}`}
-          </Text>
-        </Pressable>
+      <Pressable
+        style={styles.titleBlock}
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+        accessibilityLabel={expanded ? '상세 접기' : '상세 펼치기'}
+        onPress={onToggleExpand}>
+        <Text style={styles.name} numberOfLines={1}>
+          {spot.name}
+        </Text>
+        {/* 서버에 주소가 없어 지금은 분류·조회수로 대신한다 */}
+        <Text style={styles.address} numberOfLines={1}>
+          {spot.addressLabel ?? `${spot.categoryLabel} · ${spot.viewCountLabel}`}
+        </Text>
+      </Pressable>
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="닫기"
-          onPress={onClose}
-          style={({ pressed }) => (pressed ? styles.pressed : undefined)}>
-          <Ionicons name="close" size={SHEET.closeSize} color={Brand.textDisabled} />
-        </Pressable>
-      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="닫기"
+        onPress={onClose}
+        hitSlop={10}
+        style={({ pressed }) => (pressed ? styles.pressed : undefined)}>
+        <Ionicons name="close" size={SHEET.closeSize} color={Brand.textDisabled} />
+      </Pressable>
+    </View>
+  );
+}
 
-      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-        {spot.prohibited ? <Text style={styles.warning}>낚시 금지 구역이에요</Text> : null}
+function SpotDetailBody({
+  spot,
+  expanded,
+  favoriteFailure,
+}: {
+  spot: SpotDetailViewModel;
+  expanded: boolean;
+  favoriteFailure: string | null;
+}) {
+  const marine = spot.marineRows !== null;
 
-        {expanded ? (
-          <Section title="오늘의 낚시 정보">
-            <View style={styles.dateRow}>
-              <Text style={styles.dateLabel}>{spot.forecastDateLabel ?? '예보 없음'}</Text>
-              {spot.forecastDateLabel ? (
-                <View style={styles.noonSegment}>
-                  <SegmentControl options={NOON_OPTIONS} value={noon} onChange={setNoon} />
-                </View>
-              ) : null}
-            </View>
-            {spot.seaSummary ? <Text style={styles.summaryText}>{spot.seaSummary}</Text> : null}
-          </Section>
-        ) : null}
+  return (
+    <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+      {spot.prohibited ? <Text style={styles.notice}>낚시 금지 구역이에요</Text> : null}
+      {favoriteFailure ? <Text style={styles.notice}>{favoriteFailure}</Text> : null}
 
-        <Section title="주요 어종">
-          <FishTiles fishes={spot.majorFishes} />
+      {/* 펼침은 날짜 행으로 시작한다. 해양은 그 아래에 낚시 지수 카드가 붙는다 */}
+      {expanded ? (
+        <View style={styles.indexGroup}>
+          <DateRow date={spot.forecastDateLabel} noon={spot.noonLabel} />
+          {spot.fishingIndex ? <FishingIndexCard index={spot.fishingIndex} /> : null}
+        </View>
+      ) : null}
+
+      {/* 접힘 해양은 제목이 붙은 낚시 지수 섹션이다 (634:1537) */}
+      {!expanded && spot.fishingIndex ? (
+        <Section title="낚시 지수" gap={7}>
+          <FishingIndexCard index={spot.fishingIndex} />
         </Section>
+      ) : null}
 
-        {marine ? (
-          <Section title={expanded ? '해양 환경' : '해양 정보'}>
-            {expanded ? (
-              <ValueRows rows={spot.forecastRows ?? []} />
-            ) : (
-              <View style={styles.summaryCard}>
-                <Text style={styles.summaryText}>{spot.seaSummary ?? '정보가 없어요'}</Text>
-              </View>
-            )}
-          </Section>
-        ) : null}
+      {expanded && spot.tide ? <TideRow tide={spot.tide} /> : null}
 
-        {expanded && marine ? (
-          <Section title="물때 정보">
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryText}>{spot.seaSummary ?? '정보가 없어요'}</Text>
-            </View>
-          </Section>
-        ) : null}
+      <Section title="주요 어종">
+        <FishTiles fishes={spot.majorFishes} />
+      </Section>
 
-        {spot.inlandRows ? (
-          <Section title="하천 정보">
-            <ValueRows rows={spot.inlandRows} />
-          </Section>
-        ) : null}
-      </ScrollView>
-    </>
+      {expanded && marine ? (
+        <Section title="해양 환경">
+          <InfoRows rows={spot.marineRows ?? []} />
+        </Section>
+      ) : null}
+
+      {spot.inlandRows ? (
+        <Section title="담수 환경">
+          <InfoRows rows={spot.inlandRows} />
+        </Section>
+      ) : null}
+    </ScrollView>
+  );
+}
+
+/** 날짜 + 오전/오후 배지 (Figma 1176:3180). 서버가 1건만 주므로 배지는 표시 전용이다 */
+function DateRow({ date, noon }: { date: string | null; noon: string | null }) {
+  return (
+    <View style={styles.dateRow}>
+      <Text style={styles.dateLabel}>{date ?? '예보 없음'}</Text>
+      {noon ? (
+        <View style={styles.noonBadge}>
+          <Text style={styles.noonText}>{noon}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function FishingIndexCard({ index }: { index: FishingIndexViewModel }) {
+  return (
+    <View style={styles.indexCard}>
+      <View style={styles.indexRow}>
+        <View style={styles.indexGrade}>
+          <View style={[styles.indexDot, { backgroundColor: index.color }]} />
+          <Text style={[styles.indexLabel, { color: index.color }]}>{index.label}</Text>
+        </View>
+        <Text style={styles.indexDescription}>{index.description}</Text>
+      </View>
+    </View>
+  );
+}
+
+/** 물때 행 (Figma 1176:3113) — 제목과 배지가 한 줄에 마주 본다 */
+function TideRow({ tide }: { tide: TideViewModel }) {
+  return (
+    <View style={styles.tideRow}>
+      <Text style={styles.sectionTitle}>물때</Text>
+      <View style={styles.tideBadge}>
+        <Text style={styles.tideName}>{tide.name}</Text>
+        {tide.description ? <Text style={styles.tideDescription}>{tide.description}</Text> : null}
+      </View>
+    </View>
   );
 }
 
 /**
- * 주요 어종 칸 (Figma 634:1563~1566).
+ * 주요 어종 칸 (Figma 1175:3058).
  *
  * 시안이 4칸 고정이라 어종이 적어도 빈 칸으로 자리를 지킨다.
- * 서버가 사진(imageUrl)을 주면 사진을, 없으면 이름을 보여준다.
+ * 서버가 사진(imageUrl)을 주면 사진을, 없으면 이름만 보여준다.
  */
 function FishTiles({ fishes }: { fishes: readonly SpotFish[] }) {
   const tiles = Array.from({ length: 4 }, (_, index): SpotFish | null => fishes[index] ?? null);
@@ -231,18 +281,21 @@ function FishTiles({ fishes }: { fishes: readonly SpotFish[] }) {
     <View style={styles.fishRow}>
       {tiles.map((fish, index) => (
         // 칸 수가 4로 고정이고 순서도 서버 순서를 그대로 따르므로 index 가 안정적인 key 다
-        <View key={index} style={styles.fishTile}>
-          {fish?.imageUrl ? (
-            <Image
-              source={{ uri: fish.imageUrl }}
-              style={styles.fishImage}
-              contentFit="contain"
-              accessibilityLabel={fish.name}
-            />
-          ) : fish ? (
-            <Text style={styles.fishName} numberOfLines={2}>
-              {fish.name}
-            </Text>
+        <View key={index} style={[styles.fishTile, fish === null && styles.fishTileEmpty]}>
+          {fish ? (
+            <View style={styles.fishInner}>
+              {fish.imageUrl ? (
+                <Image
+                  source={{ uri: fish.imageUrl }}
+                  style={styles.fishImage}
+                  contentFit="contain"
+                  accessibilityLabel={fish.name}
+                />
+              ) : null}
+              <Text style={styles.fishName} numberOfLines={1}>
+                {fish.name}
+              </Text>
+            </View>
           ) : null}
         </View>
       ))}
@@ -250,22 +303,33 @@ function FishTiles({ fishes }: { fishes: readonly SpotFish[] }) {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  gap = SHEET.titleGap,
+  children,
+}: {
+  title: string;
+  gap?: number;
+  children: React.ReactNode;
+}) {
   return (
-    <View style={styles.section}>
+    <View style={{ gap }}>
       <Text style={styles.sectionTitle}>{title}</Text>
       {children}
     </View>
   );
 }
 
-function ValueRows({ rows }: { rows: readonly SpotLabelValue[] }) {
+/** 해양 환경 · 담수 환경 목록 (Figma Map/Info/List 1171:2975). 마지막 행은 구분선이 없다 */
+function InfoRows({ rows }: { rows: readonly SpotLabelValue[] }) {
   return (
-    <View style={styles.rows}>
-      {rows.map((row) => (
-        <View key={row.label} style={styles.row}>
-          <Text style={styles.rowLabel}>{row.label}</Text>
-          <Text style={styles.rowValue}>{row.value}</Text>
+    <View>
+      {rows.map((row, index) => (
+        <View
+          key={row.label}
+          style={[styles.infoRow, index === rows.length - 1 && styles.infoRowLast]}>
+          <Text style={styles.infoLabel}>{row.label}</Text>
+          <Text style={styles.infoValue}>{row.value}</Text>
         </View>
       ))}
     </View>
@@ -286,6 +350,7 @@ const styles = StyleSheet.create({
     elevation: 12,
   },
   stateWrap: { paddingHorizontal: SHEET.paddingX, paddingVertical: 32 },
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -311,55 +376,160 @@ const styles = StyleSheet.create({
     color: Brand.textWeak,
     textAlign: 'center',
   },
+
   body: {
     paddingHorizontal: SHEET.paddingX,
     paddingTop: SHEET.headerGap,
     paddingBottom: SHEET.paddingBottom,
     gap: SHEET.sectionGap,
   },
-  warning: { ...Typography.itemMeta, color: Brand.textError },
-  section: { gap: SHEET.titleGap },
+  notice: { ...Typography.itemMeta, color: Brand.textError },
   sectionTitle: {
     fontFamily: Fonts.semiBold,
     fontWeight: '600',
     fontSize: 16,
     lineHeight: 28,
     letterSpacing: -0.32,
-    color: Brand.textStrong,
+    color: Brand.textHeading,
   },
-  dateRow: {
+
+  indexGroup: { gap: SHEET.indexHeadGap },
+  dateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  dateLabel: {
+    fontFamily: Fonts.bold,
+    fontWeight: '700',
+    fontSize: 18,
+    lineHeight: 28,
+    letterSpacing: -0.36,
+    color: Brand.textHeading,
+  },
+  noonBadge: {
+    paddingHorizontal: SHEET.badgePaddingX,
+    paddingVertical: SHEET.badgePaddingY,
+    borderRadius: SHEET.badgeRadius,
+    borderWidth: 1,
+    borderColor: SHEET.badgeBorder,
+  },
+  noonText: {
+    fontFamily: Fonts.semiBold,
+    fontWeight: '600',
+    fontSize: 12.833,
+    lineHeight: 25.667,
+    letterSpacing: -0.2567,
+    color: Brand.textAccent,
+  },
+
+  indexCard: {
+    height: SHEET.indexCardHeight,
+    justifyContent: 'center',
+    paddingLeft: SHEET.indexCardPaddingLeft,
+    paddingRight: SHEET.indexCardPaddingRight,
+    paddingVertical: SHEET.indexCardPaddingY,
+    borderRadius: SHEET.indexCardRadius,
+    backgroundColor: SHEET.indexCardBg,
+  },
+  indexRow: { flexDirection: 'row', alignItems: 'center', gap: SHEET.indexCardGap },
+  indexGrade: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  indexDot: { width: SHEET.indexDot, height: SHEET.indexDot, borderRadius: SHEET.indexDot / 2 },
+  // ⚠️ 시안은 세로 그라데이션 글자다. 마스킹 라이브러리가 package.json 에 없어 단색으로 대신한다.
+  indexLabel: {
+    fontFamily: Fonts.bold,
+    fontWeight: '700',
+    fontSize: 18,
+    lineHeight: 28,
+    letterSpacing: -0.36,
+  },
+  indexDescription: {
+    flexShrink: 1,
+    fontFamily: Fonts.medium,
+    fontWeight: '500',
+    fontSize: 13,
+    lineHeight: 20,
+    letterSpacing: -0.26,
+    color: Brand.textHeading,
+  },
+
+  tideRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  tideBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
+    gap: SHEET.badgeGap,
+    paddingHorizontal: SHEET.badgePaddingX,
+    paddingVertical: SHEET.badgePaddingY,
+    borderRadius: SHEET.badgeRadius,
+    backgroundColor: SHEET.badgeBg,
   },
-  dateLabel: { ...Typography.cardTitle, color: Brand.primaryDark },
-  noonSegment: { width: 150 },
+  tideName: {
+    fontFamily: Fonts.bold,
+    fontWeight: '700',
+    fontSize: 12.833,
+    lineHeight: 25.667,
+    letterSpacing: -0.2567,
+    color: Brand.textHeading,
+  },
+  tideDescription: {
+    fontFamily: Fonts.medium,
+    fontWeight: '500',
+    fontSize: 12.833,
+    lineHeight: 25.667,
+    letterSpacing: -0.2567,
+    color: Brand.textMuted,
+  },
+
   fishRow: { flexDirection: 'row', gap: SHEET.fishTileGap },
   fishTile: {
     flex: 1,
     aspectRatio: 1,
     maxWidth: SHEET.fishTile,
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 4,
+    justifyContent: 'flex-end',
+    paddingHorizontal: SHEET.fishTilePaddingX,
+    paddingBottom: SHEET.fishTilePaddingBottom,
     borderRadius: SHEET.fishTileRadius,
+    borderWidth: 1,
+    borderColor: SHEET.fishTileBorder,
     backgroundColor: SHEET.fishTileBg,
   },
-  fishImage: { width: '100%', height: '100%' },
-  fishName: { ...Typography.chipLabel, color: Brand.textMuted, textAlign: 'center' },
-  summaryCard: {
-    minHeight: SHEET.summaryHeight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    borderRadius: SHEET.summaryRadius,
-    backgroundColor: SHEET.summaryBg,
+  /** 빈 칸은 자리만 지킨다 — 시안의 4칸 정렬이 어긋나지 않게 */
+  fishTileEmpty: { borderColor: Brand.inactive },
+  fishInner: { flex: 1, alignSelf: 'stretch', alignItems: 'center', gap: SHEET.fishTileInnerGap },
+  fishImage: { flex: 1, width: '100%' },
+  fishName: {
+    fontFamily: Fonts.semiBold,
+    fontWeight: '600',
+    fontSize: 12,
+    lineHeight: 16,
+    letterSpacing: -0.24,
+    color: Brand.textAccent,
+    textAlign: 'center',
   },
-  summaryText: { ...Typography.body, color: Brand.textStrong, textAlign: 'center' },
-  rows: { gap: 6 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  rowLabel: { ...Typography.itemMeta, color: Brand.textMuted },
-  rowValue: { ...Typography.itemTitle, color: Brand.textStrong },
+
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SHEET.rowPaddingX,
+    paddingVertical: SHEET.rowPaddingY,
+    borderBottomWidth: 1,
+    borderBottomColor: SHEET.rowDivider,
+  },
+  infoRowLast: { borderBottomWidth: 0 },
+  infoLabel: {
+    fontFamily: Fonts.semiBold,
+    fontWeight: '600',
+    fontSize: 14,
+    lineHeight: 28,
+    letterSpacing: -0.28,
+    color: SHEET.rowLabel,
+  },
+  infoValue: {
+    fontFamily: Fonts.bold,
+    fontWeight: '700',
+    fontSize: 16,
+    lineHeight: 28,
+    letterSpacing: -0.32,
+    color: Brand.textStrong,
+  },
+
   pressed: { opacity: 0.72 },
 });

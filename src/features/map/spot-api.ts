@@ -2,6 +2,8 @@ import type { SpotDataSource, SpotDetail, SpotSummary } from '@/features/map/spo
 import { apiRequest } from '@/lib/api/client';
 import { toFail } from '@/lib/api/result';
 
+const NEEDS_LOGIN = { reason: 'unauthorized' as const, message: '로그인이 필요해요.' };
+
 /**
  * 스팟 API 어댑터.
  *
@@ -15,6 +17,9 @@ export function createApiSpotDataSource(token: string | null): SpotDataSource {
   return {
     getSpots: () => get<readonly SpotSummary[]>('/api/spots', token),
     getSpot: (spotId) => get<SpotDetail>(`/api/spots/${spotId}`, token),
+    // 찜은 idempotent 라 이미 찜한 스팟을 다시 눌러도 서버가 성공으로 응답한다.
+    addFavorite: (spotId) => favorite(`/api/spots/${spotId}/favorite`, 'POST', token),
+    removeFavorite: (spotId) => favorite(`/api/spots/${spotId}/favorite`, 'DELETE', token),
   };
 }
 
@@ -22,4 +27,14 @@ function get<T>(path: string, token?: string | null): Promise<T> {
   return apiRequest<T>(path, { token }).catch((e) => {
     throw toFail(e);
   });
+}
+
+function favorite(path: string, method: 'POST' | 'DELETE', token: string | null): Promise<void> {
+  if (!token) return Promise.reject({ ok: false, ...NEEDS_LOGIN });
+
+  return apiRequest<null>(path, { method, token })
+    .then(() => undefined)
+    .catch((e) => {
+      throw toFail(e, { 401: NEEDS_LOGIN });
+    });
 }

@@ -364,7 +364,10 @@ export const Components = {
     },
 
     /**
-     * 스팟 상세 시트 (Figma 스팟 선택시 634:1537 / 상세 634:1611 / 1125:2937).
+     * 스팟 상세 시트.
+     *
+     * 접힘  해양 634:1537 · 내륙 1176:3265 (높이 386)
+     * 펼침  해양 1125:2937 · 내륙 1176:3145 (높이 740)
      * 좌표는 390x844 시안 기준이고, 높이는 화면 비율로 환산해 쓴다.
      */
     sheet: {
@@ -373,27 +376,58 @@ export const Components = {
       shadowBlur: 21.2,
       shadowOpacity: 0.12,
       paddingX: 28,
+      /** 시트 윗면 ~ 제목 (458 → 486) */
       paddingTop: 28,
       paddingBottom: 32,
-      /** 접힘 366/844, 펼침 740/844 */
-      collapsedRatio: 0.434,
+      /** 접힘 386/844, 펼침 740/844 */
+      collapsedRatio: 0.457,
       expandedRatio: 0.877,
-      /** 섹션 제목과 그 내용 사이 */
-      titleGap: 8,
+      /** 주소 아래 ~ 첫 섹션 (542 → 558) */
+      headerGap: 16,
       /** 섹션과 섹션 사이 */
-      sectionGap: 16,
-      headerGap: 20,
+      sectionGap: 20,
+      /** 섹션 제목 ~ 내용 */
+      titleGap: 12,
       closeSize: 28,
       favoriteSize: 24,
+
       /** 주요 어종 칸 — 4개가 한 줄에 들어간다 */
       fishTile: 74,
       fishTileRadius: 4,
       fishTileGap: 12,
+      fishTileInner: 48,
+      fishTilePaddingX: 13,
+      fishTilePaddingBottom: 8,
+      fishTileInnerGap: 2,
       fishTileBg: Palette.blue[100],
-      /** 해양 정보 간단요약 카드 */
-      summaryHeight: 57,
-      summaryRadius: 4,
-      summaryBg: Palette.blue[100],
+      fishTileBorder: Palette.blue[200],
+
+      /** 낚시 지수 카드 (해양) */
+      indexCardHeight: 72,
+      indexCardRadius: 8,
+      indexCardBg: Palette.bluegray[100],
+      indexCardPaddingLeft: 17,
+      indexCardPaddingRight: 19,
+      indexCardPaddingY: 16,
+      indexCardGap: 24,
+      indexDot: 12,
+      /** 날짜 행 ~ 낚시 지수 카드 */
+      indexHeadGap: 16,
+
+      /** 오전/오후 · 물때 배지 */
+      badgeRadius: 4.583,
+      badgePaddingX: 16,
+      badgePaddingY: 4,
+      badgeGap: 4,
+      badgeBorder: Palette.bluegray[200],
+      badgeBg: Palette.bluegray[100],
+
+      /** 해양 환경 · 담수 환경 목록 행 (Map/Info/List 1171:2975) */
+      rowPaddingX: 20,
+      rowPaddingY: 8,
+      rowDivider: Palette.line.disabled,
+      /** Brand 에 없는 중간 회색 (Figma font/03_dark) */
+      rowLabel: Palette.font.dark,
     },
   },
   /**

@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Screen, ScreenHeader, SearchBar } from '@/components/common';
@@ -32,6 +32,15 @@ export default function MapScreen() {
   const [recenterSignal, setRecenterSignal] = useState(0);
   const [seaInfoOpen, setSeaInfoOpen] = useState(false);
   const [selectedSpotId, setSelectedSpotId] = useState<number | null>(null);
+  /**
+   * 찜을 토글해도 목록(GET /api/spots)의 isFavorite 은 그대로라,
+   * 같은 스팟을 다시 열면 하트가 예전 상태로 보인다. 바뀐 값만 여기에 덮어 둔다.
+   */
+  const [favoriteOverrides, setFavoriteOverrides] = useState<Record<number, boolean>>({});
+
+  const rememberFavorite = useCallback((spotId: number, isFavorite: boolean) => {
+    setFavoriteOverrides((current) => ({ ...current, [spotId]: isFavorite }));
+  }, []);
 
   const dataSource = useMemo(
     () => (USE_FIXTURE ? createFixtureSpotDataSource() : createApiSpotDataSource(token)),
@@ -40,6 +49,10 @@ export default function MapScreen() {
   const { markers, allSpots, query, setQuery } = useSpotsViewModel(dataSource);
   // 검색으로 걸러진 markers 가 아니라 원본에서 찾는다 — 검색 중에도 즐겨찾기 표시가 유지되도록.
   const selectedSpot = allSpots?.find((spot) => spot.id === selectedSpotId) ?? null;
+  const selectedIsFavorite =
+    (selectedSpotId !== null ? favoriteOverrides[selectedSpotId] : undefined) ??
+    selectedSpot?.isFavorite ??
+    false;
 
   return (
     <Screen edgeToEdge header={<ScreenHeader title="지도" />}>
@@ -98,7 +111,8 @@ export default function MapScreen() {
       <SpotDetailSheet
         dataSource={dataSource}
         spotId={selectedSpotId}
-        isFavorite={selectedSpot?.isFavorite ?? false}
+        isFavorite={selectedIsFavorite}
+        onFavoriteChange={rememberFavorite}
         onClose={() => setSelectedSpotId(null)}
       />
     </Screen>
