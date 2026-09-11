@@ -114,7 +114,9 @@ async function main() {
       requests.push({ route, ...options });
       if (route === failurePath) throw new ApiError(401, 'expired');
       switch (route) {
-        case '/api/collections/dex': return normal;
+        case '/api/collections/dex': return options.token ? normal : {
+          ...normal, caughtCount: 0, fishes: normal.fishes.map((fish) => ({ ...fish, caught: false })),
+        };
         case '/api/collections/custom/dex': return { fishes: [
           { id: 1, name: rawCustom.name, imageUrl: customImageUrl, habitat: null, catchCount: 2 },
           { id: 2, name: '수기 테스트 어종', imageUrl: null, habitat: '강', catchCount: 1 },
@@ -156,7 +158,7 @@ async function main() {
     assert.equal(requests.length, before, 'guest private reads must stop before the API boundary');
     const shadowDex = await guest.getMyDex();
     assert.equal(shadowDex.fishes.length, normal.fishes.length, 'guest sees the shadow dex without custom species');
-    assert.equal(shadowDex.caughtCount, normal.caughtCount);
+    assert.equal(shadowDex.caughtCount, 0);
     assert.equal(requests.length, before + 1, 'guest must not request the authenticated custom dex');
     assert.equal(requests.at(-1).route, '/api/collections/dex');
     assert.equal(requests.at(-1).token, undefined, 'guest dex must go out without an Authorization header');
@@ -289,10 +291,11 @@ async function main() {
   };
   const cards = load('src/features/dex/components/species-card.tsx', uiImports);
   const dialogs = load('src/features/dex/components/species-detail-dialog.tsx', uiImports);
+  let uiToken = 'test-token';
   const screen = load('src/app/(tabs)/dex/index.tsx', {
     ...uiImports,
     'expo-router': { useRouter: () => ({}), useFocusEffect: () => {} },
-    '@/features/auth': { useAuth: () => ({ token: 'test-token' }) },
+    '@/features/auth': { useAuth: () => ({ token: uiToken }) },
     '@/features/dex/dex-api': apiModule,
     '@/features/dex/dex-data': dex,
     '@/features/dex/components/species-card': cards,
@@ -332,6 +335,15 @@ async function main() {
     assert.equal(loader.props.custom, !!species.custom);
   }
   assert.notEqual(...dialogKeys, 'switching same-ID species kinds must remount their detail loader');
+  uiToken = null;
+  uiHost.render(screen);
+  await flush();
+  tree = uiHost.render(screen);
+  const guestGrid = nodes(tree).find((node) => node.type === 'FlatList');
+  assert.ok(guestGrid, 'guest screen must render the public dex instead of a login gate');
+  assert.equal(guestGrid.props.data.length, 24);
+  assert.ok(guestGrid.props.data.every((fish) => !fish.caught && fish.label === '???' && !fish.custom));
+  assert.equal(guestGrid.props.ListHeaderComponent.props.collected, 0);
   uiHost.unmount();
   console.log('dex checks passed: server artwork/fallback, custom DTO/photos, ID/detail separation, completion/search, guest/errors, stale responses and route keys');
 }

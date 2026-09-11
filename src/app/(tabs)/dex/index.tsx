@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 
@@ -48,9 +48,7 @@ const LABEL_FITS_PERCENT = 15;
 const COLUMNS = 3;
 
 export default function DexScreen() {
-  const router = useRouter();
   const { token } = useAuth();
-  const needsLogin = !USE_FIXTURE && token === null;
   const dataSource = useMemo(
     () => (USE_FIXTURE ? createFixtureDexDataSource() : createApiDexDataSource(token)),
     [token],
@@ -99,17 +97,7 @@ export default function DexScreen() {
       <View style={styles.tankArea}>
         <View style={styles.tankRim}>
           <View style={styles.tankWater}>
-            {needsLogin ? (
-              <View style={styles.stateWrap}>
-                <ScreenState
-                  variant="empty"
-                  title="로그인하면 도감을 볼 수 있어요"
-                  description="잡은 물고기가 도감에 차곡차곡 쌓여요."
-                  actionLabel="로그인하기"
-                  onAction={() => router.push('/auth/login')}
-                />
-              </View>
-            ) : gridData ? (
+            {gridData ? (
               <FlatList
                 data={gridData}
                 keyExtractor={(item, index) => (item ? `${item.custom ? 'custom' : 'fish'}-${item.id}` : `filler-${index}`)}
