@@ -1,12 +1,12 @@
 # PR #19 · #20 · #21 통합 QA
 
 2026-09-11 기준 로컬 브랜치 `qa/pr19-20-21`.
-`origin/dev`의 `eface54` 위에 아래 순서로 병합했다. 원격 dev와 원본 PR은 변경하지 않았다.
+`origin/dev`의 `eface54` 위에 아래 순서로 병합했다. Figma 최종 수정도 원본 PR 브랜치에서 커밋한 뒤 통합했다. 원격 dev는 변경하지 않았다.
 
 | 순서 | PR | 검증한 커밋 |
 | --- | --- | --- |
-| 1 | #20 인증 세션 | `472c57c` |
-| 2 | #21 도감·인증·홈 | `eacb660` |
+| 1 | #20 인증 세션·로그인 UI | `3f6531c` |
+| 2 | #21 도감·인증·홈 | `e677551` |
 | 3 | #19 관광 시설 | `b9a8d55` |
 
 코드 충돌은 없었다. `TODO.md` 충돌은 8번 관광 시설과 9번 인증·도감 기록을 모두 보존해 해결했다.
@@ -33,8 +33,8 @@ npx expo start --lan --port 8140
 
 ## 통합본에서 완료한 검사
 
-- [x] 아래 5개 검사 스크립트, 타입 검사, 린트, `git diff --check`
-- [x] iOS · Android · 웹 export (`/tmp/fishlog-export-integrated-20260911`)
+- [x] 아래 6개 검사 스크립트, 타입 검사, 린트, `git diff --check`
+- [x] iOS · Android · 웹 export (`/tmp/fishlog-export-final-figma-ready-20260911`)
 - [x] 브라우저 통제 응답: 로그인 → 사진 선택·분류 → 크기 입력 → 등록 요청 401 → refresh 1회 → 재요청 성공
 - [x] 같은 브라우저 세션에서 도감 획득 수 `1/24`, 홈 진행도 `1/24` 갱신
 - [x] 같은 브라우저 세션에서 관광 시설 목록 → 상세 조회 (통제 좌표·응답)
@@ -45,6 +45,7 @@ npx expo start --lan --port 8140
 ```sh
 node scripts/check-auth-session.cjs
 node scripts/check-catch-flow.cjs
+node scripts/check-catch-ui.cjs
 node scripts/check-dex-data.cjs
 node scripts/check-home-data.cjs
 node scripts/check-tour-data.cjs
@@ -56,6 +57,25 @@ npx expo export --platform all --output-dir /tmp/fishlog-qa-export
 
 최초 타입 검사 전에 Expo 서버를 한 번 실행해야 무시된 `expo-env.d.ts`와 라우트 타입이 생성된다.
 `scripts/check-use-section.js`는 Node용이 아니라 Expo 웹 개발 서버의 브라우저 콘솔용이다.
+
+## 2026-09-11 Figma 최종 대조
+
+기준 파일: https://www.figma.com/design/INwO5bCiYYEvIRkfAL2QEZ?node-id=634-1176
+
+| 화면 | 노드 | 결과 |
+| --- | --- | --- |
+| 로그인 | `634:2544` | 최신 SVG 로고, 환영 문구, 세로 간격 반영 (#20) |
+| 홈 | `634:1177`, `634:1188` | 최신 SVG 로고 반영 (#21) |
+| 인증 촬영·분석·후보·결과·완료 | `634:3106`, `634:3124`, `689:2264`, `634:3140`, `634:3158`, `978:2934` | 제공된 MP4를 분석 중 무음 반복 재생, 기타어종 완료 카드 간격 반영 (#21) |
+| 도감·기타어종 상세 | `634:1294`, `978:3311` | 기존 그리드·기본 어종 이미지·인증 사진 표시 유지 |
+| 관광 시설 필터·상세 | `634:1651`, `634:1711`, `966:2635` | 기존 #19 유지. 아래 API 차이 확인 |
+
+- 웹 390×844·375×667, iPhone 17 Pro에서 로그인 로고·환영 문구 확인.
+- 웹에서 영상 재생 시간 증가·무음·반복·컨트롤 숨김, 뒤로가기/분석 완료/실패 시 영상 제거 확인. 정상·직접 입력 등록 완료 화면도 fixture로 확인.
+- iOS Expo Go에서 영상의 서로 다른 두 프레임과 분석 후 후보 3종 전환 확인. 카메라 대신 임시 자동 촬영 fixture를 사용했으며 검증 후 자동 촬영 코드·지연·`USE_FIXTURE`를 모두 원복했다.
+- `check-catch-ui.cjs`는 첫 프레임 전/재생 실패 시 정지 이미지, 동작 줄이기 설정과 분석 실패에서 영상 미생성을 확인한다. 실제 하드웨어의 카메라·음소거 검증을 대신하지 않는다.
+- 영상 길이만큼 API 결과를 지연시키지 않는다. 크기를 제공하지 않는 분류 응답은 기존처럼 직접 입력한다.
+- 운영 OpenAPI를 다시 확인했다. `TourSpotResponse`에는 대표 사진·썸네일만 있고 추가 사진, 네이버 플레이스 ID/URL, 카카오 장소 URL이 없다. 따라서 Figma의 사진 3장·정확한 외부 장소 링크는 아직 미반영이다.
 
 ## 병합 전 실기기 체크
 
