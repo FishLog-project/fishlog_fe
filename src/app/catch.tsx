@@ -6,7 +6,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { usePreventRemove } from 'expo-router/react-navigation';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 
@@ -333,10 +333,13 @@ function AnalysisAnimation() {
     video.loop = true;
     video.muted = true;
     video.audioMixingMode = 'mixWithOthers';
-    video.play();
   });
   const { status } = useEvent(player, 'statusChange', { status: player.status });
   const [firstFrame, setFirstFrame] = useState(false);
+  // 웹에서는 VideoView가 붙기 전의 play()가 무시되므로 준비 완료 후 재생한다.
+  useEffect(() => {
+    if (status === 'readyToPlay') player.play();
+  }, [player, status]);
 
   return (
     <>
