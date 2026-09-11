@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -51,11 +52,19 @@ export function ScreenHeader({
         ) : null}
       </View>
 
-      {title ? (
+      {title && variant === 'brand' ? (
+        <View style={styles.brand} accessibilityRole="header" accessibilityLabel={title}>
+          <Image
+            source={require('@/assets/images/brand/fishlog.svg')}
+            style={styles.logo}
+            contentFit="contain"
+          />
+        </View>
+      ) : title ? (
         <Text
           accessibilityRole="header"
           numberOfLines={1}
-          style={variant === 'brand' ? styles.brand : styles.title}>
+          style={styles.title}>
           {title}
         </Text>
       ) : (
@@ -86,9 +95,8 @@ const styles = StyleSheet.create({
     color: Brand.textStrong,
   },
   brand: {
-    ...Typography.brand,
     flex: 1,
-    textAlign: 'center',
-    color: Brand.primary,
+    alignItems: 'center',
   },
+  logo: { width: 88.147, height: 28 },
 });
