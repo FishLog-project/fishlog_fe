@@ -10,7 +10,7 @@ let reducedMotion = false;
 let status = 'loading';
 const player = { play() { this.played = true; } };
 const screen = load('src/app/catch.tsx', {
-  react: { ...screenHost.react, useState: videoHost.react.useState },
+  react: { ...screenHost.react, useState: videoHost.react.useState, useEffect: videoHost.react.useEffect },
   expo: { useEvent: () => ({ status }) },
   'expo-asset': {},
   'expo-camera': {},
@@ -47,11 +47,14 @@ function analysis() {
 const animation = nodes(analysis()).find((node) => node.type?.name === 'AnalysisAnimation');
 assert.ok(animation, 'analysis must mount the video');
 let tree = videoHost.render(animation.type);
-assert.ok(player.loop && player.muted && player.played, 'analysis must autoplay silently and loop');
+assert.ok(player.loop && player.muted, 'analysis must be silent and loop');
+assert.ok(!player.played, 'do not play before the video view is ready');
 const video = nodes(tree).find((node) => node.type === 'VideoView');
 assert.equal(video.props.nativeControls, false);
 assert.ok(nodes(tree).some((node) => node.type === 'Image'), 'keep the illustration until a frame renders');
 status = 'readyToPlay';
+videoHost.render(animation.type);
+assert.ok(player.played, 'autoplay when the mounted view is ready');
 video.props.onFirstFrameRender();
 tree = videoHost.render(animation.type);
 assert.ok(!nodes(tree).some((node) => node.type === 'Image'), 'reveal the playing video');
