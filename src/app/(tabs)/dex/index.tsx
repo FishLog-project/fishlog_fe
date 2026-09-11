@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 
 import { Screen, ScreenHeader, ScreenState, SearchBar } from '@/components/common';
@@ -11,7 +11,7 @@ import { createApiDexDataSource } from '@/features/dex/dex-api';
 import { createFixtureDexDataSource } from '@/features/dex/dex-data';
 import { SpeciesCard } from '@/features/dex/components/species-card';
 import { SpeciesDetailDialog } from '@/features/dex/components/species-detail-dialog';
-import { useDexViewModel } from '@/features/dex/use-dex-view-model';
+import { useDexViewModel, type DexSpeciesViewModel } from '@/features/dex/use-dex-view-model';
 import { USE_FIXTURE } from '@/lib/data-source-mode';
 
 const DEX = Components.dex;
@@ -48,9 +48,7 @@ const LABEL_FITS_PERCENT = 15;
 const COLUMNS = 3;
 
 export default function DexScreen() {
-  const router = useRouter();
   const { token } = useAuth();
-  const needsLogin = !USE_FIXTURE && token === null;
   const dataSource = useMemo(
     () => (USE_FIXTURE ? createFixtureDexDataSource() : createApiDexDataSource(token)),
     [token],
@@ -59,10 +57,18 @@ export default function DexScreen() {
     useDexViewModel(dataSource);
 
   // 다른 화면에서 인증한 기록을 돌아왔을 때 다시 불러온다.
-  useFocusEffect(useCallback(() => { retry(); }, [retry]));
+  // 첫 포커스는 마운트 요청과 겹치므로 건너뛴다.
+  const returned = useRef(false);
+  useFocusEffect(useCallback(() => {
+    if (!returned.current) {
+      returned.current = true;
+      return;
+    }
+    retry();
+  }, [retry]));
 
   // 상세 카드를 연 어종. 잠금 카드는 눌리지 않으므로 획득한 어종만 들어온다.
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selected, setSelected] = useState<DexSpeciesViewModel | null>(null);
 
   /**
    * 마지막 줄이 덜 차면 flex:1 카드가 남은 자리를 나눠 갖느라 넓어진다.
@@ -91,24 +97,14 @@ export default function DexScreen() {
       <View style={styles.tankArea}>
         <View style={styles.tankRim}>
           <View style={styles.tankWater}>
-            {needsLogin ? (
-              <View style={styles.stateWrap}>
-                <ScreenState
-                  variant="empty"
-                  title="로그인하면 도감을 볼 수 있어요"
-                  description="잡은 물고기가 도감에 차곡차곡 쌓여요."
-                  actionLabel="로그인하기"
-                  onAction={() => router.push('/auth/login')}
-                />
-              </View>
-            ) : gridData ? (
+            {gridData ? (
               <FlatList
                 data={gridData}
-                keyExtractor={(item, index) => (item ? String(item.id) : `filler-${index}`)}
+                keyExtractor={(item, index) => (item ? `${item.custom ? 'custom' : 'fish'}-${item.id}` : `filler-${index}`)}
                 numColumns={COLUMNS}
                 renderItem={({ item }) =>
                   item ? (
-                    <SpeciesCard species={item} onPress={(s) => setSelectedId(s.id)} />
+                    <SpeciesCard species={item} onPress={setSelected} />
                   ) : (
                     <View style={styles.filler} />
                   )
@@ -160,8 +156,9 @@ export default function DexScreen() {
 
       <SpeciesDetailDialog
         dataSource={dataSource}
-        fishId={selectedId}
-        onClose={() => setSelectedId(null)}
+        fishId={selected?.id ?? null}
+        custom={selected?.custom}
+        onClose={() => setSelected(null)}
       />
     </Screen>
   );
