@@ -143,6 +143,16 @@ async function checkFacilities() {
   assert.equal(positions.length, 1);
   assert.equal(requests.length, 0, 'category selection must wait for GPS before querying');
   assert.equal(screenState().props.variant, 'loading');
+  const refreshButton = button('현재 위치로 시설 다시 조회');
+  assert.ok(!refreshButton.props.disabled && !refreshButton.props.accessibilityState?.disabled, 'pending GPS must allow retry');
+  refreshButton.props.onPress();
+  render();
+  await flush();
+  assert.equal(positions.length, 2, 'retry starts a fresh GPS request while the old one is pending');
+  positions[0].resolve({ coords: { latitude: 35, longitude: 129 } });
+  await flush();
+  render();
+  assert.equal(requests.length, 0, 'stale GPS must not start a facility request');
   positions.at(-1).resolve({ coords: { latitude: origin.lat, longitude: origin.lng } });
   await flush();
   render();
@@ -322,11 +332,11 @@ async function check() {
   switches.unmount();
 
   const positions = [];
-  let permissionGranted = true;
+  let permission = { status: 'granted', granted: true };
   const location = hook('src/features/map/use-current-location.ts', 'useCurrentLocation', {
     'expo-location': {
       Accuracy: { Balanced: 3 },
-      requestForegroundPermissionsAsync: async () => ({ granted: permissionGranted }),
+      requestForegroundPermissionsAsync: async () => permission,
       getCurrentPositionAsync: () => {
         const request = deferred();
         positions.push(request);
@@ -356,11 +366,15 @@ async function check() {
     await locating;
     assert.deepEqual(location.render()[0], { status: 'unavailable' });
   }
-  permissionGranted = false;
+  permission = { status: 'denied', granted: false };
   const countBeforeDenied = positions.length;
   await location.render()[1]();
   assert.deepEqual(location.render()[0], { status: 'denied' });
   assert.equal(positions.length, countBeforeDenied, 'denied permission must not request GPS');
+  permission = { status: 'granted', granted: false };
+  await location.render()[1]();
+  assert.deepEqual(location.render()[0], { status: 'unavailable' }, 'web GPS failure is not permission denial');
+  assert.equal(positions.length, countBeforeDenied);
   location.unmount();
 
   const { createFixtureTourDataSource } = load('src/features/map/tour-data.ts');

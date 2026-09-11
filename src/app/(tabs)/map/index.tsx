@@ -50,24 +50,24 @@ export default function MapScreen() {
         <View pointerEvents="none" style={styles.mapShade} />
 
         <View style={styles.actionColumn}>
-          {MAP_ACTIONS.map((action, index) => !facilitiesOpen || index === 0 ? (
+          {MAP_ACTIONS.map((action, index) => (
             <MapAction key={action.label} {...action}
               selected={index === 0 && facilitiesOpen}
               onPress={index === 0 ? () => setFacilitiesOpen((open) => !open) : undefined} />
-          ) : null)}
+          ))}
         </View>
 
-        {!facilitiesOpen && SPOTS.map((spot) => (
+        {SPOTS.map((spot) => (
           <MapMarker key={spot.name} {...spot} />
         ))}
 
-        {!facilitiesOpen && <Image
+        <Image
           source={require('@/assets/images/map/current-location.svg')}
           style={styles.currentMarker}
           contentFit="contain"
-        />}
+        />
 
-        {!facilitiesOpen && <Pressable
+        <Pressable
           accessibilityRole="button"
           accessibilityLabel="현재 위치로 이동"
           style={({ pressed }) => [styles.locationButton, pressed && styles.pressed]}>
@@ -76,7 +76,7 @@ export default function MapScreen() {
             style={styles.actionIcon}
             contentFit="contain"
           />
-        </Pressable>}
+        </Pressable>
         {facilitiesOpen ? <TourFacilities /> : null}
       </View>
     </Screen>

@@ -71,8 +71,6 @@ export function TourFacilities() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="현재 위치로 시설 다시 조회"
-              accessibilityState={{ disabled: location.status === 'loading' }}
-              disabled={location.status === 'loading'}
               onPress={refreshLocation}
               style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}>
               <Image source={require('@/assets/images/map/my-location.svg')} style={styles.locationIcon} contentFit="contain" />

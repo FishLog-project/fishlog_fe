@@ -21,8 +21,9 @@ export function useCurrentLocation() {
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
       if (current !== request.current) return;
+      // 웹은 위치 조회 실패도 granted:false로 주므로 명시적 거부만 권한 안내로 보낸다.
       if (!permission.granted) {
-        setState({ status: 'denied' });
+        setState({ status: permission.status === 'denied' ? 'denied' : 'unavailable' });
         return;
       }
       const options = {
