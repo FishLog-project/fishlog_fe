@@ -9,8 +9,9 @@
 import {
   createFixtureDexDataSource,
   recordFixtureCatch,
+  recordFixtureCustomCatch,
 } from '@/features/dex/dex-data';
-import type { FishDetail } from '@/features/dex/dex-data';
+import type { CustomCatchRecord, FishDetail } from '@/features/dex/dex-data';
 
 /** POST /api/collections/classify 응답의 후보 한 종 (Top-3) */
 export interface ClassifyCandidate {
@@ -36,7 +37,7 @@ export interface ClassifyResponse {
 /** POST /api/collections/verify 요청 (multipart) */
 export interface VerifyRequest {
   fishId: number;
-  /** cm. 필수 — 분류가 크기를 안 주므로 결과 화면에서 확인·입력받는다 */
+  /** cm. 0 초과 300 이하 — 분류가 크기를 안 주므로 결과 화면에서 확인·입력받는다 */
   size: number;
   /** image 필드로 올릴 기기 로컬 경로 */
   photoUri: string;
@@ -56,6 +57,30 @@ export interface VerifyResponse {
   catchCount: number;
 }
 
+/** POST /api/collections/custom 요청 (multipart) */
+export interface VerifyCustomRequest {
+  /** 앞뒤 공백을 제거한 어종명, 최대 30자 */
+  fishName: string;
+  /** cm. 0 초과 300 이하 */
+  size: number;
+  photoUri: string;
+  /** 최대 100자 */
+  location?: string;
+  /** 최대 20자 */
+  habitat?: string;
+}
+
+export interface VerifyCustomResponse {
+  customCatchRecordId: number;
+  customFishId: number;
+  fishName: string;
+  habitat: string | null;
+  imageUrl: string;
+  size: number;
+  location: string | null;
+  registeredAt: string;
+}
+
 export interface SpeciesOption {
   id: number;
   name: string;
@@ -69,8 +94,11 @@ export interface CatchDataSource {
   classify(photoUri: string): Promise<ClassifyResponse>;
   /** 어종·크기·사진을 도감에 등록한다 */
   verify(request: VerifyRequest): Promise<VerifyResponse>;
+  /** 일반 도감에 없는 어종을 내 기타어종으로 등록한다 */
+  verifyCustom(request: VerifyCustomRequest): Promise<VerifyCustomResponse>;
   /** 등록 완료 카드의 설명·서식지 */
   getFish(fishId: number): Promise<FishDetailResponse>;
+  getCustomFish(customFishId: number): Promise<CustomCatchRecord>;
   /** 직접 입력한 어종명을 도감 fishId로 맞추는 데 쓴다 */
   listSpecies(): Promise<readonly SpeciesOption[]>;
 }
@@ -170,9 +198,37 @@ export function createFixtureCatchDataSource(
         VERIFY_DELAY_MS,
       );
     },
+    async verifyCustom({ fishName, size, photoUri, location }) {
+      if (failNextVerify) {
+        failNextVerify = false;
+        await rejectAfter('기타어종 등록 fixture가 실패했습니다.', VERIFY_DELAY_MS);
+      }
+      const customCatchRecordId = Date.now();
+      const registeredAt = new Date().toISOString();
+      const recorded = recordFixtureCustomCatch(fishName.trim(), {
+        catchRecordId: customCatchRecordId,
+        imageUrl: photoUri,
+        size,
+        location: location ?? null,
+        verifiedAt: registeredAt,
+      });
+      return resolveAfter({
+        customCatchRecordId,
+        customFishId: recorded.customFishId,
+        fishName: recorded.name,
+        habitat: recorded.habitat,
+        imageUrl: photoUri,
+        size,
+        location: location ?? null,
+        registeredAt,
+      }, VERIFY_DELAY_MS);
+    },
     getFish: dex.getFish,
+    getCustomFish: dex.getCustomFish,
     async listSpecies() {
-      return (await dex.getMyDex()).fishes.map(({ id, name }) => ({ id, name }));
+      return (await dex.getMyDex()).fishes
+        .filter((fish) => !fish.custom)
+        .map(({ id, name }) => ({ id, name }));
     },
   };
 }
