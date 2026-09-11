@@ -273,8 +273,9 @@ async function checkMultipartAndAbort() {
 async function checkTimeouts() {
   const timers = new Map();
   let sequence = 0;
+  let expectedTimeout = 30_000;
   const app = mount({ timers: {
-    setTimeout: (callback, ms) => { assert.equal(ms, 30_000); const id = ++sequence; timers.set(id, callback); return id; },
+    setTimeout: (callback, ms) => { assert.equal(ms, expectedTimeout); const id = ++sequence; timers.set(id, callback); return id; },
     clearTimeout: (id) => timers.delete(id),
   }, http: (call) => {
     if (call.path === '/api/auth/login') return response(200, otherTokens);
@@ -300,8 +301,17 @@ async function checkTimeouts() {
   [...timers.values()][0]();
   assert.equal((await timedOut).status, 408);
   assert.equal(timers.size, 0);
+  expectedTimeout = 120_000;
+  const form = new FormData();
+  form.append('image', new Blob(['photo bytes']), 'catch.jpg');
+  const uploading = app.client.apiRequest('/verify', { method: 'POST', body: form }).catch((error) => error);
+  await flush();
+  [...timers.values()][0]();
+  assert.equal((await uploading).status, 408);
+  assert.equal(app.requests.filter((call) => call.path === '/verify').length, 1, 'timed-out upload must not replay');
+  assert.equal(timers.size, 0);
   app.unmount();
-  console.log('PASS deadlines: 30-second attempts, abort propagation, timer cleanup, timed-out auth queue recovers');
+  console.log('PASS deadlines: 30-second requests, 120-second uploads without replay, abort cleanup, auth queue recovers');
 }
 
 async function main() {
