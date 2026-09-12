@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Modal,
   Pressable,
@@ -10,6 +10,13 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { ScreenState } from '@/components/common';
 import { Brand, Components, Fonts, Typography } from '@/constants/theme';
@@ -51,25 +58,29 @@ export function SpotDetailSheet({
   onClose: () => void;
 }) {
   return (
-    <Modal visible={spotId !== null} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.scrim}>
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          accessibilityRole="button"
-          accessibilityLabel="닫기"
-          onPress={onClose}
-        />
-        {spotId !== null ? (
-          <SpotDetailLoader
-            key={spotId}
-            dataSource={dataSource}
-            spotId={spotId}
-            isFavorite={isFavorite}
-            onFavoriteChange={onFavoriteChange}
-            onClose={onClose}
+    // animationType 을 none 으로 둔다. slide 로 두면 뒤의 막까지 시트와 함께 올라온다.
+    <Modal visible={spotId !== null} transparent animationType="none" onRequestClose={onClose}>
+      {/* 제스처는 Modal 안에 자체 root 가 있어야 동작한다 */}
+      <GestureHandlerRootView style={styles.root}>
+        <View style={styles.scrim}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            accessibilityRole="button"
+            accessibilityLabel="닫기"
+            onPress={onClose}
           />
-        ) : null}
-      </View>
+          {spotId !== null ? (
+            <SpotDetailLoader
+              key={spotId}
+              dataSource={dataSource}
+              spotId={spotId}
+              isFavorite={isFavorite}
+              onFavoriteChange={onFavoriteChange}
+              onClose={onClose}
+            />
+          ) : null}
+        </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }
@@ -87,35 +98,81 @@ function SpotDetailLoader({
   onFavoriteChange?: (spotId: number, isFavorite: boolean) => void;
   onClose: () => void;
 }) {
+  // Reanimated 의 shared value 를 직접 바꾸는 코드라 React Compiler 의 불변성 검사를 끈다.
+  'use no memo';
+
   const { height } = useWindowDimensions();
   const [state, retry] = useSpotDetailViewModel(dataSource, spotId);
   const [expanded, setExpanded] = useState(false);
   const favorite = useSpotFavorite(dataSource, spotId, isFavorite, onFavoriteChange);
 
-  const sheetHeight = height * (expanded ? SHEET.expandedRatio : SHEET.collapsedRatio);
+  const collapsedHeight = height * SHEET.collapsedRatio;
+  const expandedHeight = height * SHEET.expandedRatio;
+
+  const sheetHeight = useSharedValue(collapsedHeight);
+  /** 시트만 아래에서 올라온다 — 뒤의 막은 그 자리에 그대로 깔린다 */
+  const enter = useSharedValue(collapsedHeight);
+
+  useEffect(() => {
+    enter.value = withTiming(0, { duration: 240 });
+  }, [enter]);
+
+  const snapTo = useCallback(
+    (next: boolean) => {
+      setExpanded(next);
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value 는 이렇게 바꾼다
+      sheetHeight.value = withTiming(next ? expandedHeight : collapsedHeight, { duration: 200 });
+    },
+    [collapsedHeight, expandedHeight, sheetHeight],
+  );
+
+  /** 위로 끌면 펼쳐지고 아래로 끌면 접힌다. 손을 떼면 가까운 쪽으로 붙는다 */
+  const drag = Gesture.Pan()
+    .onChange((event) => {
+      const next = sheetHeight.value - event.changeY;
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value 는 이렇게 바꾼다
+      sheetHeight.value = Math.min(Math.max(next, collapsedHeight), expandedHeight);
+    })
+    .onEnd(() => {
+      const goesUp = sheetHeight.value > (collapsedHeight + expandedHeight) / 2;
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value 는 이렇게 바꾼다
+      sheetHeight.value = withTiming(goesUp ? expandedHeight : collapsedHeight, { duration: 200 });
+      runOnJS(setExpanded)(goesUp);
+    });
+
+  const sheetStyle = useAnimatedStyle(() => ({
+    height: sheetHeight.value,
+    transform: [{ translateY: enter.value }],
+  }));
 
   return (
-    <View accessibilityViewIsModal style={[styles.sheet, { height: sheetHeight }]}>
-      {state.status === 'ready' ? (
-        <>
-          <SheetHeader
-            spot={state.data}
-            favorite={favorite}
-            expanded={expanded}
-            onToggleExpand={() => setExpanded((value) => !value)}
-            onClose={onClose}
-          />
-          <SpotDetailBody spot={state.data} expanded={expanded} favoriteFailure={favorite.failure} />
-        </>
-      ) : (
-        <View style={styles.stateWrap}>
-          <ScreenState
-            variant={state.status === 'empty' ? 'empty' : state.status}
-            onRetry={state.status === 'error' ? retry : undefined}
-          />
-        </View>
-      )}
-    </View>
+    <GestureDetector gesture={drag}>
+      <Animated.View accessibilityViewIsModal style={[styles.sheet, sheetStyle]}>
+        {state.status === 'ready' ? (
+          <>
+            <SheetHeader
+              spot={state.data}
+              favorite={favorite}
+              expanded={expanded}
+              onToggleExpand={() => snapTo(!expanded)}
+              onClose={onClose}
+            />
+            <SpotDetailBody
+              spot={state.data}
+              expanded={expanded}
+              favoriteFailure={favorite.failure}
+            />
+          </>
+        ) : (
+          <View style={styles.stateWrap}>
+            <ScreenState
+              variant={state.status === 'empty' ? 'empty' : state.status}
+              onRetry={state.status === 'error' ? retry : undefined}
+            />
+          </View>
+        )}
+      </Animated.View>
+    </GestureDetector>
   );
 }
 
@@ -187,32 +244,27 @@ function SpotDetailBody({
   const marine = spot.marineRows !== null;
 
   return (
-    <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.bodyViewport}
+      contentContainerStyle={styles.body}
+      scrollEnabled={expanded}
+      showsVerticalScrollIndicator={false}>
       {spot.prohibited ? <Text style={styles.notice}>낚시 금지 구역이에요</Text> : null}
       {favoriteFailure ? <Text style={styles.notice}>{favoriteFailure}</Text> : null}
 
-      {/* 펼침은 날짜 행으로 시작한다. 해양은 그 아래에 낚시 지수 카드가 붙는다 */}
-      {expanded ? (
-        <View style={styles.indexGroup}>
-          <DateRow date={spot.forecastDateLabel} noon={spot.noonLabel} />
-          {spot.fishingIndex ? <FishingIndexCard index={spot.fishingIndex} /> : null}
-        </View>
-      ) : null}
+      {/* 본문은 항상 같은 순서로 유지하고 시트 높이만 바꾼다. */}
+      <View style={styles.indexGroup}>
+        <DateRow date={spot.forecastDateLabel} noon={spot.noonLabel} />
+        {spot.fishingIndex ? <FishingIndexCard index={spot.fishingIndex} /> : null}
+      </View>
 
-      {/* 접힘 해양은 제목이 붙은 낚시 지수 섹션이다 (634:1537) */}
-      {!expanded && spot.fishingIndex ? (
-        <Section title="낚시 지수" gap={7}>
-          <FishingIndexCard index={spot.fishingIndex} />
-        </Section>
-      ) : null}
-
-      {expanded && spot.tide ? <TideRow tide={spot.tide} /> : null}
+      {spot.tide ? <TideRow tide={spot.tide} /> : null}
 
       <Section title="주요 어종">
         <FishTiles fishes={spot.majorFishes} />
       </Section>
 
-      {expanded && marine ? (
+      {marine ? (
         <Section title="해양 환경">
           <InfoRows rows={spot.marineRows ?? []} />
         </Section>
@@ -337,8 +389,10 @@ function InfoRows({ rows }: { rows: readonly SpotLabelValue[] }) {
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   scrim: { flex: 1, justifyContent: 'flex-end', backgroundColor: Brand.scrim },
   sheet: {
+    overflow: 'hidden',
     backgroundColor: Brand.background,
     borderTopLeftRadius: SHEET.radius,
     borderTopRightRadius: SHEET.radius,
@@ -377,6 +431,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
+  bodyViewport: { flex: 1 },
   body: {
     paddingHorizontal: SHEET.paddingX,
     paddingTop: SHEET.headerGap,
@@ -420,7 +475,8 @@ const styles = StyleSheet.create({
   },
 
   indexCard: {
-    height: SHEET.indexCardHeight,
+    // 시안은 고정 높이(72)지만 문구가 길면 잘려서 최소 높이로 둔다
+    minHeight: SHEET.indexCardHeight,
     justifyContent: 'center',
     paddingLeft: SHEET.indexCardPaddingLeft,
     paddingRight: SHEET.indexCardPaddingRight,
