@@ -80,11 +80,17 @@ export default function TabsLayout() {
           alignItems: 'center',
           justifyContent: 'center',
         },
-        // 아이콘 컨테이너를 아이콘 크기로 명시한다.
-        // 지정하지 않으면 react-navigation 기본값(약 29dp)에 맞춰 36dp 아이콘이 잘린다.
+        /**
+         * 아이콘 칸이 버튼 안쪽을 세로로 다 채우게 한다.
+         *
+         * 폭만 아이콘 크기로 못 박는다 — 지정하지 않으면 기본값(약 29dp)에 맞춰
+         * 36dp 아이콘이 잘린다. 높이는 flex 로 채운다. 탭 버튼 안쪽은 라이브러리가
+         * 위쪽 정렬 + 상하 패딩 10 으로 그려서(BottomTabItem), 높이를 고정하면
+         * 아이콘이 위로 붙는다. 칸이 꽉 차면 그 안에서 아이콘이 가운데 놓인다.
+         */
         tabBarIconStyle: {
+          flex: 1,
           width: Layout.tabIconSize,
-          height: Layout.tabIconSize,
         },
       }}>
       {TABS.map(({ name, label, leaf, active, inactive }) => (
