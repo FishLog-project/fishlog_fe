@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -16,18 +17,19 @@ import { USE_FIXTURE } from '@/lib/data-source-mode';
 const MAP = Components.map;
 
 /** 해양 정보만 토글이다 (Figma 634:1495) — 나머지 셋은 아직 동작이 정해지지 않았다 */
-const MAP_ACTIONS = [
+const MAP_ACTIONS: readonly { key: string; icon: number; label: string }[] = [
   { key: 'grid', icon: require('@/assets/images/map/grid.svg'), label: '격자로 보기' },
-  { key: 'sea', icon: require('@/assets/images/map/sea-info.svg'), label: '해양 정보 보기' },
-  {
-    key: 'prohibited',
-    icon: require('@/assets/images/map/fishing-disabled.svg'),
-    label: '낚시 금지 구역 보기',
-  },
-  { key: 'fish', icon: require('@/assets/images/map/fish-scan.svg'), label: '어종 탐색' },
+  // { key: 'sea', icon: require('@/assets/images/map/sea-info.svg'), label: '해양 정보 보기' },
+  // {
+  //   key: 'prohibited',
+  //   icon: require('@/assets/images/map/fishing-disabled.svg'),
+  //   label: '낚시 금지 구역 보기',
+  // },
+  { key: 'fish', icon: require('@/assets/images/map/fish-scan.svg'), label: '물고기 인증하기' },
 ] as const;
 
 export default function MapScreen() {
+  const router = useRouter();
   const { token } = useAuth();
   const [recenterSignal, setRecenterSignal] = useState(0);
   const [seaInfoOpen, setSeaInfoOpen] = useState(false);
@@ -46,30 +48,53 @@ export default function MapScreen() {
     () => (USE_FIXTURE ? createFixtureSpotDataSource() : createApiSpotDataSource(token)),
     [token],
   );
-  const { markers, allSpots, query, setQuery } = useSpotsViewModel(dataSource);
-  // 검색으로 걸러진 markers 가 아니라 원본에서 찾는다 — 검색 중에도 즐겨찾기 표시가 유지되도록.
+  const { markers, allSpots } = useSpotsViewModel(dataSource);
   const selectedSpot = allSpots?.find((spot) => spot.id === selectedSpotId) ?? null;
   const selectedIsFavorite =
     (selectedSpotId !== null ? favoriteOverrides[selectedSpotId] : undefined) ??
     selectedSpot?.isFavorite ??
     false;
 
+  /**
+   * 검색 화면에서 고른 스팟을 연다.
+   *
+   * 같은 spotId 로 목록이 다시 들어와도 시트를 또 열지 않도록 처리한 값을 기억한다.
+   */
+  const { spotId: requestedSpotId, searchRequest } = useLocalSearchParams<{ spotId?: string; searchRequest?: string }>();
+  const requestKey = requestedSpotId ? `${requestedSpotId}:${searchRequest ?? ''}` : null;
+  const [handledSpotId, setHandledSpotId] = useState<string | null>(null);
+  const [focus, setFocus] = useState<{ lat: number; lng: number; nonce: number } | null>(null);
+
+  // effect 가 아니라 렌더 중에 맞춘다 — 파라미터라는 "바깥 값"에 상태를 맞추는 경우라
+  // effect 로 두면 한 번 그린 뒤 다시 그리게 된다.
+  if (requestedSpotId && requestKey !== handledSpotId && allSpots) {
+    const spot = allSpots.find((item) => item.id === Number(requestedSpotId));
+    if (spot) {
+      setHandledSpotId(requestKey);
+      setSelectedSpotId(spot.id);
+      setFocus({ lat: spot.lat, lng: spot.lng, nonce: (focus?.nonce ?? 0) + 1 });
+    }
+  }
+
   return (
     <Screen edgeToEdge header={<ScreenHeader title="지도" />}>
-      <View style={styles.searchArea}>
-        <SearchBar
-          value={query}
-          onChangeText={setQuery}
-          placeholder="낚시터 검색"
-          returnKeyType="search"
-        />
-      </View>
+      {/* 검색은 별도 화면에서 한다 — 여기서는 들어가는 입구 역할만 */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="낚시터 검색"
+        onPress={() => router.push('/search')}
+        style={styles.searchArea}>
+        <View pointerEvents="none">
+          <SearchBar value={selectedSpot?.name ?? ''} placeholder="낚시터 검색" />
+        </View>
+      </Pressable>
 
       <View style={styles.mapCanvas}>
         <FishlogKakaoMap
           recenterSignal={recenterSignal}
           spots={markers ?? undefined}
           onSpotPress={setSelectedSpotId}
+          focus={focus}
         />
         <View pointerEvents="none" style={styles.mapShade} />
 
@@ -80,7 +105,13 @@ export default function MapScreen() {
               icon={action.icon}
               label={action.label}
               selected={action.key === 'sea' && seaInfoOpen}
-              onPress={action.key === 'sea' ? () => setSeaInfoOpen((open) => !open) : undefined}
+              onPress={
+                action.key === 'sea'
+                  ? () => setSeaInfoOpen((open) => !open)
+                  : action.key === 'fish'
+                    ? () => router.push('/catch')
+                    : undefined
+              }
             />
           ))}
         </View>
