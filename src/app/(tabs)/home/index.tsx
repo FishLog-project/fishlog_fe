@@ -52,7 +52,11 @@ export default function HomeScreen() {
   return (
     <Screen scroll header={<ScreenHeader title="Fishlog" variant="brand" />}>
       <View style={styles.hero}>
-        <HeroCarousel featured={featuredSpecies} recommendedSpots={recommendedSpots} />
+        <HeroCarousel
+          featured={featuredSpecies}
+          collectionProgress={collectionProgress}
+          recommendedSpots={recommendedSpots}
+        />
       </View>
 
       <View style={styles.statRow}>
@@ -124,7 +128,10 @@ export default function HomeScreen() {
               accessibilityLabel={`${s.rank}위 ${s.name}, ${[s.distance, s.species]
                 .filter(Boolean)
                 .join(', ')}. 지도에서 보기`}
-              onPress={() => router.push('/map')}>
+              onPress={() => router.navigate({
+                pathname: '/map',
+                params: { spotId: String(s.id), searchRequest: String(Date.now()) },
+              })}>
               <RankPin rank={s.rank} />
               <View style={styles.spotText}>
                 <Text numberOfLines={1} style={styles.spotName}>
