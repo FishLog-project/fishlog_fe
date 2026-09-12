@@ -17,17 +17,17 @@ index c3a003d..d9ab736 100644
      reactContext: ReactApplicationContext,
 diff --git a/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapView.kt b/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapView.kt
 new file mode 100644
-index 0000000..dfc2a6f
+index 0000000..1370966
 --- /dev/null
 +++ b/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapView.kt
-@@ -0,0 +1,278 @@
+@@ -0,0 +1,326 @@
 +﻿package net.mjstudio.rnkakao.map
 +
 +import android.graphics.Bitmap
++import android.graphics.BitmapFactory
 +import android.graphics.Canvas
 +import android.graphics.Color
 +import android.graphics.Paint
-+import android.graphics.Path
 +import android.widget.FrameLayout
 +import com.facebook.react.bridge.LifecycleEventListener
 +import com.facebook.react.bridge.Arguments
@@ -39,6 +39,7 @@ index 0000000..dfc2a6f
 +import com.kakao.vectormap.KakaoMapReadyCallback
 +import com.kakao.vectormap.LatLng
 +import com.kakao.vectormap.MapLifeCycleCallback
++import com.kakao.vectormap.MapGravity
 +import com.kakao.vectormap.MapType
 +import com.kakao.vectormap.MapView
 +import com.kakao.vectormap.PoiScale
@@ -50,12 +51,19 @@ index 0000000..dfc2a6f
 +import com.kakao.vectormap.label.LabelOptions
 +import com.kakao.vectormap.label.LabelStyle
 +import com.kakao.vectormap.label.LabelStyles
++import com.kakao.vectormap.label.LabelTextBuilder
++import com.kakao.vectormap.label.LabelTextStyle
 +
 +internal data class CameraProps(val latitude: Double, val longitude: Double, val zoomLevel: Int)
 +
 +internal data class LatLngProps(val latitude: Double, val longitude: Double)
 +
-+internal data class SpotProps(val id: Int, val latitude: Double, val longitude: Double)
++internal data class SpotProps(
++  val id: Int,
++  val name: String,
++  val latitude: Double,
++  val longitude: Double,
++)
 +
 +/** 마커를 눌렀을 때 JS 로 올려 보내는 이벤트. onSpotPress 로 도착한다. */
 +internal class SpotPressEvent(surfaceId: Int, viewId: Int, private val spotId: Int) :
@@ -169,9 +177,7 @@ index 0000000..dfc2a6f
 +    val styles =
 +      spotStyles
 +        ?: labelManager
-+          .addLabelStyles(
-+            LabelStyles.from(SPOT_STYLE_ID, LabelStyle.from(createSpotPin()).setAnchorPoint(0.5f, 1f)),
-+          )
++          .addLabelStyles(LabelStyles.from(SPOT_STYLE_ID, createSpotStyle()))
 +          ?.also { spotStyles = it }
 +        ?: return
 +
@@ -180,6 +186,7 @@ index 0000000..dfc2a6f
 +        LabelOptions
 +          .from(LatLng.from(spot.latitude, spot.longitude))
 +          .setStyles(styles)
++          .setTexts(LabelTextBuilder().setTexts(spot.name))
 +          .setClickable(true)
 +          .setTag(spot.id)
 +      },
@@ -191,32 +198,59 @@ index 0000000..dfc2a6f
 +    dispatcher.dispatchEvent(SpotPressEvent(UIManagerHelper.getSurfaceId(reactContext), id, spotId))
 +  }
 +
-+  /** 기본 마커 — 커스텀 디자인이 나오기 전까지 쓰는 물방울 핀이다. */
++  /**
++   * 마커 한 벌 — 낚시찌 그림 + 그 위에 얹는 낚시터 이름 (Figma 634:1675).
++   *
++   * dp 보정을 끄고 픽셀 값을 직접 넘긴다. 켜 두면 그림은 그대로인데 글자만 한 번 더
++   * 확대돼 둘의 비율이 시안과 달라진다.
++   */
++  private fun createSpotStyle(): LabelStyle {
++    val density = resources.displayMetrics.density
++
++    return LabelStyle
++      .from(createSpotPin())
++      .setApplyDpScale(false)
++      // 그림의 아래쪽 15%는 발광이 번진 여백이라, 찌 끝이 좌표에 닿도록 위로 당긴다
++      .setAnchorPoint(0.5f, SPOT_PIN_TIP_RATIO)
++      // 시안에 없는 흰 테두리를 한 겹 준다 — 지도 위 짙은 면에서는 검은 글자만으론 안 읽힌다
++      .setTextStyles(
++        LabelTextStyle.from(
++          (SPOT_LABEL_SIZE_DP * density).toInt(),
++          Color.rgb(28, 28, 28),
++          density.toInt().coerceAtLeast(1),
++          Color.WHITE,
++        ),
++      )
++      .setTextGravity(MapGravity.TOP)
++      .setPadding(SPOT_LABEL_GAP_DP * density)
++  }
++
++  /**
++   * 낚시찌 마커 (Figma 634:1675).
++   *
++   * 발광까지 들어간 그림이라 Canvas 로 다시 그리지 않고 내보낸 PNG 를 쓴다.
++   * drawable 은 with-spot-marker-drawable 플러그인이 prebuild 때 넣어 준다.
++   */
 +  private fun createSpotPin(): Bitmap {
 +    val density = resources.displayMetrics.density
-+    val width = (22 * density).toInt().coerceAtLeast(1)
-+    val height = (30 * density).toInt().coerceAtLeast(1)
++    val width = (SPOT_PIN_WIDTH_DP * density).toInt().coerceAtLeast(1)
++    val height = (SPOT_PIN_HEIGHT_DP * density).toInt().coerceAtLeast(1)
++    val resId = resources.getIdentifier("spot_marker", "drawable", context.packageName)
++    val source = if (resId == 0) null else BitmapFactory.decodeResource(resources, resId)
++
++    // 그림을 못 찾아도 지도는 계속 보여 준다 — 마커만 단색 원으로 대신한다
++    if (source == null) return createFallbackPin(width, height)
++
++    return Bitmap.createScaledBitmap(source, width, height, true)
++  }
++
++  private fun createFallbackPin(
++    width: Int,
++    height: Int,
++  ): Bitmap {
 +    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-+    val canvas = Canvas(bitmap)
-+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-+    val centerX = width / 2f
-+    val headRadius = 9f * density
-+    val headCenterY = headRadius + 1f * density
-+
-+    paint.color = Color.rgb(0, 121, 202)
-+    canvas.drawPath(
-+      Path().apply {
-+        moveTo(centerX, height.toFloat())
-+        lineTo(centerX - 6f * density, headCenterY + headRadius * 0.6f)
-+        lineTo(centerX + 6f * density, headCenterY + headRadius * 0.6f)
-+        close()
-+      },
-+      paint,
-+    )
-+    canvas.drawCircle(centerX, headCenterY, headRadius, paint)
-+    paint.color = Color.WHITE
-+    canvas.drawCircle(centerX, headCenterY, headRadius - 3.5f * density, paint)
-+
++    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(0, 124, 206) }
++    Canvas(bitmap).drawCircle(width / 2f, width / 2f, width / 2f - 1f, paint)
 +    return bitmap
 +  }
 +
@@ -299,12 +333,26 @@ index 0000000..dfc2a6f
 +
 +private const val SPOT_LAYER_ID = "fishlog-spots"
 +private const val SPOT_STYLE_ID = "fishlog-spot-pin"
++
++/**
++ * 마커 그림 크기 (Figma 634:1675).
++ *
++ * 찌 자체는 20×32dp 지만 내보낸 그림에는 사방으로 번진 발광이 함께 들어 있어
++ * 34.38×46.38dp 다. 찌 끝(발광 제외)은 위에서 85.6% 지점이다.
++ */
++private const val SPOT_PIN_WIDTH_DP = 34.38f
++private const val SPOT_PIN_HEIGHT_DP = 46.38f
++private const val SPOT_PIN_TIP_RATIO = 0.856f
++
++/** 마커 위 낚시터 이름 — SUITE SemiBold 12 / 그림과의 간격 4 */
++private const val SPOT_LABEL_SIZE_DP = 12f
++private const val SPOT_LABEL_GAP_DP = 4f
 diff --git a/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapViewManager.kt b/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapViewManager.kt
 new file mode 100644
-index 0000000..b031f64
+index 0000000..f15c2b8
 --- /dev/null
 +++ b/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapViewManager.kt
-@@ -0,0 +1,69 @@
+@@ -0,0 +1,76 @@
 +﻿package net.mjstudio.rnkakao.map
 +
 +import com.facebook.react.bridge.ReadableArray
@@ -352,7 +400,14 @@ index 0000000..b031f64
 +    for (index in 0 until size()) {
 +      val item = getMap(index) ?: continue
 +      if (!item.hasKey("id") || !item.hasKey("lat") || !item.hasKey("lng")) continue
-+      result.add(SpotProps(item.getDouble("id").toInt(), item.getDouble("lat"), item.getDouble("lng")))
++      result.add(
++        SpotProps(
++          item.getDouble("id").toInt(),
++          if (item.hasKey("name")) item.getString("name").orEmpty() else "",
++          item.getDouble("lat"),
++          item.getDouble("lng"),
++        ),
++      )
 +    }
 +    return result
 +  }
@@ -463,7 +518,7 @@ index 6a6cd98..1f79d7a 100644
  //# sourceMappingURL=Util.js.map
 \ No newline at end of file
 diff --git a/node_modules/@react-native-kakao/map/lib/typescript/src/component/KakaoMapView.d.ts b/node_modules/@react-native-kakao/map/lib/typescript/src/component/KakaoMapView.d.ts
-index e6cacbe..e4d3a2d 100644
+index e6cacbe..ad6ace4 100644
 --- a/node_modules/@react-native-kakao/map/lib/typescript/src/component/KakaoMapView.d.ts
 +++ b/node_modules/@react-native-kakao/map/lib/typescript/src/component/KakaoMapView.d.ts
 @@ -6,6 +6,10 @@ interface KakaoMapProps extends ViewProps {
@@ -477,12 +532,13 @@ index e6cacbe..e4d3a2d 100644
      cameraMinLevel?: number;
      cameraMaxLevel?: number;
      cameraAnimationDuration?: number;
-@@ -16,6 +20,16 @@ interface KakaoMapProps extends ViewProps {
+@@ -16,6 +20,17 @@ interface KakaoMapProps extends ViewProps {
      language?: 'ko' | 'en';
      isShowScaleBar?: boolean;
      isShowCompass?: boolean;
 +    spots?: ReadonlyArray<{
 +        id: number;
++        name: string;
 +        lat: number;
 +        lng: number;
 +    }>;
@@ -529,7 +585,7 @@ index f598be9..279517c 100644
  //# sourceMappingURL=type.d.ts.map
 \ No newline at end of file
 diff --git a/node_modules/@react-native-kakao/map/src/component/KakaoMapView.tsx b/node_modules/@react-native-kakao/map/src/component/KakaoMapView.tsx
-index 53c719e..da62ccc 100644
+index 53c719e..42478ee 100644
 --- a/node_modules/@react-native-kakao/map/src/component/KakaoMapView.tsx
 +++ b/node_modules/@react-native-kakao/map/src/component/KakaoMapView.tsx
 @@ -12,6 +12,8 @@ interface KakaoMapProps extends ViewProps {
@@ -547,7 +603,7 @@ index 53c719e..da62ccc 100644
    isShowCompass?: boolean;
 +
 +  /** 지도에 찍을 낚시 스팟 마커 */
-+  spots?: ReadonlyArray<{ id: number; lat: number; lng: number }>;
++  spots?: ReadonlyArray<{ id: number; name: string; lat: number; lng: number }>;
 +  /** 마커를 눌렀을 때. nativeEvent.id 가 스팟 id 다 */
 +  onSpotPress?: (event: { nativeEvent: { id: number } }) => void;
  }
@@ -596,7 +652,7 @@ index 1cc6a4d..e143fee 100644
  
  const Native: Spec = Module
 diff --git a/node_modules/@react-native-kakao/map/src/spec/RNCKakaoMapViewNativeComponent.ts b/node_modules/@react-native-kakao/map/src/spec/RNCKakaoMapViewNativeComponent.ts
-index 85a6f84..c430214 100644
+index 85a6f84..82c61d6 100644
 --- a/node_modules/@react-native-kakao/map/src/spec/RNCKakaoMapViewNativeComponent.ts
 +++ b/node_modules/@react-native-kakao/map/src/spec/RNCKakaoMapViewNativeComponent.ts
 @@ -1,5 +1,8 @@
@@ -609,7 +665,7 @@ index 85a6f84..c430214 100644
  import codegenNativeCommands from 'react-native/Libraries/Utilities/codegenNativeCommands';
  import codegenNativeComponent from 'react-native/Libraries/Utilities/codegenNativeComponent';
  
-@@ -9,7 +12,22 @@ interface Camera {
+@@ -9,7 +12,24 @@ interface Camera {
    tilt?: Double;
    rotation?: Double;
    zoomLevel?: Double;
@@ -621,6 +677,8 @@ index 85a6f84..c430214 100644
 +/** 지도에 찍을 낚시 스팟 마커 한 개 */
 +interface SpotMarker {
 +  id: Double;
++  /** 마커 위에 함께 그리는 낚시터 이름 */
++  name: string;
 +  lat: Double;
 +  lng: Double;
 +}
@@ -632,7 +690,7 @@ index 85a6f84..c430214 100644
  interface Props extends ViewProps {
    buildingScale?: Double;
    overlays?: ReadonlyArray<string>;
-@@ -20,12 +38,16 @@ interface Props extends ViewProps {
+@@ -20,12 +40,16 @@ interface Props extends ViewProps {
    baseMapType?: string;
    camera?: Camera;
    initialCamera?: Camera;

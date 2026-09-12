@@ -12,7 +12,8 @@ const DEFAULT_CAMERA = {
   zoomLevel: 8,
 };
 
-const CURRENT_LOCATION_ZOOM = 15;
+const CURRENT_LOCATION_ZOOM = 9;
+const SEARCH_LOCATION_ZOOM = 15;
 
 /** 기본값을 매 렌더 새로 만들지 않도록 모듈 상수로 둔다 */
 const EMPTY_SPOTS: readonly SpotMarker[] = [];
@@ -33,6 +34,8 @@ type CameraState = Coordinate & { zoomLevel: number; nonce?: number };
 
 export interface SpotMarker {
   id: number;
+  /** 마커 위에 함께 그리는 낚시터 이름 (Figma 634:1675) */
+  name: string;
   lat: number;
   lng: number;
 }
@@ -42,12 +45,15 @@ type FishlogKakaoMapProps = {
   /** 지도에 찍을 낚시 스팟. 아직 목록을 못 받았으면 빈 배열을 넘긴다 */
   spots?: readonly SpotMarker[];
   onSpotPress?: (spotId: number) => void;
+  /** 검색에서 고른 스팟으로 카메라를 옮긴다. nonce 가 바뀔 때만 움직인다 */
+  focus?: { lat: number; lng: number; nonce: number } | null;
 };
 
 export function FishlogKakaoMap({
   recenterSignal,
   spots = EMPTY_SPOTS,
   onSpotPress,
+  focus,
 }: FishlogKakaoMapProps) {
   const nativeAppKey = Constants.expoConfig?.extra?.kakaoNativeAppKey;
   const hasNativeAppKey = typeof nativeAppKey === 'string' && nativeAppKey.length > 0;
@@ -72,6 +78,25 @@ export function FishlogKakaoMap({
       active = false;
     };
   }, [hasNativeAppKey, nativeAppKey]);
+
+  /**
+   * 검색에서 고른 스팟으로 이동한다.
+   *
+   * effect 가 아니라 렌더 중에 맞춘다 — 바깥에서 내려온 focus 에 카메라를 맞추는
+   * 경우라 effect 로 두면 한 번 그린 뒤 다시 그리게 된다.
+   * nonce 를 그대로 실어 보내 같은 스팟을 다시 골라도 움직이게 한다.
+   */
+  const [appliedFocus, setAppliedFocus] = useState<number | null>(null);
+
+  if (focus && focus.nonce !== appliedFocus) {
+    setAppliedFocus(focus.nonce);
+    setCamera({
+      lat: focus.lat,
+      lng: focus.lng,
+      zoomLevel: SEARCH_LOCATION_ZOOM,
+      nonce: focus.nonce,
+    });
+  }
 
   useEffect(() => {
     let active = true;
@@ -130,6 +155,7 @@ export function FishlogKakaoMap({
       currentLocation={currentLocation}
       spots={spots}
       onSpotPress={(event) => onSpotPress?.(event.nativeEvent.id)}
+      cameraAnimationDuration={300}
       cameraMinLevel={1}
       cameraMaxLevel={20}
       language="ko"
