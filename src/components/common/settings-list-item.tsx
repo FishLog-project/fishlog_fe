@@ -7,6 +7,8 @@ type Props = {
   label: string;
   onPress?: () => void;
   disabled?: boolean;
+  /** 인증 기록 목록(634:3205)처럼 화살표가 없는 변형 */
+  showChevron?: boolean;
 };
 
 /**
@@ -16,7 +18,7 @@ type Props = {
  * 디자인상 모든 항목의 라벨은 같은 검정이다. 계정 탈퇴도 예외가 아니라
  * 색으로 경고하지 않는다 — 경고는 눌러서 들어간 화면이 맡는다.
  */
-export function SettingsListItem({ label, onPress, disabled }: Props) {
+export function SettingsListItem({ label, onPress, disabled, showChevron = true }: Props) {
   return (
     <Pressable
       accessibilityRole="button"
@@ -24,11 +26,13 @@ export function SettingsListItem({ label, onPress, disabled }: Props) {
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed && styles.pressed, disabled && styles.off]}>
       <Text style={styles.label}>{label}</Text>
-      <Image
-        source={require('@/assets/images/profile/chevron-20.svg')}
-        style={styles.chevron}
-        contentFit="contain"
-      />
+      {showChevron ? (
+        <Image
+          source={require('@/assets/images/profile/chevron-20.svg')}
+          style={styles.chevron}
+          contentFit="contain"
+        />
+      ) : null}
     </Pressable>
   );
 }

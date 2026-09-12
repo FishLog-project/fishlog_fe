@@ -205,6 +205,40 @@ export const Components = {
       paddingY: 10,
       chevronSize: 20,
     },
+
+    /** 낚시 인증 기록 조회 (Figma 634:3205) */
+    records: {
+      /** 날짜 묶음 사이 */
+      groupGap: 24,
+      /** 날짜 라벨 ~ 첫 항목 */
+      labelGap: 8,
+    },
+
+    /** 저장 목록 — 낚시터 (Figma 저장 목록 826:2288, 행 HeartList/Base 837:2502) */
+    savedList: {
+      /** 행 사이 */
+      rowGap: 20,
+      /** 썸네일 ~ 본문 */
+      contentGap: 16,
+      thumbSize: 88,
+      thumbRadius: 8,
+      /** 시안이 회색 자리표시자다 — 서버에 낚시터 사진이 없다 */
+      thumbBg: Derived.neutral,
+      /** 제목/주소 묶음 ~ 태그 줄 */
+      blockGap: 16,
+      /** 제목 ~ 주소 */
+      titleGap: 4,
+      heartSize: 20,
+      /** 어종 태그 */
+      tagGap: 8,
+      tagRadius: 29,
+      tagPaddingX: 12,
+      tagPaddingY: 4,
+      tagBg: Palette.line.regular,
+      tagLabel: Palette.bluegray[400],
+      /** 주소 줄 (Figma font/03_dark) */
+      addressLabel: Palette.font.dark,
+    },
   },
   /** 홈 통계 카드 (도감 진행도 / 물고기 인증하기, Figma 634:1244 · 634:1251) */
   statCard: {
@@ -346,6 +380,24 @@ export const Components = {
     actionSize: 40,
     actionIconSize: 24,
     markerLabelGap: 2,
+
+    /**
+     * ⚠️ 낚시터 검색 화면 — Figma 시안이 없다.
+     * 지도 화면의 여백·목록 간격을 따라 임시로 잡은 값이다. 시안이 나오면 여기를 바꾼다.
+     */
+    search: {
+      /** 검색바 ~ 본문 */
+      topGap: 20,
+      /** 구획 제목 ~ 목록 */
+      labelGap: 8,
+      /** 최근 검색어 한 줄 */
+      recentPaddingY: 12,
+      /** 결과 한 줄 */
+      resultPaddingY: 12,
+      /** 결과 이름 ~ 주소 */
+      resultTitleGap: 2,
+      removeSize: 18,
+    },
 
     /**
      * 해양 정보 스트립 (Figma 지도 해양 정보 634:1495).

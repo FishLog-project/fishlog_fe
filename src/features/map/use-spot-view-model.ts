@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type {
   InlandDetail,
@@ -9,6 +9,7 @@ import type {
   SpotForecast,
   SpotSummary,
 } from '@/features/map/spot-data';
+import { lookupAddress } from '@/features/map/kakao-address';
 import { useSection } from '@/lib/use-section';
 
 /** 지도에 찍는 마커 한 개. 서버의 `lot` 을 지도가 쓰는 `lng` 로 바꿔 둔다 */
@@ -113,6 +114,62 @@ export function useSpotsViewModel(dataSource: SpotDataSource) {
   return { state, markers, allSpots, query, setQuery, retry };
 }
 
+/**
+ * 저장 목록 — 찜한 낚시터만 (Figma 826:2288).
+ *
+ * ⚠️ 찜 목록 전용 엔드포인트가 없다 (전체 31개 중 찜은 POST/DELETE 뿐).
+ *    GET /api/spots 가 로그인 토큰을 받으면 isFavorite 을 채워 주므로 그걸 걸러 쓴다.
+ */
+function toSavedSpots(spots: readonly SpotSummary[]): readonly SpotMarkerViewModel[] | null {
+  const saved = spots.filter((spot) => spot.isFavorite);
+  return saved.length === 0 ? null : (toMarkers(saved) ?? null);
+}
+
+export function useSavedSpotsViewModel(dataSource: SpotDataSource) {
+  return useSection(dataSource, loadSpots, toSavedSpots);
+}
+
+/**
+ * 저장 목록 한 줄에 채워 넣을 나머지 정보.
+ *
+ * 목록 응답에는 이름·좌표·분류뿐이라 시안(837:2502)의 주소와 어종 태그를 따로 구한다.
+ * - 주소: 좌표를 카카오 Local API 로 변환한다 (바다 위면 결과가 없어 null 이다)
+ * - 어종: 스팟 상세의 majorFishes 를 쓴다
+ *
+ * ⚠️ 상세 조회는 viewCount 를 올린다 (사용자/IP 별 1일 1회). 저장 목록을 열면
+ *    찜한 스팟들의 조회수가 함께 오른다는 뜻이라, 찜 목록 전용 엔드포인트가
+ *    생기면 이 호출은 걷어내는 편이 좋다.
+ *
+ * 둘 다 실패해도 행은 그대로 그린다 — 목록 자체가 막히면 안 된다.
+ */
+export function useSavedSpotExtras(dataSource: SpotDataSource, spot: SpotMarkerViewModel) {
+  const [address, setAddress] = useState<string | null>(null);
+  const [fishes, setFishes] = useState<readonly SpotFish[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+
+    lookupAddress(spot.lat, spot.lng)
+      .then((value) => {
+        if (alive) setAddress(value);
+      })
+      .catch(() => undefined);
+
+    dataSource
+      .getSpot(spot.id)
+      .then((detail) => {
+        if (alive) setFishes(detail.majorFishes);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      alive = false;
+    };
+  }, [dataSource, spot.id, spot.lat, spot.lng]);
+
+  return { address, fishes };
+}
+
 interface DetailSource {
   dataSource: SpotDataSource;
   spotId: number;
@@ -151,19 +208,19 @@ function toDateLabel(predcYmd: string): string | null {
 const FISHING_INDEX: Readonly<Record<string, { color: string; description: string }>> = {
   좋음: {
     color: '#0E9F6E',
-    description: '파고와 바람이 잔잔해\n갯바위와 방파제 모두 나서기 좋습니다.',
+    description: '파고와 바람이 잔잔해\n나서기 좋은 날입니다.',
   },
   보통: {
     color: '#0079CA',
-    description: '큰 무리는 없지만 물때와 바람을\n한 번 더 확인하고 나서세요.',
+    description: '물때와 바람을\n한 번 더 확인하세요.',
   },
   나쁨: {
     color: '#FF4312',
-    description: '파고와 바람이 함께 올라 갯바위,\n방파제 모두 주의가 필요합니다.',
+    description: '파고와 바람이 높아\n주의가 필요합니다.',
   },
   위험: {
     color: '#C93B3B',
-    description: '기상이 거칠어 출조를 미루는 편이\n안전합니다.',
+    description: '기상이 거칠어\n출조를 미루세요.',
   },
 };
 
