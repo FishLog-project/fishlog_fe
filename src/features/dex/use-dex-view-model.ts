@@ -81,7 +81,11 @@ function toDexViewModel(dex: MyDex): DexViewModel | null {
   const collected = Math.min(Math.max(0, dex.caughtCount), total);
 
   return {
-    species: dex.fishes.map(toDexSpecies),
+    // 채운 칸을 앞으로 당겨 내가 모은 어종부터 보이게 한다.
+    // 같은 그룹 안에서는 서버가 준 순서를 그대로 둔다 (sort 는 안정 정렬이다).
+    species: dex.fishes
+      .map(toDexSpecies)
+      .sort((a, b) => Number(b.caught) - Number(a.caught)),
     collected,
     total,
     progressPercent: total === 0 ? 0 : Math.round((collected / total) * 100),
