@@ -51,7 +51,9 @@ export interface SpotDetailViewModel {
    * 시안(634:1537)의 "서울 00시 00구 000" 자리.
    * ⚠️ GET /api/spots/{spotId} 응답에 주소 필드가 없어 항상 null 이다.
    */
-  addressLabel: string | null;
+  /** 주소는 서버에 없어 좌표를 변환해 쓴다 (useSpotAddress) */
+  lat: number;
+  lng: number;
   categoryLabel: string;
   /** 낚시 금지 구역이면 화면이 경고를 띄운다 */
   prohibited: boolean;
@@ -288,7 +290,8 @@ export function toSpotDetailViewModel(detail: SpotDetail): SpotDetailViewModel {
   return {
     id: detail.spotId,
     name: detail.name,
-    addressLabel: null,
+    lat: detail.lat,
+    lng: detail.lot,
     categoryLabel: detail.category,
     prohibited: detail.prohibit,
     viewCountLabel: `조회 ${detail.viewCount.toLocaleString('ko-KR')}회`,
@@ -300,6 +303,35 @@ export function toSpotDetailViewModel(detail: SpotDetail): SpotDetailViewModel {
     marineRows: forecast ? toMarineRows(forecast) : null,
     inlandRows: detail.inlandDetail ? toInlandRows(detail.inlandDetail) : null,
   };
+}
+
+/**
+ * 좌표를 주소로 바꾼다 (Figma 634:1560).
+ *
+ * 서버 스팟 응답에 주소가 없어 카카오 Local API 를 쓴다. 좌표가 바다 위면
+ * 주소가 없어 null 이고, 그때는 화면이 그 줄을 그리지 않는다.
+ */
+export function useSpotAddress(lat: number, lng: number) {
+  const [found, setFound] = useState<{ key: string; address: string } | null>(null);
+  const key = `${lat},${lng}`;
+
+  useEffect(() => {
+    let alive = true;
+
+    lookupAddress(lat, lng)
+      .then((value) => {
+        if (alive && value !== null) setFound({ key, address: value });
+      })
+      .catch(() => undefined);
+
+    return () => {
+      alive = false;
+    };
+  }, [lat, lng, key]);
+
+  // 좌표와 함께 들고 있다가 다른 스팟을 열면 버린다 —
+  // 그래야 새 주소가 오기 전에 이전 스팟 주소가 잠깐 보이지 않는다.
+  return found !== null && found.key === key ? found.address : null;
 }
 
 /** 스팟 상세 — 마커를 누를 때마다 새로 받는다 */

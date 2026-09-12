@@ -22,6 +22,7 @@ import { ScreenState } from '@/components/common';
 import { Brand, Components, Fonts, Typography } from '@/constants/theme';
 import type { SpotDataSource, SpotFish } from '@/features/map/spot-data';
 import {
+  useSpotAddress,
   useSpotDetailViewModel,
   useSpotFavorite,
   type FishingIndexViewModel,
@@ -189,6 +190,8 @@ function SheetHeader({
   onToggleExpand: () => void;
   onClose: () => void;
 }) {
+  const address = useSpotAddress(spot.lat, spot.lng);
+
   return (
     <View style={styles.header}>
       <Pressable
@@ -214,10 +217,15 @@ function SheetHeader({
         <Text style={styles.name} numberOfLines={1}>
           {spot.name}
         </Text>
-        {/* 서버에 주소가 없어 지금은 분류·조회수로 대신한다 */}
-        <Text style={styles.address} numberOfLines={1}>
-          {spot.addressLabel ?? `${spot.categoryLabel} · ${spot.viewCountLabel}`}
+        <Text style={styles.meta} numberOfLines={1}>
+          {`${spot.categoryLabel} · ${spot.viewCountLabel}`}
         </Text>
+        {/* 좌표가 바다 위면 주소가 없다 — 그때는 줄 자체를 그리지 않는다 */}
+        {address ? (
+          <Text style={styles.address} numberOfLines={1}>
+            {address}
+          </Text>
+        ) : null}
       </Pressable>
 
       <Pressable
@@ -421,11 +429,22 @@ const styles = StyleSheet.create({
     color: Brand.textStrong,
     textAlign: 'center',
   },
-  address: {
+  /** 분류 · 조회수 */
+  meta: {
     fontFamily: Fonts.medium,
     fontWeight: '500',
     fontSize: 15,
     lineHeight: 28,
+    letterSpacing: -0.3,
+    color: Brand.textWeak,
+    textAlign: 'center',
+  },
+  /** 주소 (Figma 634:1560). 분류 줄 아래에 한 줄 더 붙으므로 줄 높이만 좁힌다 */
+  address: {
+    fontFamily: Fonts.medium,
+    fontWeight: '500',
+    fontSize: 15,
+    lineHeight: 22,
     letterSpacing: -0.3,
     color: Brand.textWeak,
     textAlign: 'center',
@@ -450,12 +469,13 @@ const styles = StyleSheet.create({
 
   indexGroup: { gap: SHEET.indexHeadGap },
   dateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  /** 구획 제목(물때·주요 어종)과 같은 스타일로 맞춘다 */
   dateLabel: {
-    fontFamily: Fonts.bold,
-    fontWeight: '700',
-    fontSize: 18,
+    fontFamily: Fonts.semiBold,
+    fontWeight: '600',
+    fontSize: 16,
     lineHeight: 28,
-    letterSpacing: -0.36,
+    letterSpacing: -0.32,
     color: Brand.textHeading,
   },
   noonBadge: {
