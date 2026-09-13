@@ -29,6 +29,11 @@ type AuthState = {
   canEnterApp: boolean;
   /** SecureStore 초기 로드 완료 여부 */
   isReady: boolean;
+  /**
+   * 로그인·로그아웃·게스트 전환마다 바뀌는 세션 번호.
+   * 토큰 회전(refresh)으로는 바뀌지 않아, 계정에 묶인 캐시를 버릴 때 기준으로 쓴다.
+   */
+  sessionId: number;
   signIn: (tokens: AuthTokens) => Promise<void>;
   /** 로그인 없이 둘러보기 */
   continueAsGuest: () => Promise<void>;
@@ -70,6 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [tokens, setTokens] = useState<AuthTokens | null>(null);
   const [isGuest, setIsGuest] = useState(false);
   const [isReady, setIsReady] = useState(false);
+  const [sessionId, setSessionId] = useState(0);
   const session = useRef<Session | null>(null);
   const revision = useRef(0);
 
@@ -78,6 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     session.current = next ? { tokens: next, accessTokens: new Set([next.accessToken]) } : null;
     setTokens(next);
     setIsGuest(guest);
+    setSessionId((id) => id + 1);
   }, []);
 
   useEffect(() => {
@@ -184,11 +191,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isGuest,
       canEnterApp: token !== null || isGuest,
       isReady,
+      sessionId,
       signIn,
       continueAsGuest,
       signOut,
     }),
-    [token, isGuest, isReady, signIn, continueAsGuest, signOut],
+    [token, isGuest, isReady, sessionId, signIn, continueAsGuest, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

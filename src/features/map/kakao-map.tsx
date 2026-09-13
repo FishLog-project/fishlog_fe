@@ -1,10 +1,11 @@
 import { KakaoMap, KakaoMapView } from '@react-native-kakao/map';
 import Constants from 'expo-constants';
-import * as Location from 'expo-location';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { Brand, Typography } from '@/constants/theme';
+import { distanceMeters } from '@/features/map/geo';
+import { getQuickLocation, requestFreshLocation } from '@/features/map/location-store';
 
 const DEFAULT_CAMERA = {
   lat: 33.3617,
@@ -14,6 +15,9 @@ const DEFAULT_CAMERA = {
 
 const CURRENT_LOCATION_ZOOM = 9;
 const SEARCH_LOCATION_ZOOM = 15;
+/** 먼저 옮긴 좌표와 새로 잰 좌표가 이만큼 벌어지면 카메라를 한 번 더 옮긴다 */
+const REFINE_DISTANCE_M = 50;
+const CAMERA_ANIMATION_MS = 150;
 
 /** 기본값을 매 렌더 새로 만들지 않도록 모듈 상수로 둔다 */
 const EMPTY_SPOTS: readonly SpotMarker[] = [];
@@ -47,6 +51,8 @@ type FishlogKakaoMapProps = {
   onSpotPress?: (spotId: number) => void;
   /** 검색에서 고른 스팟으로 카메라를 옮긴다. nonce 가 바뀔 때만 움직인다 */
   focus?: { lat: number; lng: number; nonce: number } | null;
+  /** 카메라 이동(드래그·버튼·검색)이 끝났을 때의 지도 중심 */
+  onCameraIdle?: (center: Coordinate & { zoomLevel: number }) => void;
 };
 
 export function FishlogKakaoMap({
@@ -54,6 +60,7 @@ export function FishlogKakaoMap({
   spots = EMPTY_SPOTS,
   onSpotPress,
   focus,
+  onCameraIdle,
 }: FishlogKakaoMapProps) {
   const nativeAppKey = Constants.expoConfig?.extra?.kakaoNativeAppKey;
   const hasNativeAppKey = typeof nativeAppKey === 'string' && nativeAppKey.length > 0;
@@ -98,31 +105,36 @@ export function FishlogKakaoMap({
     });
   }
 
+  /**
+   * 진입할 때와 현재 위치 버튼을 누를 때마다 현재 위치로 옮긴다.
+   *
+   * 새 측정을 기다리지 않고 받아 둔 좌표로 먼저 옮긴 뒤, 새로 잰 좌표가 충분히 다를 때만
+   * 한 번 더 옮긴다. 버튼을 연달아 눌러도 새 측정은 하나만 돌고, 누를 때마다 바로 움직인다.
+   */
   useEffect(() => {
     let active = true;
 
-    const moveToCurrentLocation = async () => {
-      const permission = await Location.requestForegroundPermissionsAsync();
-      if (!active || permission.status !== Location.PermissionStatus.GRANTED) return;
-
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-      if (!active) return;
-
-      const coordinate: Coordinate = {
-        lat: location.coords.latitude,
-        lng: location.coords.longitude,
-      };
-
+    // nonce 를 함께 넘긴다. 사용자가 지도를 옮긴 뒤 버튼을 눌러도 좌표가 이전과 같으면
+    // Fabric 이 prop 변화를 값으로 비교해 걸러내므로, 이 값이 바뀌어야 카메라가 다시 이동한다.
+    // 검색 focus 의 nonce(양수)와 겹치지 않게 음수를 쓴다.
+    const moveTo = (coordinate: Coordinate, step: 1 | 2) => {
       setCurrentLocation(coordinate);
-      // nonce 를 함께 넘긴다. 사용자가 지도를 옮긴 뒤 버튼을 눌러도 좌표가 이전과 같으면
-      // Fabric 이 prop 변화를 값으로 비교해 걸러내므로, 이 값이 바뀌어야 카메라가 다시 이동한다.
-      setCamera({ ...coordinate, zoomLevel: CURRENT_LOCATION_ZOOM, nonce: recenterSignal });
+      setCamera({ ...coordinate, zoomLevel: CURRENT_LOCATION_ZOOM, nonce: -(recenterSignal * 2 + step) });
+    };
+
+    const moveToCurrentLocation = async () => {
+      const quick = await getQuickLocation();
+      if (!active) return;
+      if (quick) moveTo(quick, 1);
+
+      const fresh = await requestFreshLocation();
+      if (!active) return;
+      if (!quick || distanceMeters(quick, fresh) > REFINE_DISTANCE_M) moveTo(fresh, 2);
+      else setCurrentLocation(fresh);
     };
 
     moveToCurrentLocation().catch(() => {
-      // 위치를 확인할 수 없는 경우 기본 위치로 지도를 계속 제공한다.
+      // 새 측정에 실패해도 먼저 옮긴 좌표(없으면 기본 위치)로 지도를 계속 제공한다.
     });
 
     return () => {
@@ -155,7 +167,8 @@ export function FishlogKakaoMap({
       currentLocation={currentLocation}
       spots={spots}
       onSpotPress={(event) => onSpotPress?.(event.nativeEvent.id)}
-      cameraAnimationDuration={300}
+      onCameraIdle={(event) => onCameraIdle?.(event.nativeEvent)}
+      cameraAnimationDuration={CAMERA_ANIMATION_MS}
       cameraMinLevel={1}
       cameraMaxLevel={20}
       language="ko"

@@ -26,7 +26,7 @@ const SEARCH = Components.map.search;
  */
 export default function SearchScreen() {
   const router = useRouter();
-  const { token } = useAuth();
+  const { token, sessionId } = useAuth();
   const [query, setQuery] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [notice, setNotice] = useState<'empty' | 'error' | null>(null);
@@ -36,7 +36,10 @@ export default function SearchScreen() {
     () => (USE_FIXTURE ? createFixtureSpotDataSource() : createApiSpotDataSource(token)),
     [token],
   );
-  const { allSpots, state, retry } = useSpotsViewModel(dataSource);
+  const { allSpots, state, refresh } = useSpotsViewModel(
+    dataSource,
+    USE_FIXTURE ? 'fixture' : `session-${sessionId}`,
+  );
   const { results, loading } = useSpotSearch(allSpots, query);
 
   const trimmed = query.trim();
@@ -99,7 +102,7 @@ export default function SearchScreen() {
         message={notice === 'error' ? '잠시 후 다시 시도해 주세요.' : '다른 낚시터 이름이나 지역으로 검색해 주세요.'}
         buttonLabel={notice === 'error' ? '다시 시도' : '확인'}
         onConfirm={() => {
-          if (notice === 'error') retry();
+          if (notice === 'error') refresh();
           setNotice(null);
         }}
       />

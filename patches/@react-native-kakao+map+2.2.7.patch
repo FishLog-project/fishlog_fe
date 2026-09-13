@@ -17,10 +17,10 @@ index c3a003d..d9ab736 100644
      reactContext: ReactApplicationContext,
 diff --git a/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapView.kt b/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapView.kt
 new file mode 100644
-index 0000000..1370966
+index 0000000..f0a0020
 --- /dev/null
 +++ b/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapView.kt
-@@ -0,0 +1,326 @@
+@@ -0,0 +1,409 @@
 +﻿package net.mjstudio.rnkakao.map
 +
 +import android.graphics.Bitmap
@@ -28,6 +28,7 @@ index 0000000..1370966
 +import android.graphics.Canvas
 +import android.graphics.Color
 +import android.graphics.Paint
++import android.graphics.Rect
 +import android.widget.FrameLayout
 +import com.facebook.react.bridge.LifecycleEventListener
 +import com.facebook.react.bridge.Arguments
@@ -44,6 +45,7 @@ index 0000000..1370966
 +import com.kakao.vectormap.MapView
 +import com.kakao.vectormap.PoiScale
 +import com.kakao.vectormap.camera.CameraAnimation
++import com.kakao.vectormap.camera.CameraPosition
 +import com.kakao.vectormap.camera.CameraUpdateFactory
 +import com.kakao.vectormap.label.Label
 +import com.kakao.vectormap.label.LabelLayer
@@ -74,6 +76,31 @@ index 0000000..1370966
 +
 +  companion object {
 +    const val EVENT_NAME = "topSpotPress"
++  }
++}
++
++/** 카메라 이동이 끝났을 때 지도 중심을 JS 로 올려 보낸다. onCameraIdle 로 도착한다. */
++internal class CameraIdleEvent(
++  surfaceId: Int,
++  viewId: Int,
++  private val latitude: Double,
++  private val longitude: Double,
++  private val zoomLevel: Int,
++) : Event<CameraIdleEvent>(surfaceId, viewId) {
++  override fun getEventName() = EVENT_NAME
++
++  // 드래그 한 번에 한 건만 의미가 있어, 아직 전달되지 않은 이전 값은 합쳐 버린다
++  override fun canCoalesce() = true
++
++  override fun getEventData(): WritableMap =
++    Arguments.createMap().apply {
++      putDouble("lat", latitude)
++      putDouble("lng", longitude)
++      putDouble("zoomLevel", zoomLevel.toDouble())
++    }
++
++  companion object {
++    const val EVENT_NAME = "topCameraIdle"
 +  }
 +}
 +
@@ -122,11 +149,19 @@ index 0000000..1370966
 +          kakaoMap = map
 +          spotLayer = null
 +          spotStyles = null
++          syncViewport(width, height)
 +          applyMapOptions(map)
 +          camera?.let(::moveCamera)
 +          map.setOnLabelClickListener { _, _, label ->
 +            (label.tag as? Int)?.let(::emitSpotPress)
 +          }
++          map.setOnCameraMoveEndListener { _, position, _ ->
++            emitCameraIdle(position)
++            // 레이아웃 패스 없이 viewport 만 어긋난 경우도 사용자가 지도를 만지면 바로잡는다
++            post { syncViewport(width, height) }
++          }
++          // 첫 카메라 위치도 알린다 — 사용자가 한 번도 움직이지 않았어도 JS 가 중심을 알 수 있게
++          emitCameraIdle(map.cameraPosition)
 +          applyCurrentLocation()
 +          applySpots()
 +        }
@@ -196,6 +231,54 @@ index 0000000..1370966
 +  private fun emitSpotPress(spotId: Int) {
 +    val dispatcher = UIManagerHelper.getEventDispatcherForReactTag(reactContext, id) ?: return
 +    dispatcher.dispatchEvent(SpotPressEvent(UIManagerHelper.getSurfaceId(reactContext), id, spotId))
++  }
++
++  private fun emitCameraIdle(position: CameraPosition?) {
++    val center = position?.position ?: return
++    val dispatcher = UIManagerHelper.getEventDispatcherForReactTag(reactContext, id) ?: return
++    dispatcher.dispatchEvent(
++      CameraIdleEvent(UIManagerHelper.getSurfaceId(reactContext), id, center.latitude, center.longitude, position.zoomLevel),
++    )
++  }
++
++  /**
++   * RN 이 이 뷰의 크기만 바꾸고 안쪽 MapView 는 다시 재지 않는다 (Fabric 은 자식 네이티브 뷰의
++   * measure 를 부르지 않는다). 키보드가 올라왔다 내려가면 지도가 줄어든 크기로 남아 아래에
++   * 빈 띠가 생겨서, 배치될 때마다 새 크기로 직접 맞춘다.
++   */
++  override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
++    layoutMap(right - left, bottom - top)
++  }
++
++  override fun requestLayout() {
++    super.requestLayout()
++    // 지도 SDK 가 스스로 레이아웃을 요청해도 RN 은 레이아웃 패스를 돌리지 않으므로 다음 프레임에 맞춘다.
++    // View 생성자 안에서도 불리는데 그때는 아직 필드가 초기화되기 전이라 null 이다.
++    measureAndLayout?.let(::post)
++  }
++
++  private val measureAndLayout: Runnable? = Runnable { layoutMap(width, height) }
++
++  private fun layoutMap(width: Int, height: Int) {
++    if (width <= 0 || height <= 0) return
++    nativeMapView.measure(
++      MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
++      MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY),
++    )
++    nativeMapView.layout(0, 0, width, height)
++    syncViewport(width, height)
++  }
++
++  /**
++   * 뷰 크기가 맞아도 지도 엔진이 그리는 영역(viewport)은 처음 크기에 남는 경우가 있다.
++   * 실기기(SM-A165N)에서 뷰는 1080×1603 인데 약 1511 높이까지만 그려져 아래에 빈 띠가 생겼다.
++   */
++  private fun syncViewport(width: Int, height: Int) {
++    val map = kakaoMap ?: return
++    if (width <= 0 || height <= 0) return
++    val viewport = map.viewport
++    if (viewport != null && viewport.width() == width && viewport.height() == height) return
++    map.setViewport(Rect(0, 0, width, height))
 +  }
 +
 +  /**
@@ -349,10 +432,10 @@ index 0000000..1370966
 +private const val SPOT_LABEL_GAP_DP = 4f
 diff --git a/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapViewManager.kt b/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapViewManager.kt
 new file mode 100644
-index 0000000..f15c2b8
+index 0000000..cf5b2db
 --- /dev/null
 +++ b/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapViewManager.kt
-@@ -0,0 +1,76 @@
+@@ -0,0 +1,79 @@
 +﻿package net.mjstudio.rnkakao.map
 +
 +import com.facebook.react.bridge.ReadableArray
@@ -374,9 +457,12 @@ index 0000000..f15c2b8
 +  override fun createViewInstance(context: ThemedReactContext) = RNCKakaoMapView(context)
 +  override fun onDropViewInstance(view: RNCKakaoMapView) { view.destroy(); super.onDropViewInstance(view) }
 +
-+  /** onSpotPress 는 뷰 자신에게만 올라가는 direct event 다. */
++  /** onSpotPress · onCameraIdle 은 뷰 자신에게만 올라가는 direct event 다. */
 +  override fun getExportedCustomDirectEventTypeConstants(): MutableMap<String, Any> =
-+    mutableMapOf(SpotPressEvent.EVENT_NAME to mutableMapOf("registrationName" to "onSpotPress"))
++    mutableMapOf(
++      SpotPressEvent.EVENT_NAME to mutableMapOf("registrationName" to "onSpotPress"),
++      CameraIdleEvent.EVENT_NAME to mutableMapOf("registrationName" to "onCameraIdle"),
++    )
 +
 +  override fun setBuildingScale(view: RNCKakaoMapView, value: Double) { view.buildingScale = value.toFloat() }
 +  override fun setOverlays(view: RNCKakaoMapView, value: ReadableArray?) = Unit
@@ -518,7 +604,7 @@ index 6a6cd98..1f79d7a 100644
  //# sourceMappingURL=Util.js.map
 \ No newline at end of file
 diff --git a/node_modules/@react-native-kakao/map/lib/typescript/src/component/KakaoMapView.d.ts b/node_modules/@react-native-kakao/map/lib/typescript/src/component/KakaoMapView.d.ts
-index e6cacbe..ad6ace4 100644
+index e6cacbe..6a45346 100644
 --- a/node_modules/@react-native-kakao/map/lib/typescript/src/component/KakaoMapView.d.ts
 +++ b/node_modules/@react-native-kakao/map/lib/typescript/src/component/KakaoMapView.d.ts
 @@ -6,6 +6,10 @@ interface KakaoMapProps extends ViewProps {
@@ -532,7 +618,7 @@ index e6cacbe..ad6ace4 100644
      cameraMinLevel?: number;
      cameraMaxLevel?: number;
      cameraAnimationDuration?: number;
-@@ -16,6 +20,17 @@ interface KakaoMapProps extends ViewProps {
+@@ -16,6 +20,24 @@ interface KakaoMapProps extends ViewProps {
      language?: 'ko' | 'en';
      isShowScaleBar?: boolean;
      isShowCompass?: boolean;
@@ -545,6 +631,13 @@ index e6cacbe..ad6ace4 100644
 +    onSpotPress?: (event: {
 +        nativeEvent: {
 +            id: number;
++        };
++    }) => void;
++    onCameraIdle?: (event: {
++        nativeEvent: {
++            lat: number;
++            lng: number;
++            zoomLevel: number;
 +        };
 +    }) => void;
  }
@@ -585,7 +678,7 @@ index f598be9..279517c 100644
  //# sourceMappingURL=type.d.ts.map
 \ No newline at end of file
 diff --git a/node_modules/@react-native-kakao/map/src/component/KakaoMapView.tsx b/node_modules/@react-native-kakao/map/src/component/KakaoMapView.tsx
-index 53c719e..42478ee 100644
+index 53c719e..4d4f3f2 100644
 --- a/node_modules/@react-native-kakao/map/src/component/KakaoMapView.tsx
 +++ b/node_modules/@react-native-kakao/map/src/component/KakaoMapView.tsx
 @@ -12,6 +12,8 @@ interface KakaoMapProps extends ViewProps {
@@ -597,7 +690,7 @@ index 53c719e..42478ee 100644
    cameraMinLevel?: number;
    cameraMaxLevel?: number;
    cameraAnimationDuration?: number;
-@@ -24,6 +26,11 @@ interface KakaoMapProps extends ViewProps {
+@@ -24,6 +26,13 @@ interface KakaoMapProps extends ViewProps {
  
    isShowScaleBar?: boolean;
    isShowCompass?: boolean;
@@ -606,10 +699,12 @@ index 53c719e..42478ee 100644
 +  spots?: ReadonlyArray<{ id: number; name: string; lat: number; lng: number }>;
 +  /** 마커를 눌렀을 때. nativeEvent.id 가 스팟 id 다 */
 +  onSpotPress?: (event: { nativeEvent: { id: number } }) => void;
++  /** 카메라 이동(제스처·애니메이션)이 끝났을 때. 지도 중심 좌표와 줌 레벨이다 */
++  onCameraIdle?: (event: { nativeEvent: { lat: number; lng: number; zoomLevel: number } }) => void;
  }
  interface KakaoMapRef {}
  
-@@ -38,6 +45,7 @@ const KakaoMapView = forwardRef(
+@@ -38,6 +47,7 @@ const KakaoMapView = forwardRef(
        language,
        overlays,
        camera: cameraProp,
@@ -617,7 +712,7 @@ index 53c719e..42478ee 100644
        cameraMinLevel = Const.nullNumber,
        cameraMaxLevel = Const.nullNumber,
        cameraAnimationDuration = 0,
-@@ -57,11 +65,16 @@ const KakaoMapView = forwardRef(
+@@ -57,11 +67,16 @@ const KakaoMapView = forwardRef(
        return { ...nullCamera, ...cameraProp };
      }, [cameraProp]);
  
@@ -652,7 +747,7 @@ index 1cc6a4d..e143fee 100644
  
  const Native: Spec = Module
 diff --git a/node_modules/@react-native-kakao/map/src/spec/RNCKakaoMapViewNativeComponent.ts b/node_modules/@react-native-kakao/map/src/spec/RNCKakaoMapViewNativeComponent.ts
-index 85a6f84..82c61d6 100644
+index 85a6f84..409120b 100644
 --- a/node_modules/@react-native-kakao/map/src/spec/RNCKakaoMapViewNativeComponent.ts
 +++ b/node_modules/@react-native-kakao/map/src/spec/RNCKakaoMapViewNativeComponent.ts
 @@ -1,5 +1,8 @@
@@ -665,7 +760,7 @@ index 85a6f84..82c61d6 100644
  import codegenNativeCommands from 'react-native/Libraries/Utilities/codegenNativeCommands';
  import codegenNativeComponent from 'react-native/Libraries/Utilities/codegenNativeComponent';
  
-@@ -9,7 +12,24 @@ interface Camera {
+@@ -9,7 +12,31 @@ interface Camera {
    tilt?: Double;
    rotation?: Double;
    zoomLevel?: Double;
@@ -687,10 +782,17 @@ index 85a6f84..82c61d6 100644
 +  id: Double;
 +}
 +
++/** 카메라 이동이 끝난 뒤의 지도 중심 */
++interface CameraIdleEvent {
++  lat: Double;
++  lng: Double;
++  zoomLevel: Double;
++}
++
  interface Props extends ViewProps {
    buildingScale?: Double;
    overlays?: ReadonlyArray<string>;
-@@ -20,12 +40,16 @@ interface Props extends ViewProps {
+@@ -20,12 +47,17 @@ interface Props extends ViewProps {
    baseMapType?: string;
    camera?: Camera;
    initialCamera?: Camera;
@@ -704,6 +806,7 @@ index 85a6f84..82c61d6 100644
 +
 +  spots?: ReadonlyArray<SpotMarker>;
 +  onSpotPress?: DirectEventHandler<SpotPressEvent>;
++  onCameraIdle?: DirectEventHandler<CameraIdleEvent>;
  }
  
  // type ComponentType = HostComponent<Props>;

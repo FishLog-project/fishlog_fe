@@ -1,7 +1,8 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { Screen, ScreenHeader, SearchBar } from '@/components/common';
 import { Brand, Components, Layout } from '@/constants/theme';
@@ -11,6 +12,7 @@ import { SpotDetailSheet } from '@/features/map/components/spot-detail-sheet';
 import { FishlogKakaoMap } from '@/features/map/kakao-map';
 import { createApiSpotDataSource } from '@/features/map/spot-api';
 import { createFixtureSpotDataSource } from '@/features/map/spot-data';
+import type { Coords } from '@/features/map/tour-data';
 import { TourFacilities } from '@/features/map/tour-facilities';
 import { useSpotsViewModel } from '@/features/map/use-spot-view-model';
 import { USE_FIXTURE } from '@/lib/data-source-mode';
@@ -31,10 +33,19 @@ const MAP_ACTIONS: readonly { key: string; icon: number; label: string }[] = [
 
 export default function MapScreen() {
   const router = useRouter();
-  const { token } = useAuth();
+  const { token, sessionId } = useAuth();
   const [recenterSignal, setRecenterSignal] = useState(0);
   const [seaInfoOpen, setSeaInfoOpen] = useState(false);
   const [facilitiesOpen, setFacilitiesOpen] = useState(false);
+  /**
+   * 카메라가 멈출 때마다 바뀌는 지도 중심. 시설을 조회하는 순간에만 읽으므로
+   * 드래그마다 화면을 다시 그리지 않게 state 가 아니라 ref 에 둔다.
+   */
+  const mapCenter = useRef<Coords | null>(null);
+  const getMapCenter = useCallback(() => mapCenter.current, []);
+  const rememberMapCenter = useCallback((center: Coords) => {
+    mapCenter.current = { lat: center.lat, lng: center.lng };
+  }, []);
   const [selectedSpotId, setSelectedSpotId] = useState<number | null>(null);
   /**
    * 찜을 토글해도 목록(GET /api/spots)의 isFavorite 은 그대로라,
@@ -50,7 +61,10 @@ export default function MapScreen() {
     () => (USE_FIXTURE ? createFixtureSpotDataSource() : createApiSpotDataSource(token)),
     [token],
   );
-  const { markers, allSpots } = useSpotsViewModel(dataSource);
+  const { markers, allSpots, refresh, refreshing } = useSpotsViewModel(
+    dataSource,
+    USE_FIXTURE ? 'fixture' : `session-${sessionId}`,
+  );
   const selectedSpot = allSpots?.find((spot) => spot.id === selectedSpotId) ?? null;
   const selectedIsFavorite =
     (selectedSpotId !== null ? favoriteOverrides[selectedSpotId] : undefined) ??
@@ -97,6 +111,7 @@ export default function MapScreen() {
           spots={markers ?? undefined}
           onSpotPress={setSelectedSpotId}
           focus={focus}
+          onCameraIdle={rememberMapCenter}
         />
         <View pointerEvents="none" style={styles.mapShade} />
 
@@ -133,6 +148,24 @@ export default function MapScreen() {
           </View>
         ) : null}
 
+        {/*
+          ⚠️ 시안에 없는 버튼이다. 스팟 목록은 한 번 받아 두고 재사용하므로
+             서버 값을 다시 받고 싶을 때 누른다. 위치는 현재 위치 버튼 위에 임시로 둔다.
+        */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="낚시터 목록 새로고침"
+          accessibilityState={{ busy: refreshing, disabled: refreshing }}
+          disabled={refreshing}
+          onPress={refresh}
+          style={({ pressed }) => [styles.locationButton, styles.refreshButton, pressed && styles.pressed]}>
+          {refreshing ? (
+            <ActivityIndicator color={Brand.primary} />
+          ) : (
+            <Ionicons name="refresh" size={MAP.actionIconSize} color={Brand.primaryDark} />
+          )}
+        </Pressable>
+
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="현재 위치로 이동"
@@ -144,7 +177,7 @@ export default function MapScreen() {
             contentFit="contain"
           />
         </Pressable>
-        {facilitiesOpen ? <TourFacilities /> : null}
+        {facilitiesOpen ? <TourFacilities getSearchOrigin={getMapCenter} /> : null}
       </View>
 
       <SpotDetailSheet
@@ -241,6 +274,7 @@ const styles = StyleSheet.create({
   actionIcon: { width: MAP.actionIconSize, height: MAP.actionIconSize },
   actionSelected: { backgroundColor: Brand.primary },
   pressed: { opacity: 0.72 },
+  refreshButton: { bottom: MAP.overlayInset + MAP.actionSize + MAP.actionGap },
   locationButton: {
     position: 'absolute',
     right: MAP.overlayInset,

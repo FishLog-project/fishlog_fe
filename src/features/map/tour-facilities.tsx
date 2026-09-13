@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenState } from '@/components/common';
 import { Brand, Components, Layout, Typography } from '@/constants/theme';
 import { createApiTourDataSource } from '@/features/map/tour-api';
-import { TOUR_CATEGORIES, type TourCategory } from '@/features/map/tour-data';
+import { type Coords, TOUR_CATEGORIES, type TourCategory } from '@/features/map/tour-data';
 import { useCurrentLocation } from '@/features/map/use-current-location';
 import { useNearbyTours, type TourPlaceViewModel } from '@/features/map/use-nearby-tours';
 
@@ -18,11 +18,24 @@ const ICONS = {
   숙박: require('@/assets/images/map/tour-stay.svg'),
 } as const;
 
-/** Figma 634:1711 / 634:1576. 지도 SDK와 독립적인 현재 위치 기반 시설 조회 레이어. */
-export function TourFacilities() {
+/**
+ * Figma 634:1711 / 634:1576. 시설 조회 레이어.
+ *
+ * 지도가 중심 좌표를 알려 주면(getSearchOrigin) 분류를 고르거나 다시 조회할 때의 지도 중심으로 찾는다.
+ * GPS 를 기다리지 않아 목록이 API 응답만큼만 걸린다. 지도를 움직일 때마다 자동으로 다시 부르지는 않는다.
+ * 중심을 모르면(지도 SDK 오류·웹) 현재 위치(GPS)로 찾는다.
+ */
+export function TourFacilities({
+  getSearchOrigin,
+}: {
+  /** 지금 지도 중심. 아직 모르면 null */
+  getSearchOrigin?: () => Coords | null;
+} = {}) {
   const [category, setCategory] = useState<TourCategory | null>(null);
   const [location, locate] = useCurrentLocation();
-  const origin = location.status === 'ready' ? location.coords : null;
+  /** 지도 중심으로 찾을 때 고정해 둔 좌표. null 이면 GPS 로 찾는다 */
+  const [mapOrigin, setMapOrigin] = useState<Coords | null>(null);
+  const origin = mapOrigin ?? (location.status === 'ready' ? location.coords : null);
   const [state, retry] = useNearbyTours(source, category, origin);
   const [selectedPlace, setSelectedPlace] = useState<TourPlaceViewModel | null>(null);
   // 새 분류/좌표의 응답에 없는 상세는 즉시 닫는다. 응답마다 달라지는 임시 id로 재선택하지 않는다.
@@ -30,15 +43,25 @@ export function TourFacilities() {
     ? selectedPlace : null;
   const insets = useSafeAreaInsets();
 
+  /** 지금 지도 중심을 조회 기준으로 잡는다. 중심을 모르면 false */
+  const pinMapOrigin = () => {
+    const center = getSearchOrigin?.() ?? null;
+    setMapOrigin(center);
+    return center !== null;
+  };
   const selectCategory = (next: TourCategory) => {
     setSelectedPlace(null);
     setCategory(next === category ? null : next);
-    if (next !== category && location.status === 'idle') void locate();
+    if (next === category) return;
+    if (!pinMapOrigin() && location.status === 'idle') void locate();
   };
   const refreshLocation = () => {
     setSelectedPlace(null);
-    void locate();
+    // 지도를 안 옮겼으면 좌표가 같아 요청 키가 그대로라 retry 로 새로 받는다
+    if (pinMapOrigin()) retry();
+    else void locate();
   };
+  const byMapCenter = mapOrigin !== null;
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
@@ -65,12 +88,16 @@ export function TourFacilities() {
         <View style={styles.sheet}>
           <View style={styles.sheetHeader}>
             <View style={styles.copy}>
-              <Text accessibilityRole="header" style={styles.heading}>내 주변 {category}</Text>
-              <Text style={styles.meta}>반경 5km · 가까운 순 · 최대 30곳</Text>
+              <Text accessibilityRole="header" style={styles.heading}>
+                {byMapCenter ? `지도 중심 주변 ${category}` : `내 주변 ${category}`}
+              </Text>
+              <Text style={styles.meta}>
+                {byMapCenter ? '지도 중심 반경 5km · 가까운 순 · 최대 30곳' : '반경 5km · 가까운 순 · 최대 30곳'}
+              </Text>
             </View>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="현재 위치로 시설 다시 조회"
+              accessibilityLabel={byMapCenter ? '지도 중심으로 시설 다시 조회' : '현재 위치로 시설 다시 조회'}
               onPress={refreshLocation}
               style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}>
               <Image source={require('@/assets/images/map/my-location.svg')} style={styles.locationIcon} contentFit="contain" />

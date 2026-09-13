@@ -10,7 +10,8 @@ import type {
   SpotSummary,
 } from '@/features/map/spot-data';
 import { lookupAddress } from '@/features/map/kakao-address';
-import { useSection } from '@/lib/use-section';
+import { useSpotList } from '@/features/map/spot-list-store';
+import { type SectionState, useSection } from '@/lib/use-section';
 
 /** 지도에 찍는 마커 한 개. 서버의 `lot` 을 지도가 쓰는 `lng` 로 바꿔 둔다 */
 export interface SpotMarkerViewModel {
@@ -93,15 +94,27 @@ function toMarkers(spots: readonly SpotSummary[]): readonly SpotMarkerViewModel[
 /**
  * 지도에 뿌릴 스팟 목록.
  *
+ * 목록은 spot-list-store 가 세션 동안 들고 있어, 화면이 다시 떠도 서버를 다시 부르지 않는다.
+ * 새로 받고 싶으면 `refresh` 를 부른다. 받아 둔 목록이 있으면 새로 받는 동안에도 그대로 보여 준다.
+ *
  * 검색은 이미 받아 둔 목록을 걸러 내기만 한다 (서버 왕복 없음).
  * 서버가 전체 목록(92건)을 한 번에 주는 계약이라 클라이언트 필터로 충분하다.
  *
  * `markers`는 검색이 걸린 결과라 지도에 뿌릴 용도다. 선택한 스팟을 다시 찾을 때는
  * 검색어에 따라 사라지지 않도록 `allSpots`를 봐야 한다.
  */
-export function useSpotsViewModel(dataSource: SpotDataSource) {
-  const [state, retry] = useSection(dataSource, loadSpots, toMarkers);
+export function useSpotsViewModel(dataSource: SpotDataSource, sessionKey: string) {
+  const [list, refresh] = useSpotList(dataSource, sessionKey);
   const [query, setQuery] = useState('');
+
+  const readySpots = list.status === 'ready' ? list.spots : null;
+  const state = useMemo<SectionState<readonly SpotMarkerViewModel[]>>(() => {
+    if (readySpots === null) return list.status === 'error' ? { status: 'error' } : { status: 'loading' };
+    const data = toMarkers(readySpots);
+    return data === null ? { status: 'empty' } : { status: 'ready', data };
+  }, [list.status, readySpots]);
+  const refreshing = list.status === 'loading' || (list.status === 'ready' && list.refreshing);
+  const refreshFailed = list.status === 'ready' && list.refreshFailed;
 
   const trimmedQuery = query.trim();
   const allSpots = state.status === 'ready' ? state.data : null;
@@ -113,7 +126,7 @@ export function useSpotsViewModel(dataSource: SpotDataSource) {
     return allSpots.filter((spot) => spot.name.includes(trimmedQuery));
   }, [allSpots, trimmedQuery]);
 
-  return { state, markers, allSpots, query, setQuery, retry };
+  return { state, markers, allSpots, query, setQuery, refresh, refreshing, refreshFailed };
 }
 
 /**

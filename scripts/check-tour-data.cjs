@@ -220,6 +220,60 @@ async function checkFacilities() {
   ui.unmount();
 }
 
+// 지도가 중심 좌표를 주면 GPS 없이 그 좌표로 찾고, 다시 조회할 때 그 순간의 중심을 다시 읽는다.
+async function checkFacilitiesByMapCenter() {
+  const requests = [];
+  let gpsCalls = 0;
+  const mocks = {
+    'react-native': {
+      ...Object.fromEntries(['ActivityIndicator', 'Modal', 'Pressable', 'ScrollView', 'Text', 'View'].map((name) => [name, name])),
+      StyleSheet: { create: (styles) => styles, absoluteFill: {} },
+    },
+    'expo-image': { Image: 'Image' },
+    '@expo/vector-icons': { Ionicons: 'Ionicons' },
+    'react-native-safe-area-context': { useSafeAreaInsets: () => ({ bottom: 0 }) },
+    'expo-location': {
+      Accuracy: { Balanced: 3 },
+      requestForegroundPermissionsAsync: async () => { gpsCalls++; return { granted: true }; },
+      getCurrentPositionAsync: () => { gpsCalls++; return new Promise(() => {}); },
+    },
+    '@/lib/api/client': { apiRequest(requestPath, options) {
+      const next = { ...deferred(), url: new URL(requestPath, 'https://api.fishlog.xyz'), options };
+      requests.push(next);
+      return next.promise;
+    } },
+  };
+  mocks['@/components/common'] = load('src/components/common/screen-state.tsx', mocks);
+  const ui = hook('src/features/map/tour-facilities.tsx', 'TourFacilities', mocks);
+  let center = { lat: 35.1, lng: 129.0 };
+  const props = { getSearchOrigin: () => center };
+  let tree = ui.render(props);
+  const render = () => { tree = ui.render(props); };
+  const button = (label) => nodes(tree).find((node) => node.props?.accessibilityLabel === label);
+  const heading = () => nodes(tree).find((node) => node.props?.accessibilityRole === 'header');
+
+  button('음식점 시설 보기').props.onPress();
+  render();
+  await flush();
+  assert.equal(gpsCalls, 0, 'map center search must not wait for GPS');
+  assert.deepEqual(Object.fromEntries(requests.at(-1).url.searchParams), { type: '음식점', lat: '35.1', lng: '129' });
+  assert.equal(heading().props.children, '지도 중심 주변 음식점');
+
+  const countBefore = requests.length;
+  button('지도 중심으로 시설 다시 조회').props.onPress();
+  render();
+  await flush();
+  assert.equal(requests.length, countBefore + 1, 'refresh on an unmoved map must still re-request');
+
+  center = { lat: 37.56, lng: 126.97 };
+  button('지도 중심으로 시설 다시 조회').props.onPress();
+  render();
+  await flush();
+  assert.deepEqual(Object.fromEntries(requests.at(-1).url.searchParams), { type: '음식점', lat: '37.56', lng: '126.97' });
+  assert.equal(gpsCalls, 0);
+  ui.unmount();
+}
+
 async function check() {
   const calls = [];
   const api = load('src/features/map/tour-api.ts', {
@@ -388,6 +442,7 @@ async function check() {
     assert.rejects(createFixtureTourDataSource().getNearbyTours(query, aborted.signal)),
   ]);
   await checkFacilities();
+  await checkFacilitiesByMapCenter();
   console.log('Tour query, coordinate/image validation, request/location races, fixtures and facility UI flow passed.');
 }
 
