@@ -2,11 +2,12 @@ import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { FontAssets } from '@/constants/theme';
 import { AuthProvider, useAuth } from '@/features/auth';
+import { PermissionOnboarding } from '@/features/permissions';
 import '@/lib/assets/preload';
 
 SplashScreen.preventAutoHideAsync();
@@ -46,6 +47,7 @@ function RootNavigator() {
   // 폰트 로드 실패는 앱을 막지 않는다. 시스템 폰트로 폴백되더라도 화면은 떠야 한다.
   const [fontsLoaded, fontError] = useFonts(FontAssets);
   const fontsReady = fontsLoaded || !!fontError;
+  const [splashHidden, setSplashHidden] = useState(false);
 
   // SecureStore·폰트 로드 전엔 네이티브 스플래시 유지
   if (!isReady || !fontsReady) return null;
@@ -54,8 +56,10 @@ function RootNavigator() {
     <>
       {/* 배경이 라이트 고정이라 상태바 글자는 항상 검정 */}
       <StatusBar style="dark" />
-      <AnimatedSplashOverlay />
+      <AnimatedSplashOverlay onHidden={() => setSplashHidden(true)} />
       <Stack screenOptions={{ headerShown: false }} />
+      {/* 스플래시가 걷힌 뒤 첫 진입 한 번만 권한을 묻는다 */}
+      <PermissionOnboarding enabled={splashHidden} />
     </>
   );
 }

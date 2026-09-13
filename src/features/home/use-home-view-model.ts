@@ -103,7 +103,7 @@ function toRecommendedSpotsViewModel(
 }
 
 export function useHomeViewModel(dataSource: FishLogDataSource) {
-  const [featuredSpecies] = useSection(
+  const [featuredSpecies, retryFeaturedSpecies] = useSection(
     dataSource,
     loadSeasonalFish,
     toFeaturedSlideViewModel,
@@ -125,5 +125,5 @@ export function useHomeViewModel(dataSource: FishLogDataSource) {
     recommendedSpots,
   };
 
-  return { viewModel, retryCollectionProgress, retryRecommendedSpots };
+  return { viewModel, retryFeaturedSpecies, retryCollectionProgress, retryRecommendedSpots };
 }

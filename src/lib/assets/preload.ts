@@ -15,8 +15,7 @@ const CRITICAL_IMAGES = [
   require('@/assets/images/tabs/profile-inactive.svg'),
 
   // 홈
-  require('@/assets/images/home/featured-flatfish.png'),
-  require('@/assets/images/home/featured-flatfish-shadow.png'),
+  require('@/assets/images/fish/basic_image.png'),
   require('@/assets/images/home/unowned-fish.png'),
   require('@/assets/images/home/scan-fish.svg'),
   require('@/assets/images/home/fishing-rod.png'),
@@ -32,14 +31,11 @@ const DEFERRED_IMAGES = [
   require('@/assets/images/home/recommended-spot-inland.jpg'),
 
   // 지도
-  require('@/assets/images/map/map-placeholder.png'),
   require('@/assets/images/map/grid.svg'),
   require('@/assets/images/map/sea-info.svg'),
   require('@/assets/images/map/fishing-disabled.svg'),
   require('@/assets/images/map/fish-scan.svg'),
   require('@/assets/images/map/my-location.svg'),
-  require('@/assets/images/map/current-location.svg'),
-  require('@/assets/images/map/marker.svg'),
 
   // 프로필·랭킹
   require('@/assets/images/profile/camera-button-40.svg'),

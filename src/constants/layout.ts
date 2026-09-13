@@ -39,9 +39,9 @@ export const Layout = {
   /** 헤더 높이 (상단 상태바 44는 safe-area가 따로 잡는다) */
   headerHeight: 56,
   /** 앱 탭바 높이. OS 네비게이션 바 높이는 런타임에 safe-area로 더한다 */
-  tabBarHeight: 52,
+  tabBarHeight: 64,
   /** 탭 버튼 하나의 터치 영역 */
-  tabItemSize: 52,
+  tabItemSize: 64,
   /** 탭 아이콘 크기 */
   tabIconSize: 36,
   maxContentWidth: 800,

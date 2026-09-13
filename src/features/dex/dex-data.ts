@@ -1,8 +1,7 @@
 /**
  * 도감 데이터 인터페이스 + fixture 어댑터.
  *
- * 타입은 서버 응답 모양을 그대로 따른다.
- * GET /api/collections/dex · /api/fish/{id} · /api/collections?fishId=
+ * 일반 도감과 수기 등록 도감을 합치되 ID와 완성도 집계는 구분한다.
  */
 
 import { Asset } from 'expo-asset';
@@ -11,6 +10,8 @@ export type Rarity = 'LOW' | 'USUALLY' | 'HIGH';
 
 export interface DexEntry {
   id: number;
+  /** customFishId는 일반 fishId와 겹칠 수 있다. */
+  custom?: boolean;
   name: string;
   imageUrl: string | null;
   rarity: Rarity;
@@ -52,17 +53,27 @@ export interface CatchRecord {
   recentCatches: readonly RecentCatch[];
 }
 
+export interface CustomCatchRecord extends CatchRecord {
+  customFishId: number;
+  name: string;
+  /** custom/dex의 기본 일러스트. 업로드 사진과 구분한다. */
+  imageUrl?: string | null;
+  /** 이 사용자의 최대 기록. 어종 자체의 최대 크기와는 다르다. */
+  maxSize: number;
+}
+
 export interface DexDataSource {
   getMyDex(): Promise<MyDex>;
   getFish(id: number): Promise<FishDetail>;
   getCatchRecord(fishId: number): Promise<CatchRecord>;
+  getCustomFish(customFishId: number): Promise<CustomCatchRecord>;
 }
 
 /** detail-error는 상세 첫 요청만 실패한다 (재시도 흐름 확인용) */
 export type DexFixtureScenario = 'ready' | 'empty' | 'error' | 'detail-error';
 
 /**
- * BE 시드 25종 + 기타어종 예시 1건. [이름, 서식지, 희귀도, 설명, 잡은 횟수, 최대 크기(cm)?]
+ * BE 시드 24종. [이름, 서식지, 희귀도, 설명, 잡은 횟수, 최대 크기(cm)?]
  * 잡은 횟수는 내 기록이라 시드에 없다 — 미획득·1회·여러 회가 다 보이도록 흩어 두었다.
  */
 const SEED: readonly (readonly [string, string, Rarity, string, number, number?])[] = [
@@ -90,7 +101,6 @@ const SEED: readonly (readonly [string, string, Rarity, string, number, number?]
   ['송어', '하천', 'USUALLY', '송어는 양식·유료터에서, 산천어는 찬 계류에서 낚이는 냉수성 어종이다. 겨울 축제 시즌에 플라이·루어로 즐긴다.', 1],
   ['피라미', '하천', 'LOW', '여울과 하천에 매우 흔한 소형 잡어로, 소형 미끼낚시나 플라이로 쉽게 낚인다. 초보 입문용으로 좋다.', 0],
   ['동자개', '강', 'LOW', '강 바닥에 사는 야행성 어종으로, 여름 밤낚시에서 잘 잡힌다. 지느러미 가시에 주의해야 한다.', 0],
-  ['뚱어', '', 'LOW', '도감에 없는 어종을 직접 등록한 기타어종이다. 서식지 정보는 없다.', 1, 20],
 ];
 
 /** 인증 사진은 사용자가 올린 S3 URL이다. fixture는 번들 에셋 경로로 대신한다 */
@@ -109,6 +119,23 @@ const fishes: readonly FishDetail[] = SEED.map(
 );
 
 let records: ReadonlyMap<number, CatchRecord> | null = null;
+const customRecords = new Map<number, CustomCatchRecord>();
+
+/** 수기 등록은 일반 24종의 획득 여부·완성도를 바꾸지 않는다. */
+export function recordFixtureCustomCatch(name: string, photo: RecentCatch): CustomCatchRecord {
+  const previous = [...customRecords.values()].find((fish) => fish.name === name);
+  const customFishId = previous?.customFishId ?? customRecords.size + 1;
+  const record: CustomCatchRecord = {
+    customFishId,
+    name,
+    habitat: null,
+    catchCount: (previous?.catchCount ?? 0) + 1,
+    maxSize: Math.max(previous?.maxSize ?? 0, photo.size),
+    recentCatches: [photo, ...(previous?.recentCatches ?? [])].slice(0, 4),
+  };
+  customRecords.set(customFishId, record);
+  return record;
+}
 
 // 에셋 URI는 렌더 환경에서만 풀리므로 모듈 로드 때가 아니라 첫 호출 때 만든다
 function getRecords() {
@@ -183,7 +210,18 @@ export function createFixtureDexDataSource(
       return resolveAfter({
         totalCount: list.length,
         caughtCount: list.filter((f) => f.caught).length,
-        fishes: list,
+        fishes: [
+          ...list,
+          ...(scenario === 'empty' ? [] : [...customRecords.values()].map((record) => ({
+            id: record.customFishId,
+            custom: true,
+            name: record.name,
+            imageUrl: null,
+            rarity: 'LOW' as const,
+            habitat: record.habitat,
+            caught: true,
+          }))),
+        ],
       });
     },
     getFish(id) {
@@ -200,6 +238,12 @@ export function createFixtureDexDataSource(
       return resolveAfter(
         record ?? { habitat: '', catchCount: 0, recentCatches: [] },
       );
+    },
+    getCustomFish(customFishId) {
+      const record = customRecords.get(customFishId);
+      return record && scenario !== 'error'
+        ? resolveAfter(record)
+        : rejectAfter('수기 등록한 어종을 찾지 못했습니다.');
     },
   };
 }

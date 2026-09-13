@@ -6,6 +6,7 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { ScreenState } from '@/components/common';
 import { Brand, Components, Fonts, Typography } from '@/constants/theme';
 import type { DexDataSource, RecentCatch } from '@/features/dex/dex-data';
+import { FishArtwork } from '@/features/dex/fish-art';
 import {
   useDexDetailViewModel,
   type DexSpeciesDetailViewModel,
@@ -16,8 +17,6 @@ const D = DEX.detail;
 
 /** Figma 상세 카드의 그림 칸(665:3461) — 테두리·그라데이션·물방울이 한 장에 들어 있다 */
 const TILE = require('@/assets/images/dex/species-detail-tile.svg');
-/** 서버 이미지(imageUrl)가 아직 없을 때 쓰는 기본 그림 — 목록 카드와 같은 그림이다 */
-const FALLBACK_ART = require('@/assets/images/dex/species-card.png');
 const PHOTO_CLOSE = require('@/assets/images/dex/photo-close.svg');
 const PHOTO_PIN = require('@/assets/images/dex/photo-pin.svg');
 
@@ -46,10 +45,12 @@ const VIEWER = {
 export function SpeciesDetailDialog({
   dataSource,
   fishId,
+  custom = false,
   onClose,
 }: {
   dataSource: DexDataSource;
   fishId: number | null;
+  custom?: boolean;
   onClose: () => void;
 }) {
   return (
@@ -66,7 +67,7 @@ export function SpeciesDetailDialog({
           onPress={onClose}
         />
         {fishId !== null ? (
-          <SpeciesDetailLoader key={fishId} dataSource={dataSource} fishId={fishId} />
+          <SpeciesDetailLoader key={`${custom}:${fishId}`} dataSource={dataSource} fishId={fishId} custom={custom} />
         ) : null}
       </View>
     </Modal>
@@ -76,11 +77,13 @@ export function SpeciesDetailDialog({
 function SpeciesDetailLoader({
   dataSource,
   fishId,
+  custom,
 }: {
   dataSource: DexDataSource;
   fishId: number;
+  custom: boolean;
 }) {
-  const [state, retry] = useDexDetailViewModel(dataSource, fishId);
+  const [state, retry] = useDexDetailViewModel(dataSource, fishId, custom);
 
   return (
     <View accessibilityViewIsModal>
@@ -117,15 +120,15 @@ export function SpeciesDetailCard({ species }: { species: DexSpeciesDetailViewMo
       <View style={styles.tile}>
         <Image source={TILE} style={StyleSheet.absoluteFill} contentFit="fill" />
         {/* Figma는 120 높이 칸 위에 140 그림을 가운데 얹는다 (899:2555) */}
-        <Image
-          source={species.imageUrl ?? FALLBACK_ART}
+        <FishArtwork
+          imageUrl={species.imageUrl}
           style={styles.art}
           contentFit="contain"
         />
       </View>
 
       <View style={styles.content}>
-        <Text style={styles.description}>{species.description}</Text>
+        {species.description ? <Text style={styles.description}>{species.description}</Text> : null}
 
         <View style={[styles.chipRow, !species.habitatLabel && styles.chipRowSingle]}>
           {species.habitatLabel ? (
@@ -133,9 +136,11 @@ export function SpeciesDetailCard({ species }: { species: DexSpeciesDetailViewMo
               <Text style={styles.chipText}>{species.habitatLabel}</Text>
             </View>
           ) : null}
-          <View style={[styles.chip, styles.catchChip]}>
-            <Text style={styles.chipText}>{species.catchLabel}</Text>
-          </View>
+          {species.catchLabel ? (
+            <View style={[styles.chip, styles.catchChip]}>
+              <Text style={styles.chipText}>{species.catchLabel}</Text>
+            </View>
+          ) : null}
         </View>
 
         <View

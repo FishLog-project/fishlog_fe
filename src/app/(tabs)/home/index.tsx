@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Screen, ScreenHeader, ScreenState, SectionTitle } from '@/components/common';
@@ -28,12 +28,21 @@ export default function HomeScreen() {
     () => (USE_FIXTURE ? createFixtureFishLogDataSource() : createApiFishLogDataSource(token)),
     [token],
   );
-  const { viewModel, retryCollectionProgress, retryRecommendedSpots } =
+  const { viewModel, retryFeaturedSpecies, retryCollectionProgress, retryRecommendedSpots } =
     useHomeViewModel(dataSource);
   const { featuredSpecies, collectionProgress, recommendedSpots } = viewModel;
 
-  // 인증을 마치고 돌아오면 도감 집계만 다시 읽는다.
-  useFocusEffect(useCallback(() => { retryCollectionProgress(); }, [retryCollectionProgress]));
+  // 인증 뒤 집계를 갱신하고, 네트워크 복구 후 홈 재진입 시 배너도 다시 읽는다.
+  // 첫 포커스는 마운트 요청과 겹치므로 건너뛴다.
+  const returned = useRef(false);
+  useFocusEffect(useCallback(() => {
+    if (!returned.current) {
+      returned.current = true;
+      return;
+    }
+    retryCollectionProgress();
+    retryFeaturedSpecies();
+  }, [retryCollectionProgress, retryFeaturedSpecies]));
 
   // 게스트는 도감 진행도 대신 로그인 안내를 본다 (fixture는 로그인 없이도 채워 준다)
   const needsLogin = !USE_FIXTURE && token === null;
@@ -52,7 +61,12 @@ export default function HomeScreen() {
   return (
     <Screen scroll header={<ScreenHeader title="Fishlog" variant="brand" />}>
       <View style={styles.hero}>
-        <HeroCarousel featured={featuredSpecies} recommendedSpots={recommendedSpots} />
+        <HeroCarousel
+          featured={featuredSpecies}
+          collectionProgress={collectionProgress}
+          recommendedSpots={recommendedSpots}
+          onRetryFeatured={retryFeaturedSpecies}
+        />
       </View>
 
       <View style={styles.statRow}>
@@ -124,7 +138,10 @@ export default function HomeScreen() {
               accessibilityLabel={`${s.rank}위 ${s.name}, ${[s.distance, s.species]
                 .filter(Boolean)
                 .join(', ')}. 지도에서 보기`}
-              onPress={() => router.push('/map')}>
+              onPress={() => router.navigate({
+                pathname: '/map',
+                params: { spotId: String(s.id), searchRequest: String(Date.now()) },
+              })}>
               <RankPin rank={s.rank} />
               <View style={styles.spotText}>
                 <Text numberOfLines={1} style={styles.spotName}>

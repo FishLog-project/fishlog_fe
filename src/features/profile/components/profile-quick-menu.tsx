@@ -9,9 +9,10 @@ const CARD = Components.profile.quickCard;
 type Props = {
   onOpenLog: () => void;
   onOpenRanking: () => void;
+  onOpenSaved: () => void;
 };
 
-export function ProfileQuickMenu({ onOpenLog, onOpenRanking }: Props) {
+export function ProfileQuickMenu({ onOpenLog, onOpenRanking, onOpenSaved }: Props) {
   return (
     <View style={styles.row}>
       <QuickCard
@@ -24,7 +25,11 @@ export function ProfileQuickMenu({ onOpenLog, onOpenRanking }: Props) {
         label="내 랭킹"
         onPress={onOpenRanking}
       />
-      <QuickCard icon={require('@/assets/images/profile/saved-card.svg')} label="저장 목록" />
+      <QuickCard
+        icon={require('@/assets/images/profile/saved-card.svg')}
+        label="저장 목록"
+        onPress={onOpenSaved}
+      />
     </View>
   );
 }

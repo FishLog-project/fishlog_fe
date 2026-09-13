@@ -14,8 +14,12 @@ import { scheduleOnRN } from 'react-native-worklets';
 const HOLD_DURATION = 1200;
 const FADE_DURATION = 500;
 
-export function AnimatedSplashOverlay() {
+export function AnimatedSplashOverlay({ onHidden }: { onHidden?: () => void } = {}) {
   const [visible, setVisible] = useState(true);
+  const hide = () => {
+    setVisible(false);
+    onHidden?.();
+  };
   const started = useRef(false);
   const opacity = useSharedValue(1);
   const animatedStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
@@ -35,7 +39,7 @@ export function AnimatedSplashOverlay() {
               { duration: FADE_DURATION, easing: Easing.out(Easing.quad) },
               (finished) => {
                 'worklet';
-                if (finished) scheduleOnRN(setVisible, false);
+                if (finished) scheduleOnRN(hide);
               },
             ),
           );

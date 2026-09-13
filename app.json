@@ -43,6 +43,12 @@
         }
       ],
       "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "내 주변 낚시터와 음식점·관광지·숙박 시설을 찾기 위해 현재 위치를 사용해요."
+        }
+      ],
       "expo-image",
       "expo-status-bar",
       "expo-web-browser",
@@ -50,10 +56,12 @@
         "expo-image-picker",
         {
           "photosPermission": "프로필 사진을 선택하기 위해 사진 접근 권한이 필요합니다.",
-          "cameraPermission": false,
+          "cameraPermission": "잡은 물고기를 촬영해 도감에 등록하기 위해 카메라를 사용해요.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "expo-video",
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true,
