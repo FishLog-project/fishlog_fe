@@ -11,14 +11,15 @@ import { SpotDetailSheet } from '@/features/map/components/spot-detail-sheet';
 import { FishlogKakaoMap } from '@/features/map/kakao-map';
 import { createApiSpotDataSource } from '@/features/map/spot-api';
 import { createFixtureSpotDataSource } from '@/features/map/spot-data';
+import { TourFacilities } from '@/features/map/tour-facilities';
 import { useSpotsViewModel } from '@/features/map/use-spot-view-model';
 import { USE_FIXTURE } from '@/lib/data-source-mode';
 
 const MAP = Components.map;
 
-/** 해양 정보만 토글이다 (Figma 634:1495) — 나머지 셋은 아직 동작이 정해지지 않았다 */
+/** 주변 시설·해양 정보는 토글이다 (Figma 634:1495) — 금지 구역은 아직 동작이 정해지지 않았다 */
 const MAP_ACTIONS: readonly { key: string; icon: number; label: string }[] = [
-  { key: 'grid', icon: require('@/assets/images/map/grid.svg'), label: '격자로 보기' },
+  { key: 'facilities', icon: require('@/assets/images/map/grid.svg'), label: '주변 시설' },
   // { key: 'sea', icon: require('@/assets/images/map/sea-info.svg'), label: '해양 정보 보기' },
   // {
   //   key: 'prohibited',
@@ -33,6 +34,7 @@ export default function MapScreen() {
   const { token } = useAuth();
   const [recenterSignal, setRecenterSignal] = useState(0);
   const [seaInfoOpen, setSeaInfoOpen] = useState(false);
+  const [facilitiesOpen, setFacilitiesOpen] = useState(false);
   const [selectedSpotId, setSelectedSpotId] = useState<number | null>(null);
   /**
    * 찜을 토글해도 목록(GET /api/spots)의 isFavorite 은 그대로라,
@@ -104,13 +106,18 @@ export default function MapScreen() {
               key={action.key}
               icon={action.icon}
               label={action.label}
-              selected={action.key === 'sea' && seaInfoOpen}
+              selected={
+                (action.key === 'facilities' && facilitiesOpen) ||
+                (action.key === 'sea' && seaInfoOpen)
+              }
               onPress={
-                action.key === 'sea'
-                  ? () => setSeaInfoOpen((open) => !open)
-                  : action.key === 'fish'
-                    ? () => router.push('/catch')
-                    : undefined
+                action.key === 'facilities'
+                  ? () => setFacilitiesOpen((open) => !open)
+                  : action.key === 'sea'
+                    ? () => setSeaInfoOpen((open) => !open)
+                    : action.key === 'fish'
+                      ? () => router.push('/catch')
+                      : undefined
               }
             />
           ))}
@@ -137,6 +144,7 @@ export default function MapScreen() {
             contentFit="contain"
           />
         </Pressable>
+        {facilitiesOpen ? <TourFacilities /> : null}
       </View>
 
       <SpotDetailSheet
@@ -169,10 +177,16 @@ function MapAction({
       onPress={onPress}
       style={({ pressed }) => [
         styles.actionButton,
-        selected && styles.actionButtonSelected,
+        selected && styles.actionSelected,
         pressed && styles.pressed,
       ]}>
-      <Image source={icon} style={styles.actionIcon} contentFit="contain" />
+      <Image
+        source={icon}
+        style={styles.actionIcon}
+        tintColor={selected ? Brand.onPrimary : undefined}
+        contentFit="contain"
+      />
+
     </Pressable>
   );
 }
@@ -224,8 +238,8 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
-  actionButtonSelected: { backgroundColor: Brand.surfaceSoft },
   actionIcon: { width: MAP.actionIconSize, height: MAP.actionIconSize },
+  actionSelected: { backgroundColor: Brand.primary },
   pressed: { opacity: 0.72 },
   locationButton: {
     position: 'absolute',

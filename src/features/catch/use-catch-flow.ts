@@ -1,7 +1,7 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { CatchDataSource, ClassifyResponse } from '@/features/catch/catch-data';
-import { toDexSpeciesDetail } from '@/features/dex/use-dex-view-model';
+import { toCustomSpeciesDetail, toDexSpeciesDetail } from '@/features/dex/use-dex-view-model';
 import type { DexSpeciesDetailViewModel } from '@/features/dex/use-dex-view-model';
 
 type CandidateStep = {
@@ -46,8 +46,11 @@ export function useCatchFlow(dataSource: CatchDataSource) {
   // 뒤로가기(취소)나 재시도 뒤에 늦게 도착한 응답을 버리기 위한 실행 번호
   const analysisRun = useRef(0);
   const registerRun = useRef(0);
-  // 버튼 연타로 verify가 두 번 나가지 않게 state보다 먼저 잠근다
-  const registeringRef = useRef(false);
+  // 성공 직후 이전 onPress가 다시 실행돼도 같은 사진을 재등록하지 않는다.
+  const registrationStatusRef = useRef<'idle' | 'saving' | 'saved'>('idle');
+  const detailGeneration = useRef(0);
+  // 토큰 회전은 진행 중 저장을 취소하지 않고, 이전 소스의 상세 보완만 무효화한다.
+  useEffect(() => () => { detailGeneration.current += 1; }, [dataSource]);
 
   const analyze = useCallback(
     async (photoUri: string) => {
@@ -124,23 +127,33 @@ export function useCatchFlow(dataSource: CatchDataSource) {
     setState((current) => (current.step === 'result' ? { ...current, location } : current));
   }, []);
 
+  /** 저장 결과까지만 기다린다. 후속 상세 조회는 완료 화면과 이동을 지연시키지 않는다. */
   const register = useCallback(async () => {
     if (
       state.step !== 'result' ||
       state.sizeCm === null ||
       !Number.isFinite(state.sizeCm) ||
       state.sizeCm <= 0 ||
-      state.sizeCm > 1000 ||
+      state.sizeCm > 300 ||
       state.fishName.trim() === '' ||
-      registeringRef.current
+      state.fishName.trim().length > 30 ||
+      state.location.trim().length > 100 ||
+      state.photoUri.trim() === '' ||
+      registrationStatusRef.current !== 'idle'
     )
       return;
 
-    const { photoUri, location } = state;
+    const { photoUri } = state;
+    const location = state.location.trim();
     const name = state.fishName.trim();
     const size = state.sizeCm;
     const run = ++registerRun.current;
-    registeringRef.current = true;
+    const generation = detailGeneration.current;
+    const updateDetail = (detail: DexSpeciesDetailViewModel) => {
+      if (run !== registerRun.current || generation !== detailGeneration.current) return;
+      setState((current) => current.step === 'registered' ? { ...current, detail } : current);
+    };
+    registrationStatusRef.current = 'saving';
     setRegistrationError(null);
     setRegistering(true);
     try {
@@ -151,9 +164,38 @@ export function useCatchFlow(dataSource: CatchDataSource) {
         fishId = species.find((s) => s.name === name)?.id ?? null;
       }
 
-      // 서버가 받지 못하는 어종은 저장 완료로 표시하지 않고 입력을 보존한다.
       if (fishId === null) {
-        setRegistrationError('도감에 없는 어종이에요. 입력한 어종명을 확인해 주세요.');
+        const verified = await dataSource.verifyCustom({
+          fishName: name, size, photoUri, location: location || undefined,
+        });
+        if (run !== registerRun.current) return;
+        // POST 성공으로 완료를 확정한다. 상세가 끝나지 않아도 저장 잠금을 풀 수 있다.
+        registrationStatusRef.current = 'saved';
+        setState({
+          step: 'registered',
+          detail: {
+            custom: true,
+            name: verified.fishName,
+            imageUrl: null,
+            description: '',
+            maxSizeLabel: null,
+            habitatLabel: verified.habitat ? `주요 서식지: ${verified.habitat}` : null,
+            // POST는 누적 횟수를 주지 않는다. 조회 실패를 1회로 추측하지 않는다.
+            catchLabel: null,
+            photos: [{
+              catchRecordId: verified.customCatchRecordId,
+              imageUrl: verified.imageUrl,
+              size: verified.size,
+              location: verified.location,
+              verifiedAt: verified.registeredAt,
+            }],
+          },
+        });
+        // custom ID는 일반 fish ID와 별개다. 후속 조회는 완료 화면만 보완한다.
+        void Promise.resolve()
+          .then(() => dataSource.getCustomFish(verified.customFishId))
+          .then((record) => updateDetail(toCustomSpeciesDetail(record)))
+          .catch(() => {});
         return;
       }
 
@@ -164,13 +206,23 @@ export function useCatchFlow(dataSource: CatchDataSource) {
         location: location || undefined,
       });
       if (run !== registerRun.current) return;
-      // 등록은 이미 끝났다. 설명을 못 받아도 완료 화면으로 간다 — 다시 누르면 중복 등록이 된다
-      const fish = await dataSource.getFish(verified.fishId).catch(() => null);
-      if (run !== registerRun.current) return;
+      const record = {
+        habitat: null,
+        catchCount: verified.catchCount,
+        recentCatches: [{
+          catchRecordId: verified.catchRecordId,
+          imageUrl: verified.imageUrl,
+          size: verified.size,
+          location: verified.location ?? (location || null),
+          verifiedAt: 'verifiedAt' in verified && typeof verified.verifiedAt === 'string'
+            ? verified.verifiedAt : new Date().toISOString(),
+        }],
+      };
+      registrationStatusRef.current = 'saved';
       setState({
         step: 'registered',
         detail: toDexSpeciesDetail(
-          fish ?? {
+          {
             id: verified.fishId,
             name: verified.fishName,
             description: '',
@@ -178,25 +230,19 @@ export function useCatchFlow(dataSource: CatchDataSource) {
             imageUrl: null,
             rarity: 'LOW',
           },
-          {
-            habitat: fish?.habitat ?? null,
-            catchCount: verified.catchCount,
-            recentCatches: [{
-              catchRecordId: verified.catchRecordId,
-              imageUrl: verified.imageUrl,
-              size: verified.size,
-              location: verified.location ?? (location || null),
-              verifiedAt: new Date().toISOString(),
-            }],
-          },
+          record,
         ),
       });
+      void Promise.resolve()
+        .then(() => dataSource.getFish(verified.fishId))
+        .then((fish) => updateDetail(toDexSpeciesDetail(fish, { ...record, habitat: fish.habitat })))
+        .catch(() => {});
     } catch {
       if (run !== registerRun.current) return;
       setRegistrationError('도감에 등록하지 못했어요. 잠시 후 다시 시도해 주세요.');
     } finally {
       if (run === registerRun.current) {
-        registeringRef.current = false;
+        if (registrationStatusRef.current === 'saving') registrationStatusRef.current = 'idle';
         setRegistering(false);
       }
     }
@@ -204,10 +250,10 @@ export function useCatchFlow(dataSource: CatchDataSource) {
 
   /** 처음으로. 분석은 취소할 수 있지만 서버 저장 중에는 사진과 결과를 유지한다. */
   const retake = useCallback(() => {
-    if (registeringRef.current) return;
+    if (registrationStatusRef.current === 'saving') return;
     analysisRun.current += 1;
     registerRun.current += 1;
-    registeringRef.current = false;
+    registrationStatusRef.current = 'idle';
     setRegistering(false);
     setRegistrationError(null);
     setState({ step: 'capture' });

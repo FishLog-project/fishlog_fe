@@ -1,11 +1,14 @@
+import { useEvent } from 'expo';
 import { Asset } from 'expo-asset';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { usePreventRemove } from 'expo-router/react-navigation';
-import { useMemo, useRef, useState } from 'react';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 
 import {
   AppDialog,
@@ -27,6 +30,7 @@ import { useCatchFlow } from '@/features/catch/use-catch-flow';
 import type { CatchStep } from '@/features/catch/use-catch-flow';
 import { SpeciesDetailCard } from '@/features/dex/components/species-detail-dialog';
 import type { DexSpeciesDetailViewModel } from '@/features/dex/use-dex-view-model';
+import { FishArtwork } from '@/features/dex/fish-art';
 import { USE_FIXTURE } from '@/lib/data-source-mode';
 
 const CATCH = Components.catch;
@@ -34,6 +38,7 @@ const DEX = Components.dex;
 
 const SHUTTER = require('@/assets/images/catch/shutter.svg');
 const ANALYSIS_ILLUSTRATION = require('@/assets/images/catch/analysis-fishing.png');
+const ANALYSIS_VIDEO = require('@/assets/videos/catch-analysis.mp4');
 const CANDIDATE_ART = require('@/assets/images/catch/candidate-flatfish.png');
 const PENCIL = require('@/assets/images/catch/pencil.svg');
 
@@ -120,7 +125,7 @@ export default function CatchScreen() {
         />
       ) : state.step === 'error' ? (
         <>
-          <AnalyzingStep />
+          <AnalyzingStep active={false} />
           <NoMatchDialog visible reason={state.reason} onRetake={flow.retake} onManual={flow.startManual} />
         </>
       ) : state.step === 'result' ? (
@@ -308,18 +313,49 @@ function CaptureStep({
   );
 }
 
-/** 인증 2 (634:3124) — 분석 중 일러스트 위에 안내 문구가 얹힌다. */
-function AnalyzingStep() {
+/** 인증 2 (634:3124) — 분석 중에만 제공받은 영상을 무음 반복 재생한다. */
+function AnalyzingStep({ active = true }: { active?: boolean }) {
+  const reducedMotion = useReducedMotion();
   return (
     <View style={styles.page}>
-      <Image
-        source={ANALYSIS_ILLUSTRATION}
-        style={styles.analysisIllustration}
-        contentFit="cover"
-        accessibilityLabel="물고기 분석 중"
-      />
+      <View style={styles.analysisIllustration} pointerEvents="none" accessible={false}>
+        {active && !reducedMotion ? <AnalysisAnimation /> : (
+          <Image source={ANALYSIS_ILLUSTRATION} style={StyleSheet.absoluteFill} contentFit="cover" />
+        )}
+      </View>
       <StepCopy lines={['AI가 어종을 분석하고 있어요', '잠시만 기다려 주세요']} />
     </View>
+  );
+}
+
+function AnalysisAnimation() {
+  const player = useVideoPlayer(ANALYSIS_VIDEO, (video) => {
+    video.loop = true;
+    video.muted = true;
+    video.audioMixingMode = 'mixWithOthers';
+  });
+  const { status } = useEvent(player, 'statusChange', { status: player.status });
+  const [firstFrame, setFirstFrame] = useState(false);
+  // 웹에서는 VideoView가 붙기 전의 play()가 무시되므로 준비 완료 후 재생한다.
+  useEffect(() => {
+    if (status === 'readyToPlay') player.play();
+  }, [player, status]);
+
+  return (
+    <>
+      <VideoView
+        player={player}
+        style={StyleSheet.absoluteFill}
+        contentFit="cover"
+        nativeControls={false}
+        allowsVideoFrameAnalysis={false}
+        playsInline
+        onFirstFrameRender={() => setFirstFrame(true)}
+      />
+      {!firstFrame || status === 'error' ? (
+        <Image source={ANALYSIS_ILLUSTRATION} style={StyleSheet.absoluteFill} contentFit="cover" />
+      ) : null}
+    </>
   );
 }
 
@@ -367,8 +403,8 @@ function CandidateStep({
               accessibilityLabel={candidate.name}
               onPress={() => onSelect(candidate.fishId)}>
               <Text style={styles.candidateName}>{candidate.name}</Text>
-              <Image
-                source={candidate.imageUrl ?? CANDIDATE_ART}
+              <FishArtwork
+                imageUrl={candidate.imageUrl}
                 style={styles.candidateImage}
                 contentFit="contain"
               />
@@ -472,7 +508,7 @@ function ResultStep({
   const draftValid =
     editing === 'location' ||
     (editing === 'name' && draft.trim() !== '') ||
-    (editing === 'size' && Number.isFinite(parsedSize) && parsedSize > 0 && parsedSize <= 1000);
+    (editing === 'size' && Number.isFinite(parsedSize) && parsedSize > 0 && parsedSize <= 300);
 
   const openEditor = (field: EditableFact) => {
     setDraft(
@@ -559,7 +595,7 @@ function ResultStep({
       <AppDialog
         visible={editing !== null}
         title={editing === 'size' ? '크기' : editing === 'name' ? '어종' : '잡은 위치'}
-        message={editing === 'size' ? 'cm 단위로 입력해 주세요' : undefined}
+        message={editing === 'size' ? '0보다 크고 300 이하의 cm 단위로 입력해 주세요' : undefined}
         buttonLabel="저장하기"
         confirmDisabled={!draftValid}
         onConfirm={save}
@@ -639,7 +675,7 @@ function RegisteredStep({
       contentContainerStyle={styles.pageScroll}
       showsVerticalScrollIndicator={false}>
       <StepCopy lines={['물고기가 도감에 등록되었어요!']} />
-      <View style={styles.registeredCard}>
+      <View style={[styles.registeredCard, detail.custom && styles.registeredCustomCard]}>
         <SpeciesDetailCard species={detail} />
       </View>
       <View style={styles.registeredActions}>
@@ -802,6 +838,7 @@ const styles = StyleSheet.create({
 
   // 인증 5 — 240 카드가 문구 아래 60에 온다 (Figma 665:3471)
   registeredCard: { width: 240, marginTop: 60, alignSelf: 'center' },
+  registeredCustomCard: { marginTop: 84 },
   registeredActions: {
     marginTop: 'auto',
     paddingTop: 24,

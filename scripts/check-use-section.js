@@ -1,4 +1,4 @@
-/* global __r, document */
+/* global __r */
 // Expo web 개발 서버를 연 브라우저 콘솔에서 이 파일을 실행한다.
 (async () => {
   const modules = [...__r.getModules()];
@@ -48,7 +48,27 @@
       : Promise.resolve('retried'));
     await act(async () => { current[1](); });
     check(current[0].data === 'retried' && attempts === 2, 'retry must reload the same source');
-    console.info('useSection: source changes, empty, stale responses and retry passed');
+
+    const requests = [];
+    await render(() => new Promise((resolve, reject) => { requests.push({ resolve, reject }); }));
+    check(requests.length === 1, 'mount must start one request');
+    await act(async () => {
+      current[1]();
+      requests[0].resolve('before catch');
+    });
+    check(requests.length === 2, 'refresh during loading must start a new request');
+    check(current[0].status === 'loading', 'pre-refresh data must not finish the current request');
+    await act(async () => { requests[1].resolve('after catch'); });
+    check(current[0].data === 'after catch', 'the refreshed response must be shown');
+
+    await act(async () => { current[1](); });
+    check(current[0].status === 'loading' && requests.length === 3, 'refresh after success must hide old data and reload');
+    await act(async () => { current[1](); });
+    check(requests.length === 4, 'a second pending refresh must start another request');
+    await act(async () => { requests[3].resolve('newest'); });
+    await act(async () => { requests[2].reject(new Error('old request failed')); });
+    check(current[0].data === 'newest', 'a stale failure must not replace the refreshed data');
+    console.info('useSection: source changes, empty, stale responses, retry and refresh while loading/ready passed');
   } finally {
     await act(async () => { root.unmount(); });
     globalThis.IS_REACT_ACT_ENVIRONMENT = previousActEnvironment;

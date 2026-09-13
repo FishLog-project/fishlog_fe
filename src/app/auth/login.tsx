@@ -1,9 +1,10 @@
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { FormField, PrimaryButton, Screen, TextField } from '@/components/common';
-import { Brand, Components, Typography } from '@/constants/theme';
+import { Brand, Components, Fonts, Typography } from '@/constants/theme';
 import { authApi, useAuth } from '@/features/auth';
 
 const LOGIN = Components.authLogin;
@@ -67,9 +68,16 @@ export default function LoginScreen() {
         />
       }>
       <View style={styles.body}>
-        <Text style={styles.logo} accessibilityRole="header">
-          Fishlog
-        </Text>
+        <View style={styles.intro}>
+          <Image
+            source={require('@/assets/images/brand/fishlog.svg')}
+            style={styles.logo}
+            contentFit="contain"
+            accessibilityRole="header"
+            accessibilityLabel="Fishlog"
+          />
+          <Text style={styles.welcome}>물고기 낚시 도감, 피쉬로그에 오신 것을 환영합니다!</Text>
+        </View>
 
         <View style={styles.form}>
           <FormField error={error} gap={LOGIN.errorGap}>
@@ -124,9 +132,11 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  /** 로고 ~ 입력 묶음 (Figma y151 → y325) */
+  /** 최신 로고·환영 문구 ~ 입력 묶음 (Figma 1176:3410 / 1176:3413) */
   body: { flex: 1, paddingTop: LOGIN.logoTop, gap: LOGIN.formTop },
-  logo: { ...Typography.brandAuth, color: Brand.primary, textAlign: 'center' },
+  intro: { alignItems: 'center', gap: 7.27 },
+  logo: { width: 140, height: 44.47 },
+  welcome: { ...Typography.caption, fontFamily: Fonts.semiBold, lineHeight: 32, color: Brand.primaryDark, textAlign: 'center' },
   /** 입력 묶음 ~ 버튼 ~ 링크 */
   form: { gap: LOGIN.blockGap },
   fields: { gap: LOGIN.fieldGap },

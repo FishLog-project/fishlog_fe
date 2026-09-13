@@ -5,10 +5,18 @@
  * 모든 함수는 성공/실패를 예외가 아니라 결과 객체로 돌려준다.
  * 화면이 상태코드를 몰라도 되게 하려는 것이고, 문구도 여기서 확정한다.
  */
-import { apiRequest } from '@/lib/api/client';
+import { ApiError, apiRequest } from '@/lib/api/client';
 import { type Fail, type Ok, toFail } from '@/lib/api/result';
 
 export type { Fail, Ok } from '@/lib/api/result';
+
+// 서버는 사용자별 refresh 키 하나를 회전/삭제한다. 늦은 logout/refresh가 새 로그인을 덮지 않게 한다.
+let authOperations = Promise.resolve();
+function serializeAuth<T>(request: () => Promise<T>): Promise<T> {
+  const pending = authOperations.then(request);
+  authOperations = pending.then(() => {}, () => {});
+  return pending;
+}
 
 // ─────────────────────────────────────────────────────────────
 // 이메일 인증 (회원가입용)
@@ -62,15 +70,16 @@ export type SignupResult = (Ok & { tokens: AuthTokens | null }) | Fail<'duplicat
 
 /** 회원가입. POST /api/auth/signup (이메일 인증 완료 후 호출) */
 export async function signup(input: SignupInput): Promise<SignupResult> {
-  try {
-    const data = await apiRequest('/api/auth/signup', { method: 'POST', body: input });
-    // 서버가 회원가입 응답에서 바로 토큰을 주는 경우에는 재로그인 없이 사용한다.
-    return { ok: true, tokens: toTokens(data) };
-  } catch (e) {
-    return toFail(e, {
-      409: { reason: 'duplicated', message: '이미 사용 중인 이메일 또는 닉네임이에요.' },
-    });
-  }
+  return serializeAuth(async () => {
+    try {
+      const data = await apiRequest('/api/auth/signup', { method: 'POST', body: input });
+      return { ok: true, tokens: toTokens(data) };
+    } catch (e) {
+      return toFail(e, {
+        409: { reason: 'duplicated', message: '이미 사용 중인 이메일 또는 닉네임이에요.' },
+      });
+    }
+  });
 }
 
 /**
@@ -81,15 +90,15 @@ export async function signup(input: SignupInput): Promise<SignupResult> {
  *    백엔드에서 실제 필드명이 확인되면 이 함수만 좁히면 된다.
  */
 function toTokens(data: unknown): AuthTokens | null {
-  if (typeof data === 'string') return { accessToken: data, refreshToken: null };
+  if (typeof data === 'string') return data.trim() ? { accessToken: data, refreshToken: null } : null;
   if (typeof data !== 'object' || data === null) return null;
   const d = data as Record<string, unknown>;
   const access = d.accessToken ?? d.access_token ?? d.token ?? d.jwt;
   const refresh = d.refreshToken ?? d.refresh_token ?? null;
-  if (typeof access !== 'string') return null;
+  if (typeof access !== 'string' || !access.trim()) return null;
   return {
     accessToken: access,
-    refreshToken: typeof refresh === 'string' ? refresh : null,
+    refreshToken: typeof refresh === 'string' && refresh.trim() ? refresh : null,
   };
 }
 
@@ -97,39 +106,46 @@ export type LoginResult = (Ok & { tokens: AuthTokens }) | Fail<'invalid' | 'malf
 
 /** 로그인. POST /api/auth/login */
 export async function login(email: string, password: string): Promise<LoginResult> {
-  try {
-    const data = await apiRequest('/api/auth/login', {
-      method: 'POST',
-      body: { email, password },
-    });
-    const tokens = toTokens(data);
-    if (!tokens) {
-      return {
-        ok: false,
-        reason: 'malformed',
-        message: '로그인 응답을 해석하지 못했어요. 잠시 후 다시 시도해 주세요.',
-      };
+  return serializeAuth(async () => {
+    try {
+      const data = await apiRequest('/api/auth/login', {
+        method: 'POST',
+        body: { email, password },
+      });
+      const tokens = toTokens(data);
+      if (!tokens) {
+        return {
+          ok: false,
+          reason: 'malformed',
+          message: '로그인 응답을 해석하지 못했어요. 잠시 후 다시 시도해 주세요.',
+        };
+      }
+      return { ok: true, tokens };
+    } catch (e) {
+      return toFail(e, {
+        401: { reason: 'invalid', message: '이메일 또는 비밀번호가 올바르지 않아요.' },
+      });
     }
-    return { ok: true, tokens };
-  } catch (e) {
-    return toFail(e, {
-      401: { reason: 'invalid', message: '이메일 또는 비밀번호가 올바르지 않아요.' },
-    });
-  }
+  });
 }
 
+export type RefreshResult = (Ok & { tokens: AuthTokens }) | Fail<'invalid' | 'unavailable'>;
+
 /** 토큰 재발급(회전). POST /api/auth/refresh */
-export async function refresh(refreshToken: string): Promise<AuthTokens | null> {
-  try {
-    return toTokens(
-      await apiRequest('/api/auth/refresh', {
-        method: 'POST',
-        body: { refreshToken },
-      }),
-    );
-  } catch {
-    return null;
-  }
+export async function refresh(refreshToken: string): Promise<RefreshResult> {
+  return serializeAuth(async () => {
+    try {
+      const tokens = toTokens(await apiRequest('/api/auth/refresh', {
+        method: 'POST', body: { refreshToken },
+      }));
+      if (tokens) return { ok: true, tokens };
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        return { ok: false, reason: 'invalid', message: '로그인 정보가 만료됐어요. 다시 로그인해 주세요.' };
+      }
+    }
+    return { ok: false, reason: 'unavailable', message: '로그인 정보를 갱신하지 못했어요. 잠시 후 다시 시도해 주세요.' };
+  });
 }
 
 /**
@@ -139,11 +155,14 @@ export async function refresh(refreshToken: string): Promise<AuthTokens | null> 
  * (토큰이 이미 만료됐을 때 로그아웃이 막히면 사용자가 빠져나갈 방법이 없다)
  */
 export async function logout(token: string | null): Promise<void> {
-  try {
-    await apiRequest('/api/auth/logout', { method: 'POST', token });
-  } catch {
-    // 무시 — 로컬 세션 삭제는 호출부에서 어차피 수행한다
-  }
+  if (!token) return;
+  await serializeAuth(async () => {
+    try {
+      await apiRequest('/api/auth/logout', { method: 'POST', token, skipSession: true });
+    } catch {
+      // 서버 실패와 관계없이 로컬 세션은 이미 종료됐다.
+    }
+  });
 }
 
 // ─────────────────────────────────────────────────────────────

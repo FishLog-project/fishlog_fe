@@ -15,8 +15,7 @@ const CRITICAL_IMAGES = [
   require('@/assets/images/tabs/profile-inactive.svg'),
 
   // 홈
-  require('@/assets/images/home/featured-flatfish.png'),
-  require('@/assets/images/home/featured-flatfish-shadow.png'),
+  require('@/assets/images/fish/basic_image.png'),
   require('@/assets/images/home/unowned-fish.png'),
   require('@/assets/images/home/scan-fish.svg'),
   require('@/assets/images/home/fishing-rod.png'),

@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 
 import { Brand, Components, Typography } from '@/constants/theme';
+import { FishArtwork } from '@/features/dex/fish-art';
 import type {
   CollectionProgressViewModel,
   FeaturedSlideViewModel,
@@ -40,10 +41,6 @@ const SPOT_PHOTO = {
   해양: require('@/assets/images/home/recommended-spot-marine.jpg'),
   내륙: require('@/assets/images/home/recommended-spot-inland.jpg'),
 } as const;
-
-/** BE가 어종 사진을 아직 안 줄 때(imageUrl null) 쓰는 기본 그림 */
-const FLATFISH = require('@/assets/images/home/featured-flatfish.png');
-const FLATFISH_SHADOW = require('@/assets/images/home/featured-flatfish-shadow.png');
 
 const FEATURED_LABEL = '오늘의 추천 어종';
 /** 섹션이 준비되기 전·실패했을 때 제목 자리에 넣는 문구 */
@@ -75,10 +72,12 @@ export function HeroCarousel({
   featured,
   collectionProgress,
   recommendedSpots,
+  onRetryFeatured,
 }: {
   featured: HomeSectionState<FeaturedSlideViewModel>;
   collectionProgress: HomeSectionState<CollectionProgressViewModel>;
   recommendedSpots: HomeSectionState<readonly RecommendedSpotViewModel[]>;
+  onRetryFeatured: () => void;
 }) {
   const scrollRef = useRef<ScrollView>(null);
   const [index, setIndex] = useState(0);
@@ -87,7 +86,7 @@ export function HeroCarousel({
   const focused = useIsFocused();
 
   const slides = [
-    <FeaturedSpeciesSlide key="featured" width={width} section={featured} />,
+    <FeaturedSpeciesSlide key="featured" width={width} section={featured} onRetry={onRetryFeatured} />,
     <UnownedSpeciesSlide key="unowned" width={width} section={collectionProgress} />,
     <RecommendedSpotSlide key="spot" width={width} section={recommendedSpots} />,
   ];
@@ -164,16 +163,12 @@ function HeroCta({
 function FeaturedSpeciesSlide({
   width,
   section,
+  onRetry,
 }: {
   width: number;
   section: HomeSectionState<FeaturedSlideViewModel>;
+  onRetry: () => void;
 }) {
-  // 원격 사진이 안 열리면 기본 그림으로 돌아간다
-  const [failedUrl, setFailedUrl] = useState<string | null>(null);
-  const imageUrl =
-    section.status === 'ready' && section.data.imageUrl !== failedUrl
-      ? section.data.imageUrl
-      : null;
   const title =
     section.status === 'ready' ? section.data.title : FEATURED_FALLBACK[section.status];
   const router = useRouter();
@@ -189,20 +184,17 @@ function FeaturedSpeciesSlide({
       />
       {section.status === 'ready' ? (
         <>
-          {/* 실루엣 그림자는 배경이 투명한 기본 그림에서만 — 원격 사진은 배경이 있을 수 있다 */}
-          {imageUrl ? null : (
-            <Image
-              source={FLATFISH_SHADOW}
-              style={[styles.featuredFish, styles.featuredFishShadow]}
-              contentFit="contain"
-              blurRadius={5.55}
-            />
-          )}
-          <Image
-            source={imageUrl ? { uri: imageUrl } : FLATFISH}
+          <FishArtwork
+            imageUrl={section.data.imageUrl}
+            style={[styles.featuredFish, styles.featuredFishShadow]}
+            contentFit="contain"
+            blurRadius={5.55}
+            tintColor="rgba(0,0,0,0.25)"
+          />
+          <FishArtwork
+            imageUrl={section.data.imageUrl}
             style={styles.featuredFish}
             contentFit="contain"
-            onError={() => setFailedUrl(imageUrl)}
           />
         </>
       ) : null}
@@ -210,13 +202,21 @@ function FeaturedSpeciesSlide({
       <Text numberOfLines={1} style={[styles.title, styles.onDark]}>
         {title}
       </Text>
-      {/* 못 불러왔을 땐 안내 문구만 남기고 링크는 숨긴다 */}
+      {/* 못 불러왔을 땐 이동 링크 대신 다시 시도를 둔다 */}
       {section.status === 'ready' ? (
         <HeroCta
           label="인증하러 가기"
           color={Brand.onPrimary}
           onPress={() => router.push('/catch')}
         />
+      ) : section.status === 'error' ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="추천 어종 다시 시도"
+          onPress={onRetry}
+          style={styles.retry}>
+          <Text style={[Typography.caption, styles.onDark]}>다시 시도</Text>
+        </Pressable>
       ) : null}
       <View style={[styles.innerGlow, styles.innerGlowDark]} />
     </View>
@@ -353,6 +353,7 @@ const styles = StyleSheet.create({
   title: { ...Typography.heroTitle, marginTop: HERO.labelGap },
   onDark: { color: Brand.onPrimary },
   onLight: { color: Brand.textHeading },
+  retry: { alignSelf: 'flex-start', minHeight: 44, minWidth: 44, justifyContent: 'center' },
 
   // 그림은 오른쪽 끝을 기준으로 잡아 카드 폭이 달라져도 우측 구도를 유지한다
   featuredFish: {

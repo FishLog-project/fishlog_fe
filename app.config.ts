@@ -13,13 +13,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   plugins: [
     ...(staticConfig.plugins ?? []),
-    [
-      'expo-location',
-      {
-        locationWhenInUsePermission:
-          '현재 위치를 기준으로 주변 낚시터를 보여드리기 위해 위치 권한이 필요합니다.',
-      },
-    ],
     './plugins/with-kakao-maven',
     './plugins/with-spot-marker-drawable',
   ],
