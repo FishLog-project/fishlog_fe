@@ -7,7 +7,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { usePreventRemove } from 'expo-router/react-navigation';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 
 import {
@@ -185,16 +185,13 @@ function CaptureStep({
     !fixturePhotoUri && permission?.granted === true && !mountFailed;
   const canCapture = Boolean(fixturePhotoUri) || (cameraAvailable && cameraReady);
 
+  // 설정 앱으로 보내지 않고 OS 권한 창만 띄운다. OS 가 더 묻지 않는 상태면 버튼 자체를 숨긴다.
   const requestCameraAccess = async () => {
     setError(null);
     try {
-      if (permission && !permission.granted && !permission.canAskAgain) {
-        await Linking.openSettings();
-        return;
-      }
       await requestPermission();
     } catch {
-      setError('카메라 설정을 열지 못했어요. 설정 앱에서 권한을 확인해 주세요.');
+      setError('카메라 권한을 요청하지 못했어요. 사진 보관함에서 선택해 주세요.');
     }
   };
 
@@ -270,16 +267,12 @@ function CaptureStep({
           ) : (
             <View style={styles.placeholder}>
               <Text style={styles.placeholderText}>{status}</Text>
-              {!permission?.granted ? (
+              {permission && !permission.granted && permission.canAskAgain ? (
                 <Pressable
                   hitSlop={8}
                   accessibilityRole="button"
                   onPress={requestCameraAccess}>
-                  <Text style={styles.placeholderLink}>
-                    {permission && !permission.canAskAgain
-                      ? '설정에서 권한 허용하기'
-                      : '카메라 권한 허용하기'}
-                  </Text>
+                  <Text style={styles.placeholderLink}>카메라 권한 허용하기</Text>
                 </Pressable>
               ) : null}
               <Pressable

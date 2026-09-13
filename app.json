@@ -56,11 +56,12 @@
         "expo-image-picker",
         {
           "photosPermission": "프로필 사진을 선택하기 위해 사진 접근 권한이 필요합니다.",
-          "cameraPermission": false,
+          "cameraPermission": "잡은 물고기를 촬영해 도감에 등록하기 위해 카메라를 사용해요.",
           "microphonePermission": false
         }
       ],
-      "expo-video"
+      "expo-video",
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true,
