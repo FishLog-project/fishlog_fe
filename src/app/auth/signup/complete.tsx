@@ -10,14 +10,11 @@ import { authApi, useAuth, useSignup } from '@/features/auth';
 const DONE = Components.signupComplete;
 
 /**
- * 회원가입 5단계 — 가입 완료.
+ * 회원가입 5단계 — 가입 완료 (Figma 634:2845).
  * "시작하기"에서 실제 가입 요청을 보내고, 성공하면 그대로 로그인해 홈으로 보낸다.
  *
  * 가입을 이 시점에 하는 이유: 앞 단계는 입력 수집일 뿐이고 이메일 인증까지 끝난 뒤라야
  * 서버가 계정을 만들어 준다. (인증만 하고 이탈하면 계정은 생기지 않는다)
- *
- * ⚠️ 이 화면만 Figma 시안이 없다. 앞 스텝들과 같은 여백·타이포를 따라가되,
- * 캐릭터 일러스트는 자리만 잡아 두었다.
  */
 export default function SignupCompleteScreen() {
   const router = useRouter();
@@ -63,7 +60,7 @@ export default function SignupCompleteScreen() {
   return (
     <Screen
       edges={['top', 'bottom']}
-      contentPadding={Layout.stepPadding}
+      edgeToEdge
       header={<ScreenHeader title="가입 완료" showBack={false} />}
       footer={<PrimaryButton label="시작하기" onPress={handleStart} loading={submitting} />}>
       <View style={styles.body}>
@@ -81,7 +78,7 @@ export default function SignupCompleteScreen() {
         <View style={styles.figure}>
           <Image
             style={styles.illustration}
-            source={require('@/assets/images/signup-complete-placeholder.png')}
+            source={require('@/assets/images/signup-complete.png')}
             contentFit="contain"
           />
           <FormError message={error} />
@@ -94,18 +91,22 @@ export default function SignupCompleteScreen() {
 const styles = StyleSheet.create({
   body: {
     flex: 1,
-    paddingTop: 88,
+    paddingTop: DONE.headingTop,
   },
-  heading: { alignItems: 'flex-start' },
+  heading: { alignItems: 'flex-start', paddingHorizontal: Layout.stepPadding },
   headingLine: { ...Typography.heading, color: Brand.textStrong },
   figure: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
+    paddingTop: DONE.figureGap,
+    paddingBottom: DONE.figureBottom,
+    paddingHorizontal: DONE.illustrationInset,
     gap: DONE.messageGap,
   },
   illustration: {
-    width: 192,
-    height: 245,
+    width: DONE.illustration.width,
+    maxWidth: '100%',
+    maxHeight: DONE.illustration.height,
+    flex: 1,
   },
 });

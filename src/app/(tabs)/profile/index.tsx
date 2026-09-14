@@ -108,9 +108,9 @@ export default function ProfileScreen() {
               />
             ) : null}
             <SettingsListItem
-              label="로그아웃"
+              label={isGuest ? '로그인 하러가기' : '로그아웃'}
               disabled={busy}
-              onPress={() => setDialog('logout')}
+              onPress={() => isGuest ? router.push('/auth/login') : setDialog('logout')}
             />
             {!isGuest && token ? (
               <SettingsListItem

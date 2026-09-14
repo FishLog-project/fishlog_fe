@@ -152,14 +152,14 @@ export const Components = {
     /** 제목 ~ 본문, 버튼 ~ 버튼 */
     tightGap: 8,
   },
-  /**
-   * ⚠️ 가입 완료 화면 — Figma 시안이 없어 임시로 잡은 값.
-   * 시안이 나오면 여기 값을 바꾸고 이 주석을 지운다.
-   */
+  /** 가입 완료 (Figma 634:2845, 일러스트 783:2290). */
   signupComplete: {
-    illustration: { width: 240, height: 300, radius: 150 },
+    illustration: { width: 360, height: 360 },
+    headingTop: 88,
+    illustrationInset: 15,
     /** 안내 문구 ~ 일러스트 */
-    figureGap: 60,
+    figureGap: 74,
+    figureBottom: 40,
     /** 일러스트 ~ 오류 문구 */
     messageGap: 16,
   },
