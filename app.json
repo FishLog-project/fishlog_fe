@@ -1,23 +1,28 @@
 {
   "expo": {
-    "name": "fishlog_fe",
+    "name": "fishlog",
     "slug": "fishlog_fe",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "fishlogfe",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/icon.png"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "xyz.fishlog.app",
+      "versionCode": 1,
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
     },
     "web": {
       "output": "static",
@@ -28,9 +33,50 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "backgroundColor": "#FFFFFF",
+          "image": "./assets/images/fishlog_logo.png",
+          "imageWidth": 165,
+          "resizeMode": "contain"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "잡은 물고기를 촬영해 도감에 등록하기 위해 카메라를 사용해요.",
+          "recordAudioAndroid": false
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "내 주변 낚시터와 음식점·관광지·숙박 시설을 찾기 위해 현재 위치를 사용해요."
+        }
+      ],
+      "expo-image",
+      "expo-status-bar",
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "프로필 사진을 선택하기 위해 사진 접근 권한이 필요합니다.",
+          "cameraPermission": "잡은 물고기를 촬영해 도감에 등록하기 위해 카메라를 사용해요.",
+          "microphonePermission": false
+        }
+      ],
+      "expo-video",
+      "expo-notifications",
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/SUITE-Light.ttf",
+            "./assets/fonts/SUITE-Regular.ttf",
+            "./assets/fonts/SUITE-Medium.ttf",
+            "./assets/fonts/SUITE-SemiBold.ttf",
+            "./assets/fonts/SUITE-Bold.ttf",
+            "./assets/fonts/SUITE-ExtraBold.ttf"
+          ]
         }
       ]
     ],

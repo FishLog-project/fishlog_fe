@@ -20,6 +20,8 @@ expo-env.d.ts
 
 # Metro
 .metro-health-check*
+.metro.*.log
+.android-debug.*.log
 
 # debug
 npm-debug.*
@@ -41,3 +43,12 @@ example
 # generated native folders
 /ios
 /android
+
+# QA 도구 산출물 (스크린샷·콘솔 로그)
+.playwright-mcp/
+
+# 릴리즈 서명 키 (저장소 밖에 보관한다)
+*.keystore
+
+# 스토어 등록 소재 (콘솔에 직접 업로드한다)
+output/
