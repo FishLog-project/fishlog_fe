@@ -88,7 +88,9 @@ export function PrimaryButton({
 
 const styles = StyleSheet.create({
   base: {
-    height: Components.button.height,
+    minHeight: Components.button.height,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     borderRadius: Components.button.radius,
     alignItems: 'center',
     justifyContent: 'center',
@@ -103,10 +105,12 @@ const styles = StyleSheet.create({
   faded: { opacity: 0.5 },
   pressed: { opacity: 0.85 },
   label: {
+    textAlign: 'center',
     color: Components.button.label,
     ...Typography.button,
   },
   outlineLabel: {
+    textAlign: 'center',
     color: Components.button.outlineLabel,
     ...Typography.button,
   },

@@ -11,6 +11,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
 
 import { Brand, Components, Typography } from '@/constants/theme';
@@ -27,7 +28,6 @@ const HERO = Components.home;
 
 const FISH_POS = {
   featured: { right: 17, top: 0 },
-  featuredShadow: { right: 0, top: 8 },
   unowned: { right: 8, top: 14 },
 } as const;
 
@@ -84,10 +84,12 @@ export function HeroCarousel({
   const [autoPlay, setAutoPlay] = useState(true);
   const [width, setWidth] = useState(0);
   const focused = useIsFocused();
+  const { fontScale } = useWindowDimensions();
+  const expanded = fontScale > 1.2 || (width > 0 && width < 320);
 
   const slides = [
-    <FeaturedSpeciesSlide key="featured" width={width} section={featured} onRetry={onRetryFeatured} />,
-    <UnownedSpeciesSlide key="unowned" width={width} section={collectionProgress} />,
+    <FeaturedSpeciesSlide key="featured" width={width} expanded={expanded} section={featured} onRetry={onRetryFeatured} />,
+    <UnownedSpeciesSlide key="unowned" width={width} expanded={expanded} section={collectionProgress} />,
     <RecommendedSpotSlide key="spot" width={width} section={recommendedSpots} />,
   ];
 
@@ -162,10 +164,12 @@ function HeroCta({
 /** 뒤에 흐릿한 실루엣을 깔아 그림자를 만든다 (Figma 778:2658/2659) */
 function FeaturedSpeciesSlide({
   width,
+  expanded,
   section,
   onRetry,
 }: {
   width: number;
+  expanded: boolean;
   section: HomeSectionState<FeaturedSlideViewModel>;
   onRetry: () => void;
 }) {
@@ -182,8 +186,12 @@ function FeaturedSpeciesSlide({
         end={GLOW_END}
         style={StyleSheet.absoluteFill}
       />
+      <Text style={[styles.label, styles.onDark]}>{FEATURED_LABEL}</Text>
+      <Text style={[styles.title, styles.onDark, !expanded && styles.featuredTitle]}>
+        {title}
+      </Text>
       {section.status === 'ready' ? (
-        <>
+        <View pointerEvents="none" style={[styles.featuredArt, expanded && styles.expandedArt]}>
           <FishArtwork
             imageUrl={section.data.imageUrl}
             style={[styles.featuredFish, styles.featuredFishShadow]}
@@ -196,12 +204,8 @@ function FeaturedSpeciesSlide({
             style={styles.featuredFish}
             contentFit="contain"
           />
-        </>
+        </View>
       ) : null}
-      <Text style={[styles.label, styles.onDark]}>{FEATURED_LABEL}</Text>
-      <Text numberOfLines={1} style={[styles.title, styles.onDark]}>
-        {title}
-      </Text>
       {/* 못 불러왔을 땐 이동 링크 대신 다시 시도를 둔다 */}
       {section.status === 'ready' ? (
         <HeroCta
@@ -229,9 +233,11 @@ function FeaturedSpeciesSlide({
  */
 function UnownedSpeciesSlide({
   width,
+  expanded,
   section,
 }: {
   width: number;
+  expanded: boolean;
   section: HomeSectionState<CollectionProgressViewModel>;
 }) {
   const router = useRouter();
@@ -253,8 +259,17 @@ function UnownedSpeciesSlide({
         end={GLOW_END}
         style={StyleSheet.absoluteFill}
       />
+
+      <Text style={[styles.label, styles.onLight]}>아직 만나지 못한 어종</Text>
+      <Text style={[styles.title, styles.onLight]}>
+        도감에 빈자리가 있어요!
+      </Text>
+      <Text style={[styles.unownedSubtitle, expanded && styles.expandedSubtitle]}>
+        {subtitle}
+      </Text>
+
       {/* ??? 는 실루엣 위에 겹쳐 올린다 — 어떤 어종인지 가리는 표시라서 */}
-      <View pointerEvents="none" style={styles.unownedSilhouette}>
+      <View pointerEvents="none" style={[styles.unownedSilhouette, expanded && styles.expandedArt]}>
         <Image
           source={require('@/assets/images/home/unowned-fish.png')}
           style={styles.unownedFish}
@@ -263,14 +278,6 @@ function UnownedSpeciesSlide({
         />
         <Text style={styles.unownedMark}>???</Text>
       </View>
-
-      <Text style={[styles.label, styles.onLight]}>아직 만나지 못한 어종</Text>
-      <Text numberOfLines={1} style={[styles.title, styles.onLight]}>
-        도감에 빈자리가 있어요!
-      </Text>
-      <Text numberOfLines={2} style={styles.unownedSubtitle}>
-        {subtitle}
-      </Text>
 
       <HeroCta
         label="도감 채우러 가기"
@@ -303,11 +310,11 @@ function RecommendedSpotSlide({
         contentFit="cover"
       />
       <Text style={[styles.label, styles.onLight]}>지금 인기 스팟</Text>
-      <Text numberOfLines={1} style={[styles.title, styles.onLight]}>
+      <Text style={[styles.title, styles.onLight]}>
         {title}
       </Text>
       {spot ? (
-        <Text numberOfLines={2} style={styles.spotSubtitle}>
+        <Text style={styles.spotSubtitle}>
           {SPOT_SUBTITLE}
         </Text>
       ) : null}
@@ -335,7 +342,7 @@ function RecommendedSpotSlide({
 
 const styles = StyleSheet.create({
   card: {
-    height: HERO.heroHeight,
+    minHeight: HERO.heroHeight,
     borderRadius: HERO.heroRadius,
     overflow: 'hidden',
     // 레이아웃 측정 전 한 프레임 동안 흰 배경이 비치지 않게 한다
@@ -343,10 +350,12 @@ const styles = StyleSheet.create({
   },
   /** 그림이 옆 슬라이드로 넘치지 않게 슬라이드 단위로도 자른다 */
   slide: {
-    height: HERO.heroHeight,
+    minHeight: HERO.heroHeight,
     overflow: 'hidden',
     paddingLeft: HERO.heroPadding,
     paddingTop: HERO.heroPadding,
+    paddingRight: HERO.heroPadding,
+    paddingBottom: 6,
   },
   spotSlide: { backgroundColor: Brand.background },
   label: { ...Typography.heroLabel },
@@ -356,14 +365,29 @@ const styles = StyleSheet.create({
   retry: { alignSelf: 'flex-start', minHeight: 44, minWidth: 44, justifyContent: 'center' },
 
   // 그림은 오른쪽 끝을 기준으로 잡아 카드 폭이 달라져도 우측 구도를 유지한다
-  featuredFish: {
+  featuredTitle: { maxWidth: '52%' },
+  featuredArt: {
     position: 'absolute',
     ...FISH_POS.featured,
     width: 162.816,
     height: 162.816,
+  },
+  expandedArt: {
+    position: 'relative',
+    top: 0,
+    right: 0,
+    alignSelf: 'flex-end',
+    marginTop: 8,
+  },
+  featuredFish: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 162.816,
+    height: 162.816,
     transform: [{ rotate: '-15.29deg' }],
   },
-  featuredFishShadow: { ...FISH_POS.featuredShadow, opacity: 0.2 },
+  featuredFishShadow: { right: -17, top: 8, opacity: 0.2 },
   /** ??? 를 실루엣 위에 겹쳐 올리는 칸 */
   unownedSilhouette: {
     position: 'absolute',
@@ -404,19 +428,19 @@ const styles = StyleSheet.create({
     maxWidth: 165,
     color: Brand.textMuted,
   },
+  expandedSubtitle: { maxWidth: '100%' },
   spotSubtitle: {
     ...Typography.cardCaption,
     fontSize: 12,
     lineHeight: 17,
     marginTop: 6,
-    maxWidth: 200,
     color: Brand.textHeading,
   },
   /** 면 없이 글자만 두므로 터치 영역은 패딩으로 벌려 둔다 */
   heroCta: {
-    position: 'absolute',
-    right: HERO.heroPadding - 6,
-    bottom: 6,
+    alignSelf: 'flex-end',
+    marginTop: 'auto',
+    marginRight: -6,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 1,
@@ -436,7 +460,7 @@ const styles = StyleSheet.create({
     left: -42.3,
     right: -59.7,
     top: -32.6,
-    height: 339,
+    bottom: -139.4,
     transform: [{ rotate: '2.69deg' }],
   },
   spotPhotoInland: {
@@ -444,7 +468,7 @@ const styles = StyleSheet.create({
     left: -57,
     right: -26,
     top: -7,
-    height: 325,
+    bottom: -150,
   },
 
   innerGlow: {

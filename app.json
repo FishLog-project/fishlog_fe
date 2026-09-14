@@ -61,7 +61,20 @@
         }
       ],
       "expo-video",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/SUITE-Light.ttf",
+            "./assets/fonts/SUITE-Regular.ttf",
+            "./assets/fonts/SUITE-Medium.ttf",
+            "./assets/fonts/SUITE-SemiBold.ttf",
+            "./assets/fonts/SUITE-Bold.ttf",
+            "./assets/fonts/SUITE-ExtraBold.ttf"
+          ]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

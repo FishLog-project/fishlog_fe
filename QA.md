@@ -1,4 +1,90 @@
-# PR #19 · #20 · #21 통합 QA
+# PR #24 기준 수정 QA (2026-09-14)
+
+기준은 `dev`의 `f224112`(PR #24 head)이며 수정 브랜치는 `fix/pr24-qa`다.
+이 문서의 첫 절이 현재 검증 결과다. 아래 2026-09-11 기록은 당시 통합본의 이력으로 보존한다.
+수정 PR의 대상은 **dev**다. PR #24(dev → main)는 별도 PR이며 이번 작업에서는 병합하지 않는다.
+회원가입 완료 이미지 수정은 팀원이 완료했다고 알려 이번 범위에서 제외했다.
+
+## 수정 범위와 재현 검사
+
+| 이슈 | 수정 | 검증 |
+| --- | --- | --- |
+| [#25](https://github.com/FishLog-project/fishlog_fe/issues/25) | 잠금 파일에서 빠진 `@emnapi/core`·`@emnapi/runtime` 복구, 버전 업그레이드 없음 | 별도 빈 설치 폴더에서 `npm ci` 및 카카오 core/map postinstall 패치 성공 |
+| [#26](https://github.com/FishLog-project/fishlog_fe/issues/26) | iOS 낚시터·관광 시설·현재 위치 마커와 터치/카메라 이벤트, 검색 뒤 늦은 GPS 카메라 이동 무효화 | `check-native-map`: GPS/검색/재중앙화 순서, 동일 좌표 nonce, 마커 종류별 ID·제거 검사; 네이티브 빌드 결과는 아래 참고 |
+| [#27](https://github.com/FishLog-project/fishlog_fe/issues/27) | 관광 마커·목록·상세의 상태 공유, 축소/확장 시트와 고정 딤, 지도·저장 목록 찜 공유, 누락된 낚시지수 | `check-map-state`, `check-tour-data`: 오래된 요청·계정 전환·연타·실패 복구·분류 변경·상세 복귀·예보 등급 검사 |
+| [#28](https://github.com/FishLog-project/fishlog_fe/issues/28) | SUITE 굵기별 파일 네이티브 등록과 중복 weight 제거, 배너/카드/입력/버튼의 작은 화면·큰 글씨 대응 | `check-typography`: 실제 TTF PostScript 이름·번들 목록·Android 별칭 확인; `check-home-data` 및 웹 화면 QA |
+| [#29](https://github.com/FishLog-project/fishlog_fe/issues/29) | 비회원 기록 로그인 CTA, 카메라 권한 팝업·사진 선택 대안, 필수 크기 안내 | `check-catch-access`: 권한 상태·iOS 팝업 닫힘 뒤 보관함 열기·중복 이벤트·크기 입력·로그인 이동 검사 |
+
+찜은 성공한 변경을 기존 공유 스팟 캐시에 반영한다. 화면별 덮어쓰기 상태를 제거하고 요청 중에만 낙관적으로 표시한다.
+관광 시설은 별도 상세 Modal을 제거해 마커·목록·상세가 같은 조회 결과를 쓴다. 새 의존성을 추가하지 않았다.
+별도 담당자가 인증 흐름과 배너·폰트·공통 입력 변경을 교차 리뷰했으며, 확인된 추가 차단 회귀는 없었다.
+
+## 완료한 자동 검증
+
+- [x] 별도 설치 폴더의 `npm ci --no-audit --no-fund` (915 packages), 두 카카오 패치 적용
+- [x] 아래 10개 `.cjs` 회귀 검사 전체
+- [x] `npx tsc --noEmit`, `npm run lint`, `git diff --check`
+- [x] iOS·Android·웹 production export (`/tmp/fishlog-pr24-fix-export`)
+- [x] iOS `RNCKakaoMapView.mm` 실제 Kakao SDK 2.10.4·RN 0.86 헤더 대상 컴파일 (오류·경고 0); Fabric 비교 연산자 조건부 누락 수정 후 재검사
+- [x] iOS 전체 개발 빌드 (`xcodebuild`, arm64 iOS Simulator Debug): `BUILD SUCCEEDED`; simulator ad-hoc 서명 재빌드·설치·실행도 성공
+
+```sh
+npm ci
+for script in scripts/check-*.cjs; do node "$script" || exit 1; done
+npx tsc --noEmit
+npm run lint
+git diff --check
+npx expo export --platform all --max-workers 2 --output-dir /tmp/fishlog-pr24-fix-export
+```
+
+`check-use-section.js`는 브라우저 콘솔용이므로 Node 회귀 검사 목록에 넣지 않는다.
+
+## 개발 빌드로 실행
+
+현재 dev는 `RNCKakaoMap` 네이티브 모듈을 포함하므로 Expo Go로 열 수 없다.
+기존 개발 빌드도 이번 폰트·지도 패치를 포함하도록 다시 빌드해야 한다.
+지도 QA용 키는 `.env.local`의 `KAKAO_NATIVE_APP_KEY`에 설정한다. 키를 저장소에 커밋하지 않는다.
+
+```sh
+npm ci
+npx expo run:ios --device
+```
+
+Xcode에서는 prebuild로 생성된 `ios/fishlogfe.xcworkspace`를 열고 `fishlogfe` scheme과 iPhone 시뮬레이터를 선택한다.
+Android SDK가 있는 환경에서는 `npx expo run:android`로 개발 빌드를 만든다.
+
+## 화면 QA와 한계
+
+- Figma 홈 `634:1177` / 히어로 `778:2648`, 인증 `634:3106`·`634:3140`, 관광 시설 `634:1711`·`634:1576`의 실제 이미지를 확인했다.
+- 웹 390px·320px 화면에서 배너 원본 이미지 표시와 텍스트/CTA 배치를 확인했다. 원본 PNG는 손상이 없었고, 작은 폭·큰 글씨에서 고정 높이와 절대 배치로 겹치는 부분을 수정했다. 폭 변경 시 캐러셀 오프셋 문제는 추가 측정에서 재현되지 않았다.
+- 웹 320×568에서 글자 크기·줄높이를 200%로 키운 스트레스 검사: 공통 권한 팝업을 끝까지 스크롤해 버튼을 누를 수 있었다. 이 검사는 iOS Dynamic Type/Android 시스템 글자 크기 검증을 대신하지 않는다.
+- iPhone 17 Pro의 ad-hoc 서명한 실제 개발 앱 실행 후 권한 안내 팝업에서 기본 `large`와 `accessibility-extra-large` 설정의 SUITE 확대·줄바꿈을 확인했다. 설정은 `large`로 원복·재조회했다. 네이티브 손가락 스크롤/하단 버튼 터치와 홈 배너까지 확인한 것은 아니다.
+- 비회원 인증 기록의 로그인 CTA → 로그인 화면 이동을 실제 웹 UI에서 확인했다.
+- 웹 390×844 통제 GPS/API: 관광 목록 → 같은 시트 상세 → 목록 복귀 → 펼치기 → 분류 변경 → 닫기 통과. 웹은 카카오 지도 대체 화면이므로 네이티브 마커 표시 성공을 뜻하지 않는다.
+- 같은 통제 응답 세션에서 권한 팝업 → 사진 보관함 → 분류 → 크기 미입력 안내/등록 비활성 → 25cm 입력 → 안내 제거/등록 활성 확인. 등록 요청은 보내지 않았다.
+
+화면 증거: [320px 배너](docs/qa/pr24/banner-320.png), [긴 제목](docs/qa/pr24/banner-long-title.png),
+[200% 팝업 스크롤](docs/qa/pr24/dialog-200-scroll.png), [관광 목록](docs/qa/pr24/tour-list.png),
+[같은 시트 상세](docs/qa/pr24/tour-detail.png), [크기 미입력](docs/qa/pr24/size-required.png),
+[크기 입력 후](docs/qa/pr24/size-valid.png), [iOS 기본 글씨](docs/qa/pr24/ios-font-normal.png),
+[iOS 접근성 큰 글씨](docs/qa/pr24/ios-font-accessibility.png). 관광명·분류 결과는 통제 응답이며 실제 관광 데이터나 서버 등록 증거가 아니다.
+
+네이티브 카카오 앱 키가 작업 폴더에 없어 인증된 지도 렌더링/실제 핀 터치는 확인하지 못했다.
+Android SDK도 이 환경에 없어 Android 네이티브 컴파일·실기기 렌더링은 미검증이다. export는 JS와 에셋 묶음 검사다.
+운영 계정 생성·사진 등록·찜 변경 요청을 보내지 않았으며 아래 항목은 QA 계정과 개발 빌드에서 별도 수행한다.
+
+| 남은 기기 QA | 통과 기준 |
+| --- | --- |
+| iOS·Android 카카오 지도 진입 | 낚시터/관광지/현재 위치 핀 표시, 핀 터치가 해당 상세만 열기, 이동 완료 후 지도 중심으로 관광 재조회 |
+| GPS 지연 중 스팟 검색 → 현재 위치 버튼 | 검색 위치를 늦은 GPS가 덮지 않고, 현재 위치 버튼은 같은 좌표에서도 다시 이동 |
+| 지도 찜 → 저장 목록 해제 → 지도 상세 재진입 | 동일한 하트 상태와 서버 응답 확인; 실패하면 원래 상태 복구 |
+| 카메라 거부/영구 거부 → 사진 선택/허용 | 팝업 대안 제공, iOS 팝업 닫힘 뒤 보관함 한 번 표시, 실제 촬영·업로드 성공 |
+| 작은 폰·시스템 큰 글자 | SUITE 렌더링, 배너/OTP/버튼/시설 시트가 겹치지 않고 모든 액션 접근 가능 |
+| 실제 어종 등록 | 크기 없는 응답에 입력 안내, 유효한 크기 입력 후 저장·도감·홈 반영 |
+
+---
+
+# 이전 기록: PR #19 · #20 · #21 통합 QA
 
 2026-09-11 기준 로컬 브랜치 `qa/pr19-20-21`.
 `origin/dev`의 `eface54` 위에 아래 순서로 병합했다. Figma 최종 수정도 원본 PR 브랜치에서 커밋한 뒤 통합했다. 원격 dev는 변경하지 않았다.
