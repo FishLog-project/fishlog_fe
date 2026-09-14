@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "fishlog_fe",
+    "name": "fishlog",
     "slug": "fishlog_fe",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -8,17 +8,21 @@
     "scheme": "fishlogfe",
     "userInterfaceStyle": "light",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/icon.png"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "xyz.fishlog.app"
+      "package": "xyz.fishlog.app",
+      "versionCode": 1,
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
     },
     "web": {
       "output": "static",
@@ -30,7 +34,7 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#FFFFFF",
-          "image": "./assets/images/splash-logo.png",
+          "image": "./assets/images/fishlog_logo.png",
           "imageWidth": 165,
           "resizeMode": "contain"
         }
