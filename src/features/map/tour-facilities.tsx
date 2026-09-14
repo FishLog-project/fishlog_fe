@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useEffect, useMemo, useState } from 'react';
+import { BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated, { ReduceMotion, SlideInDown } from 'react-native-reanimated';
 
 import { ScreenState } from '@/components/common';
 import { Brand, Components, Layout, Typography } from '@/constants/theme';
@@ -25,12 +25,7 @@ const ICONS = {
  * GPS 를 기다리지 않아 목록이 API 응답만큼만 걸린다. 지도를 움직일 때마다 자동으로 다시 부르지는 않는다.
  * 중심을 모르면(지도 SDK 오류·웹) 현재 위치(GPS)로 찾는다.
  */
-export function TourFacilities({
-  getSearchOrigin,
-}: {
-  /** 지금 지도 중심. 아직 모르면 null */
-  getSearchOrigin?: () => Coords | null;
-} = {}) {
+export function useTourFacilities(getSearchOrigin?: () => Coords | null) {
   const [category, setCategory] = useState<TourCategory | null>(null);
   const [location, locate] = useCurrentLocation();
   /** 지도 중심으로 찾을 때 고정해 둔 좌표. null 이면 GPS 로 찾는다 */
@@ -41,7 +36,6 @@ export function TourFacilities({
   // 새 분류/좌표의 응답에 없는 상세는 즉시 닫는다. 응답마다 달라지는 임시 id로 재선택하지 않는다.
   const selected = state.status === 'ready' && selectedPlace && state.places.includes(selectedPlace)
     ? selectedPlace : null;
-  const insets = useSafeAreaInsets();
 
   /** 지금 지도 중심을 조회 기준으로 잡는다. 중심을 모르면 false */
   const pinMapOrigin = () => {
@@ -61,10 +55,37 @@ export function TourFacilities({
     if (pinMapOrigin()) retry();
     else void locate();
   };
-  const byMapCenter = mapOrigin !== null;
+  const close = () => { setSelectedPlace(null); setCategory(null); };
+  const back = () => setSelectedPlace(null);
+  const selectPlace = (id: string) => {
+    if (state.status === 'ready') setSelectedPlace(state.places.find((place) => place.id === id) ?? null);
+  };
+  const markers = useMemo(() => state.status === 'ready'
+    ? state.places.flatMap((place) => place.coords ? [{ id: place.id, name: place.name, ...place.coords }] : [])
+    : [], [state]);
+
+  return { category, location, origin, state, selected, markers, byMapCenter: mapOrigin !== null,
+    selectCategory, refreshLocation, retry, selectPlace, back, close };
+}
+
+/** 지도 마커·목록·상세가 같은 요청 결과와 선택 상태를 쓴다. */
+export function TourFacilities({ facilities }: { facilities: ReturnType<typeof useTourFacilities> }) {
+  const { category, location, origin, state, selected, byMapCenter,
+    selectCategory, refreshLocation, retry, selectPlace, back, close } = facilities;
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => {
+    if (!category) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (selected) back();
+      else close();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [category, selected, back, close]);
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+      {category ? <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.backdrop]} /> : null}
       <ScrollView
         horizontal
         style={styles.filters}
@@ -76,7 +97,7 @@ export function TourFacilities({
             accessibilityRole="button"
             accessibilityLabel={`${item} 시설 보기`}
             accessibilityState={{ selected: category === item }}
-            onPress={() => selectCategory(item)}
+            onPress={() => { setExpanded(false); selectCategory(item); }}
             style={({ pressed }) => [styles.chip, category === item && styles.chipSelected, pressed && styles.pressed]}>
             <Image source={ICONS[item]} style={styles.chipIcon} contentFit="contain" />
             <Text style={styles.chipLabel}>{item}</Text>
@@ -85,26 +106,47 @@ export function TourFacilities({
       </ScrollView>
 
       {category ? (
-        <View style={styles.sheet}>
+        <Animated.View
+          key={category}
+          testID="tour-facility-sheet"
+          entering={SlideInDown.duration(220).reduceMotion(ReduceMotion.System)}
+          style={[styles.sheet, expanded && styles.sheetExpanded]}>
           <View style={styles.sheetHeader}>
+            {selected ? (
+              <Pressable accessibilityRole="button" accessibilityLabel="시설 목록으로 돌아가기" onPress={back} style={styles.iconButton}>
+                <Ionicons name="chevron-back" size={24} color={Brand.textStrong} />
+              </Pressable>
+            ) : null}
             <View style={styles.copy}>
               <Text accessibilityRole="header" style={styles.heading}>
-                {byMapCenter ? `지도 중심 주변 ${category}` : `내 주변 ${category}`}
+                {selected?.name ?? (byMapCenter ? `지도 중심 주변 ${category}` : `내 주변 ${category}`)}
               </Text>
-              <Text style={styles.meta}>
+              {!selected ? <Text style={styles.meta}>
                 {byMapCenter ? '지도 중심 반경 5km · 가까운 순 · 최대 30곳' : '반경 5km · 가까운 순 · 최대 30곳'}
-              </Text>
+              </Text> : null}
             </View>
-            <Pressable
+            {!selected ? <Pressable
               accessibilityRole="button"
               accessibilityLabel={byMapCenter ? '지도 중심으로 시설 다시 조회' : '현재 위치로 시설 다시 조회'}
               onPress={refreshLocation}
               style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}>
               <Image source={require('@/assets/images/map/my-location.svg')} style={styles.locationIcon} contentFit="contain" />
+            </Pressable> : null}
+            <Pressable accessibilityRole="button" accessibilityLabel={expanded ? '시설 시트 접기' : '시설 시트 펼치기'} accessibilityState={{ expanded }} onPress={() => setExpanded(!expanded)} style={styles.iconButton}>
+              <Ionicons name={expanded ? 'chevron-down' : 'chevron-up'} size={24} color={Brand.textStrong} />
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="시설 목록 닫기" onPress={close} style={styles.iconButton}>
+              <Ionicons name="close" size={24} color={Brand.textStrong} />
             </Pressable>
           </View>
-          <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-            {!origin ? (
+          <ScrollView key={selected?.id ?? 'list'} style={styles.viewport} contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+            {selected ? (
+              <View testID="tour-facility-detail" style={styles.detailContent}>
+                <Text style={styles.address}>{selected.address ?? '주소 정보가 없어요'}</Text>
+                <Text style={styles.distance}>{selected.distanceLabel ?? '거리 정보 없음'}</Text>
+                <PlaceImage uri={selected.photos[0] ?? null} large />
+              </View>
+            ) : !origin ? (
               <ScreenState
                 variant={location.status === 'denied' || location.status === 'unavailable' ? 'error' : 'loading'}
                 title={location.status === 'denied' ? '위치 권한이 필요해요'
@@ -120,7 +162,7 @@ export function TourFacilities({
                   key={place.id}
                   accessibilityRole="button"
                   accessibilityLabel={`${place.name}, ${place.address ?? '주소 정보 없음'}, ${place.distanceLabel ?? '거리 정보 없음'}. 시설 상세 보기`}
-                  onPress={() => setSelectedPlace(place)}
+                  onPress={() => selectPlace(place.id)}
                   style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
                   <PlaceImage uri={place.thumbnailUrl} />
                   <View style={styles.placeCopy}>
@@ -141,28 +183,7 @@ export function TourFacilities({
               />
             )}
           </ScrollView>
-        </View>
-      ) : null}
-
-      {selected ? (
-        <Modal transparent animationType="slide" onRequestClose={() => setSelectedPlace(null)}>
-          <View style={styles.backdrop} accessibilityViewIsModal>
-            <Pressable style={StyleSheet.absoluteFill} onPress={() => setSelectedPlace(null)} accessible={false} />
-            <View style={[styles.detail, { paddingBottom: Math.max(insets.bottom, 20) }]}>
-              <View style={styles.detailHeader}>
-                <Text accessibilityRole="header" style={styles.detailTitle}>{selected.name}</Text>
-                <Pressable accessibilityRole="button" accessibilityLabel="시설 상세 닫기" onPress={() => setSelectedPlace(null)} style={styles.iconButton}>
-                  <Ionicons name="close" size={28} color={Brand.textStrong} />
-                </Pressable>
-              </View>
-              <ScrollView contentContainerStyle={styles.detailContent}>
-                <Text style={styles.address}>{selected.address ?? '주소 정보가 없어요'}</Text>
-                <Text style={styles.distance}>{selected.distanceLabel ?? '거리 정보 없음'}</Text>
-                <PlaceImage uri={selected.photos[0] ?? null} large />
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
+        </Animated.View>
       ) : null}
     </View>
   );
@@ -185,9 +206,11 @@ const styles = StyleSheet.create({
   chipSelected: { backgroundColor: Brand.surfaceSoft, boxShadow: 'inset 0px 2px 4px rgba(49,135,241,0.25)' },
   chipIcon: { width: 16, height: 16 },
   chipLabel: { ...Typography.caption, color: Brand.textHeading, lineHeight: 28 },
-  sheet: { position: 'absolute', top: 80, bottom: 0, left: 0, right: 0, backgroundColor: Brand.background, borderTopLeftRadius: 16, borderTopRightRadius: 16, overflow: 'hidden' },
-  sheetHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Layout.screenPadding, paddingTop: 12, paddingBottom: 4, gap: 12 },
-  copy: { flex: 1, gap: 4 },
+  sheet: { position: 'absolute', top: '50%', bottom: 0, left: 0, right: 0, backgroundColor: Brand.background, borderTopLeftRadius: 16, borderTopRightRadius: 16, overflow: 'hidden' },
+  sheetExpanded: { top: 80 },
+  viewport: { flex: 1 },
+  sheetHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Layout.screenPadding, paddingTop: 8, paddingBottom: 4, gap: 4 },
+  copy: { flex: 1, minWidth: 0, gap: 4 },
   heading: { ...Typography.sectionTitle, color: Brand.textHeading },
   meta: { ...Typography.footnote, color: Brand.textWeak, lineHeight: 19 },
   iconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
@@ -200,10 +223,7 @@ const styles = StyleSheet.create({
   address: { ...Typography.footnote, color: Brand.textWeak, lineHeight: 19 },
   distance: { ...Typography.caption, color: Brand.textMuted, lineHeight: 20, marginTop: 8 },
   pressed: { opacity: 0.72 },
-  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: Brand.scrim },
-  detail: { maxHeight: '75%', backgroundColor: Brand.background, borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingHorizontal: Layout.screenPadding },
-  detailHeader: { paddingTop: 12, flexDirection: 'row', gap: 12, alignItems: 'center' },
-  detailTitle: { ...Typography.sectionTitle, color: Brand.textHeading, flex: 1 },
+  backdrop: { backgroundColor: Brand.scrim },
   detailContent: { paddingBottom: 12 },
   detailPhoto: { width: '100%', height: 200, marginTop: 16 },
 });

@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Screen, ScreenHeader } from '@/components/common';
-import { Brand, Typography } from '@/constants/theme';
+import { Brand, Typography, Fonts } from '@/constants/theme';
 
 type Props = {
   title: string;
@@ -34,5 +34,5 @@ export function PlaceholderScreen({ title, icon, showBack = false }: Props) {
 const styles = StyleSheet.create({
   body: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
   title: { ...Typography.sectionTitle, fontSize: 20, color: Brand.primaryDark },
-  sub: { ...Typography.caption, fontWeight: '400', color: Brand.textMuted },
+  sub: { ...Typography.caption, fontFamily: Fonts.regular, color: Brand.textMuted },
 });

@@ -7,7 +7,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { usePreventRemove } from 'expo-router/react-navigation';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 
 import {
@@ -180,18 +180,27 @@ function CaptureStep({
   const [mountFailed, setMountFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [permissionDismissed, setPermissionDismissed] = useState(false);
+  const libraryAfterDismiss = useRef(false);
+  const permissionDialogVisible = !fixturePhotoUri && permission !== null &&
+    !permission.granted && !permissionDismissed;
 
   const cameraAvailable =
     !fixturePhotoUri && permission?.granted === true && !mountFailed;
   const canCapture = Boolean(fixturePhotoUri) || (cameraAvailable && cameraReady);
 
-  // 설정 앱으로 보내지 않고 OS 권한 창만 띄운다. OS 가 더 묻지 않는 상태면 버튼 자체를 숨긴다.
+  // OS가 다시 물을 수 있는 경우에만 요청하고, 거부해도 보관함 대안을 남긴다.
   const requestCameraAccess = async () => {
+    if (busy || !permission?.canAskAgain) return;
+    setBusy(true);
     setError(null);
     try {
-      await requestPermission();
+      const result = await requestPermission();
+      if (result.granted) setPermissionDismissed(true);
     } catch {
       setError('카메라 권한을 요청하지 못했어요. 사진 보관함에서 선택해 주세요.');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -210,6 +219,17 @@ function CaptureStep({
       setError('사진을 불러오지 못했어요. 다시 시도해 주세요.');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const openLibrary = () => {
+    if (busy) return;
+    setPermissionDismissed(true);
+    // iOS 사진 선택기는 다른 Modal이 닫히는 중이면 표시되지 않을 수 있다.
+    if (Platform.OS === 'ios' && permissionDialogVisible) {
+      libraryAfterDismiss.current = true;
+    } else {
+      void pickFromLibrary();
     }
   };
 
@@ -267,12 +287,12 @@ function CaptureStep({
           ) : (
             <View style={styles.placeholder}>
               <Text style={styles.placeholderText}>{status}</Text>
-              {permission && !permission.granted && permission.canAskAgain ? (
+              {permission && !permission.granted ? (
                 <Pressable
                   hitSlop={8}
                   accessibilityRole="button"
-                  onPress={requestCameraAccess}>
-                  <Text style={styles.placeholderLink}>카메라 권한 허용하기</Text>
+                  onPress={() => setPermissionDismissed(false)}>
+                  <Text style={styles.placeholderLink}>카메라 권한 안내 보기</Text>
                 </Pressable>
               ) : null}
               <Pressable
@@ -280,7 +300,7 @@ function CaptureStep({
                 accessibilityRole="button"
                 accessibilityState={{ disabled: busy }}
                 disabled={busy}
-                onPress={pickFromLibrary}>
+                onPress={openLibrary}>
                 <Text style={styles.placeholderLink}>사진 보관함에서 선택하기</Text>
               </Pressable>
             </View>
@@ -302,6 +322,26 @@ function CaptureStep({
           <Image source={SHUTTER} style={StyleSheet.absoluteFill} contentFit="contain" />
         </Pressable>
       </View>
+
+      <AppDialog
+        visible={permissionDialogVisible}
+        title="카메라 권한이 필요해요"
+        message={permission?.canAskAgain
+          ? '잡은 물고기를 촬영하려면 카메라 사용을 허용해 주세요. 사진 보관함에서도 선택할 수 있어요.'
+          : '카메라 권한이 꺼져 있어요. 사진 보관함의 물고기 사진으로 인증할 수 있어요.'}
+        buttonLabel={permission?.canAskAgain ? '카메라 허용하기' : '사진 선택하기'}
+        onConfirm={permission?.canAskAgain ? requestCameraAccess : openLibrary}
+        secondaryLabel={permission?.canAskAgain ? '사진 선택하기' : undefined}
+        onSecondary={permission?.canAskAgain ? openLibrary : undefined}
+        cancelLabel="나중에"
+        onCancel={() => setPermissionDismissed(true)}
+        loading={busy}
+        onDismiss={() => {
+          if (!libraryAfterDismiss.current) return;
+          libraryAfterDismiss.current = false;
+          void pickFromLibrary();
+        }}
+      />
     </View>
   );
 }
@@ -571,6 +611,13 @@ function ResultStep({
       ) : null}
 
       <View style={styles.resultActions}>
+        {!canRegister ? (
+          <Text style={styles.registrationHint} accessibilityLiveRegion="polite">
+            {sizeCm === null
+              ? '등록하려면 위의 크기를 눌러 물고기 크기(cm)를 입력해 주세요.'
+              : '등록하려면 위의 어종을 눌러 물고기 이름을 입력해 주세요.'}
+          </Text>
+        ) : null}
         <PrimaryButton
           label="이대로 도감에 등록하기"
           onPress={onRegister}
@@ -680,6 +727,7 @@ function RegisteredStep({
 }
 
 const styles = StyleSheet.create({
+  registrationHint: { ...Typography.footnote, color: Brand.textMuted, textAlign: 'center' },
   page: { flex: 1 },
   pageScroll: { flexGrow: 1 },
   /** 헤더 아래 44, 좌우 24 (Figma 634:3121) */

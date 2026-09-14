@@ -52,10 +52,10 @@ export function SpotDetailSheet({
 }: {
   dataSource: SpotDataSource;
   spotId: number | null;
-  /** 목록(GET /api/spots)이 주는 초기값. 토글은 시트 안에서 관리한다 */
+  /** 공유 목록의 현재 찜 값. 요청 대기 중에만 시트가 낙관적으로 표시한다 */
   isFavorite?: boolean;
-  /** 찜이 서버에 반영됐을 때. 지도 목록의 낡은 값을 덮어쓰는 데 쓴다 */
-  onFavoriteChange?: (spotId: number, isFavorite: boolean) => void;
+  /** 찜이 서버에 반영됐을 때 공유 목록을 갱신한다 */
+  onFavoriteChange: (spotId: number, isFavorite: boolean) => void;
   onClose: () => void;
 }) {
   return (
@@ -96,7 +96,7 @@ function SpotDetailLoader({
   dataSource: SpotDataSource;
   spotId: number;
   isFavorite: boolean;
-  onFavoriteChange?: (spotId: number, isFavorite: boolean) => void;
+  onFavoriteChange: (spotId: number, isFavorite: boolean) => void;
   onClose: () => void;
 }) {
   // Reanimated 의 shared value 를 직접 바꾸는 코드라 React Compiler 의 불변성 검사를 끈다.
@@ -422,7 +422,6 @@ const styles = StyleSheet.create({
   titleBlock: { flex: 1, alignItems: 'center' },
   name: {
     fontFamily: Fonts.bold,
-    fontWeight: '700',
     fontSize: 20,
     lineHeight: 28,
     letterSpacing: -0.4,
@@ -432,7 +431,6 @@ const styles = StyleSheet.create({
   /** 분류 · 조회수 */
   meta: {
     fontFamily: Fonts.medium,
-    fontWeight: '500',
     fontSize: 15,
     lineHeight: 28,
     letterSpacing: -0.3,
@@ -442,7 +440,6 @@ const styles = StyleSheet.create({
   /** 주소 (Figma 634:1560). 분류 줄 아래에 한 줄 더 붙으므로 줄 높이만 좁힌다 */
   address: {
     fontFamily: Fonts.medium,
-    fontWeight: '500',
     fontSize: 15,
     lineHeight: 22,
     letterSpacing: -0.3,
@@ -460,7 +457,6 @@ const styles = StyleSheet.create({
   notice: { ...Typography.itemMeta, color: Brand.textError },
   sectionTitle: {
     fontFamily: Fonts.semiBold,
-    fontWeight: '600',
     fontSize: 16,
     lineHeight: 28,
     letterSpacing: -0.32,
@@ -472,7 +468,6 @@ const styles = StyleSheet.create({
   /** 구획 제목(물때·주요 어종)과 같은 스타일로 맞춘다 */
   dateLabel: {
     fontFamily: Fonts.semiBold,
-    fontWeight: '600',
     fontSize: 16,
     lineHeight: 28,
     letterSpacing: -0.32,
@@ -487,7 +482,6 @@ const styles = StyleSheet.create({
   },
   noonText: {
     fontFamily: Fonts.semiBold,
-    fontWeight: '600',
     fontSize: 12.833,
     lineHeight: 25.667,
     letterSpacing: -0.2567,
@@ -504,13 +498,13 @@ const styles = StyleSheet.create({
     borderRadius: SHEET.indexCardRadius,
     backgroundColor: SHEET.indexCardBg,
   },
-  indexRow: { flexDirection: 'row', alignItems: 'center', gap: SHEET.indexCardGap },
-  indexGrade: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  indexRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: SHEET.indexCardGap, rowGap: 8 },
+  indexGrade: { flexDirection: 'row', alignItems: 'center', flexShrink: 1, minWidth: 0, gap: 8 },
   indexDot: { width: SHEET.indexDot, height: SHEET.indexDot, borderRadius: SHEET.indexDot / 2 },
   // ⚠️ 시안은 세로 그라데이션 글자다. 마스킹 라이브러리가 package.json 에 없어 단색으로 대신한다.
   indexLabel: {
+    flexShrink: 1,
     fontFamily: Fonts.bold,
-    fontWeight: '700',
     fontSize: 18,
     lineHeight: 28,
     letterSpacing: -0.36,
@@ -518,7 +512,6 @@ const styles = StyleSheet.create({
   indexDescription: {
     flexShrink: 1,
     fontFamily: Fonts.medium,
-    fontWeight: '500',
     fontSize: 13,
     lineHeight: 20,
     letterSpacing: -0.26,
@@ -537,7 +530,6 @@ const styles = StyleSheet.create({
   },
   tideName: {
     fontFamily: Fonts.bold,
-    fontWeight: '700',
     fontSize: 12.833,
     lineHeight: 25.667,
     letterSpacing: -0.2567,
@@ -545,7 +537,6 @@ const styles = StyleSheet.create({
   },
   tideDescription: {
     fontFamily: Fonts.medium,
-    fontWeight: '500',
     fontSize: 12.833,
     lineHeight: 25.667,
     letterSpacing: -0.2567,
@@ -572,7 +563,6 @@ const styles = StyleSheet.create({
   fishImage: { flex: 1, width: '100%' },
   fishName: {
     fontFamily: Fonts.semiBold,
-    fontWeight: '600',
     fontSize: 12,
     lineHeight: 16,
     letterSpacing: -0.24,
@@ -592,7 +582,6 @@ const styles = StyleSheet.create({
   infoRowLast: { borderBottomWidth: 0 },
   infoLabel: {
     fontFamily: Fonts.semiBold,
-    fontWeight: '600',
     fontSize: 14,
     lineHeight: 28,
     letterSpacing: -0.28,
@@ -600,7 +589,6 @@ const styles = StyleSheet.create({
   },
   infoValue: {
     fontFamily: Fonts.bold,
-    fontWeight: '700',
     fontSize: 16,
     lineHeight: 28,
     letterSpacing: -0.32,

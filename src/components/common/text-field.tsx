@@ -45,7 +45,8 @@ export const TextField = forwardRef<TextInput, Props>(function TextField(
 const styles = StyleSheet.create({
   input: {
     ...Typography.input,
-    height: Components.authInput.boxHeight,
+    minHeight: Components.authInput.boxHeight,
+    paddingVertical: 12,
     borderRadius: Components.authInput.boxRadius,
     backgroundColor: Components.authInput.boxBg,
     paddingHorizontal: Components.authInput.boxPaddingX,

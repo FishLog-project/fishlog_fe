@@ -13,7 +13,8 @@ import { FishlogKakaoMap } from '@/features/map/kakao-map';
 import { createApiSpotDataSource } from '@/features/map/spot-api';
 import { createFixtureSpotDataSource } from '@/features/map/spot-data';
 import type { Coords } from '@/features/map/tour-data';
-import { TourFacilities } from '@/features/map/tour-facilities';
+import { TourFacilities, useTourFacilities } from '@/features/map/tour-facilities';
+import { setSpotFavorite } from '@/features/map/spot-list-store';
 import { useSpotsViewModel } from '@/features/map/use-spot-view-model';
 import { USE_FIXTURE } from '@/lib/data-source-mode';
 
@@ -47,15 +48,11 @@ export default function MapScreen() {
     mapCenter.current = { lat: center.lat, lng: center.lng };
   }, []);
   const [selectedSpotId, setSelectedSpotId] = useState<number | null>(null);
-  /**
-   * 찜을 토글해도 목록(GET /api/spots)의 isFavorite 은 그대로라,
-   * 같은 스팟을 다시 열면 하트가 예전 상태로 보인다. 바뀐 값만 여기에 덮어 둔다.
-   */
-  const [favoriteOverrides, setFavoriteOverrides] = useState<Record<number, boolean>>({});
-
+  const sessionKey = USE_FIXTURE ? 'fixture' : `session-${sessionId}`;
   const rememberFavorite = useCallback((spotId: number, isFavorite: boolean) => {
-    setFavoriteOverrides((current) => ({ ...current, [spotId]: isFavorite }));
-  }, []);
+    setSpotFavorite(sessionKey, spotId, isFavorite);
+  }, [sessionKey]);
+  const facilities = useTourFacilities(getMapCenter);
 
   const dataSource = useMemo(
     () => (USE_FIXTURE ? createFixtureSpotDataSource() : createApiSpotDataSource(token)),
@@ -63,13 +60,10 @@ export default function MapScreen() {
   );
   const { markers, allSpots, refresh, refreshing } = useSpotsViewModel(
     dataSource,
-    USE_FIXTURE ? 'fixture' : `session-${sessionId}`,
+    sessionKey,
   );
   const selectedSpot = allSpots?.find((spot) => spot.id === selectedSpotId) ?? null;
-  const selectedIsFavorite =
-    (selectedSpotId !== null ? favoriteOverrides[selectedSpotId] : undefined) ??
-    selectedSpot?.isFavorite ??
-    false;
+  const selectedIsFavorite = selectedSpot?.isFavorite ?? false;
 
   /**
    * 검색 화면에서 고른 스팟을 연다.
@@ -109,7 +103,9 @@ export default function MapScreen() {
         <FishlogKakaoMap
           recenterSignal={recenterSignal}
           spots={markers ?? undefined}
-          onSpotPress={setSelectedSpotId}
+          onSpotPress={(id) => { facilities.close(); setSelectedSpotId(id); }}
+          tourPlaces={facilitiesOpen ? facilities.markers : undefined}
+          onTourPress={(id) => { setSelectedSpotId(null); facilities.selectPlace(id); }}
           focus={focus}
           onCameraIdle={rememberMapCenter}
         />
@@ -127,7 +123,7 @@ export default function MapScreen() {
               }
               onPress={
                 action.key === 'facilities'
-                  ? () => setFacilitiesOpen((open) => !open)
+                  ? () => { facilities.close(); setFacilitiesOpen((open) => !open); }
                   : action.key === 'sea'
                     ? () => setSeaInfoOpen((open) => !open)
                     : action.key === 'fish'
@@ -177,10 +173,11 @@ export default function MapScreen() {
             contentFit="contain"
           />
         </Pressable>
-        {facilitiesOpen ? <TourFacilities getSearchOrigin={getMapCenter} /> : null}
+        {facilitiesOpen ? <TourFacilities facilities={facilities} /> : null}
       </View>
 
       <SpotDetailSheet
+        key={sessionKey}
         dataSource={dataSource}
         spotId={selectedSpotId}
         isFavorite={selectedIsFavorite}

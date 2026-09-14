@@ -9,7 +9,7 @@ import type {
 } from '@/features/map/tour-data';
 
 export interface TourPlaceViewModel {
-  /** BE에 id가 없어 순번으로 만든다. 같은 응답 안에서만 유일하다 */
+  /** BE에 id가 없어 요청 키와 순번으로 만든다. 오래된 마커 이벤트는 새 결과를 고르지 못한다 */
   id: string;
   name: string;
   address: string | null;
@@ -43,14 +43,14 @@ function imageUrl(value: string | null): string | null {
   }
 }
 
-function toPlace(spot: TourSpot, index: number, origin: Coords): TourPlaceViewModel {
+function toPlace(spot: TourSpot, index: number, origin: Coords, requestKey: string): TourPlaceViewModel {
   const position = { lat: spot.mapY, lng: spot.mapX };
   const coords = isValidCoords(position) ? position : null;
   const thumbnail = imageUrl(spot.firstImage2);
   const image = imageUrl(spot.firstImage) || thumbnail;
 
   return {
-    id: `${index}-${spot.title}`,
+    id: `${requestKey}:${index}-${spot.title}`,
     name: spot.title,
     address: [spot.addr1, spot.addr2].filter(Boolean).join(' ') || null,
     distanceLabel: coords ? formatDistance(distanceMeters(origin, coords)) : null,
@@ -93,7 +93,7 @@ export function useNearbyTours(
       .getNearbyTours({ type: category, ...coords }, controller.signal)
       .then((res) => {
         if (controller.signal.aborted) return;
-        const places = res.items.map((spot, i) => toPlace(spot, i, coords));
+        const places = res.items.map((spot, i) => toPlace(spot, i, coords, request.key!));
         setLoaded({
           request,
           state: places.length === 0 ? { status: 'empty' } : { status: 'ready', places },
