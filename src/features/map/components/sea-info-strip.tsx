@@ -64,7 +64,6 @@ const styles = StyleSheet.create({
   // 시안은 라벨 SUITE SemiBold 11, 값 Pretendard Medium 12 — 앱 기본 서체가 SUITE라 값도 SUITE로 맞춘다.
   label: {
     fontFamily: Fonts.semiBold,
-    fontWeight: '600',
     fontSize: 11,
     lineHeight: 16,
     letterSpacing: -0.22,
@@ -73,7 +72,6 @@ const styles = StyleSheet.create({
   },
   value: {
     fontFamily: Fonts.medium,
-    fontWeight: '500',
     fontSize: 12,
     lineHeight: 16,
     letterSpacing: -0.24,

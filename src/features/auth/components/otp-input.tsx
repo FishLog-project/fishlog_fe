@@ -86,7 +86,7 @@ const styles = StyleSheet.create({
   },
   cell: {
     flex: 1,
-    height: Components.otp.cellHeight,
+    minHeight: Components.otp.cellHeight,
     borderBottomWidth: Components.authInput.underlineWidth,
     alignItems: 'center',
     justifyContent: 'flex-end',
