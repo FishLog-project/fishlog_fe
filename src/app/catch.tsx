@@ -36,7 +36,7 @@ import { USE_FIXTURE } from '@/lib/data-source-mode';
 const CATCH = Components.catch;
 const DEX = Components.dex;
 
-const SHUTTER = require('@/assets/images/catch/shutter.svg');
+const SHUTTER = require('@/assets/images/catch/shutter.png');
 const ANALYSIS_ILLUSTRATION = require('@/assets/images/catch/analysis-fishing.png');
 const ANALYSIS_VIDEO = require('@/assets/videos/catch-analysis.mp4');
 const CANDIDATE_ART = require('@/assets/images/catch/candidate-flatfish.png');
@@ -71,6 +71,11 @@ export default function CatchScreen() {
   );
   const flow = useCatchFlow(dataSource);
   const { state, registering } = flow;
+  // 분석 일러스트(600KB)는 디코딩에 시간이 걸려, 분석 화면에 들어가자마자 그리면
+  // 영상 첫 프레임이 뜰 때까지 흰 화면이 보인다. 촬영 화면에서 미리 디코딩해 둔다.
+  useEffect(() => {
+    void Image.prefetch(Asset.fromModule(ANALYSIS_ILLUSTRATION).uri).catch(() => {});
+  }, []);
   // 헤더뿐 아니라 Android 뒤로가기와 iOS 뒤로 스와이프도 저장 완료까지 막는다.
   usePreventRemove(registering, () => {});
 
