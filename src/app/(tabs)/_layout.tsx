@@ -1,9 +1,12 @@
 import { Image } from 'expo-image';
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
+import { useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Brand, Layout } from '@/constants/theme';
+import { AppDialog } from '@/components/common';
+import { useAuth } from '@/features/auth';
 
 /**
  * 탭 순서·아이콘·스크린리더 이름.
@@ -59,57 +62,80 @@ const TABS = [
  * 5탭: 홈 · 지도 · 기록 · 랭킹 · 프로필 — 아이콘 전용, 라벨 없음.
  */
 export default function TabsLayout() {
+  const router = useRouter();
+  const { isGuest } = useAuth();
+  const [guestNotice, setGuestNotice] = useState<string | null>(null);
   // 안드로이드 제스처 바 / 3버튼 네비게이션 바 높이. 기기마다 달라서
   // 고정값을 쓰면 탭 아이콘이 OS 네비게이션 바에 가린다.
   const insets = useSafeAreaInsets();
 
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarShowLabel: false,
-        tabBarStyle: {
-          height: Layout.tabBarHeight + insets.bottom,
-          paddingBottom: insets.bottom,
-          borderTopWidth: 0,
-          backgroundColor: Brand.background,
-        },
-        // 버튼 하나의 터치 영역
-        tabBarItemStyle: {
-          height: Layout.tabItemSize,
-          alignItems: 'center',
-          justifyContent: 'center',
-        },
-        /**
-         * 아이콘 칸이 버튼 안쪽을 세로로 다 채우게 한다.
-         *
-         * 폭만 아이콘 크기로 못 박는다 — 지정하지 않으면 기본값(약 29dp)에 맞춰
-         * 36dp 아이콘이 잘린다. 높이는 flex 로 채운다. 탭 버튼 안쪽은 라이브러리가
-         * 위쪽 정렬 + 상하 패딩 10 으로 그려서(BottomTabItem), 높이를 고정하면
-         * 아이콘이 위로 붙는다. 칸이 꽉 차면 그 안에서 아이콘이 가운데 놓인다.
-         */
-        tabBarIconStyle: {
-          flex: 1,
-          width: Layout.tabIconSize,
-        },
-      }}>
-      {TABS.map(({ name, label, leaf, active, inactive }) => (
-        <Tabs.Screen
-          key={name}
-          name={name}
-          options={{
-            tabBarAccessibilityLabel: label,
-            tabBarIcon: ({ focused }) => (
-              <Image
-                source={focused ? active : inactive}
-                style={[styles.icon, { width: leaf, height: leaf }]}
-                contentFit="contain"
-              />
-            ),
-          }}
-        />
-      ))}
-    </Tabs>
+    <>
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarShowLabel: false,
+          tabBarStyle: {
+            height: Layout.tabBarHeight + insets.bottom,
+            paddingBottom: insets.bottom,
+            borderTopWidth: 0,
+            backgroundColor: Brand.background,
+          },
+          // 버튼 하나의 터치 영역
+          tabBarItemStyle: {
+            height: Layout.tabItemSize,
+            alignItems: 'center',
+            justifyContent: 'center',
+          },
+          /**
+           * 아이콘 칸이 버튼 안쪽을 세로로 다 채우게 한다.
+           *
+           * 폭만 아이콘 크기로 못 박는다 — 지정하지 않으면 기본값(약 29dp)에 맞춰
+           * 36dp 아이콘이 잘린다. 높이는 flex 로 채운다. 탭 버튼 안쪽은 라이브러리가
+           * 위쪽 정렬 + 상하 패딩 10 으로 그려서(BottomTabItem), 높이를 고정하면
+           * 아이콘이 위로 붙는다. 칸이 꽉 차면 그 안에서 아이콘이 가운데 놓인다.
+           */
+          tabBarIconStyle: {
+            flex: 1,
+            width: Layout.tabIconSize,
+          },
+        }}>
+        {TABS.map(({ name, label, leaf, active, inactive }) => (
+          <Tabs.Screen
+            key={name}
+            name={name}
+            listeners={{
+              focus: () => {
+                setGuestNotice(isGuest && (name === 'dex' || name === 'ranking') ? label : null);
+              },
+              blur: () => setGuestNotice(null),
+            }}
+            options={{
+              tabBarAccessibilityLabel: label,
+              tabBarIcon: ({ focused }) => (
+                <Image
+                  source={focused ? active : inactive}
+                  style={[styles.icon, { width: leaf, height: leaf }]}
+                  contentFit="contain"
+                />
+              ),
+            }}
+          />
+        ))}
+      </Tabs>
+      <AppDialog
+        visible={isGuest && guestNotice !== null}
+        title={`로그인하고 ${guestNotice ?? ''}을 이용해 보세요`}
+        message="로그인 후 낚시 인증을 하면 나만의 도감을 채우고 랭킹에 참여할 수 있어요."
+        cancelLabel="확인"
+        onCancel={() => setGuestNotice(null)}
+        buttonLabel="로그인 하러 가기"
+        onConfirm={() => {
+          setGuestNotice(null);
+          router.push('/auth/login');
+        }}
+      />
+    </>
   );
 }
 
