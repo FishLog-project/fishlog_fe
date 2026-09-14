@@ -3,6 +3,7 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
+import { Platform, StyleSheet, View } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { FontAssets } from '@/constants/theme';
@@ -67,9 +68,30 @@ function RootNavigator() {
 // 색상 토큰이 라이트 단일 팔레트라 ThemeProvider를 두지 않는다.
 // expo-router의 NavigationContainer가 이미 DefaultTheme(라이트)을 기본값으로 넣는다.
 export default function RootLayout() {
+  const app = <RootNavigator />;
+
   return (
     <AuthProvider>
-      <RootNavigator />
+      {Platform.OS === 'web' ? (
+        <View style={styles.webPage}>
+          <View style={styles.webApp}>{app}</View>
+        </View>
+      ) : app}
     </AuthProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  webPage: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: '#EEF4F8',
+  },
+  webApp: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 390,
+    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
+  },
+});

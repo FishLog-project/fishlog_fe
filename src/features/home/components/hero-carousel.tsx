@@ -186,12 +186,22 @@ function FeaturedSpeciesSlide({
         end={GLOW_END}
         style={StyleSheet.absoluteFill}
       />
-      <Text style={[styles.label, styles.onDark]}>{FEATURED_LABEL}</Text>
-      <Text style={[styles.title, styles.onDark, !expanded && styles.featuredTitle]}>
-        {title}
-      </Text>
+      {/* 글자 칸은 그림과 겹치지 않게 폭을 제한하고, 제목은 항상 한 줄이다 */}
+      <View style={[styles.copyBox, expanded && styles.copyBoxWide]}>
+        <Text numberOfLines={1} style={[styles.label, styles.onDark]}>
+          {FEATURED_LABEL}
+        </Text>
+        {/* 어종 이름이 길거나 글꼴이 커도 줄을 바꾸지 않고 글자를 줄인다 */}
+        <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.6}
+          style={[styles.title, styles.onDark]}>
+          {title}
+        </Text>
+      </View>
       {section.status === 'ready' ? (
-        <View pointerEvents="none" style={[styles.featuredArt, expanded && styles.expandedArt]}>
+        <View pointerEvents="none" style={[styles.featuredArt, expanded && styles.featuredArtCompact]}>
           <FishArtwork
             imageUrl={section.data.imageUrl}
             style={[styles.featuredFish, styles.featuredFishShadow]}
@@ -260,23 +270,29 @@ function UnownedSpeciesSlide({
         style={StyleSheet.absoluteFill}
       />
 
-      <Text style={[styles.label, styles.onLight]}>아직 만나지 못한 어종</Text>
-      <Text style={[styles.title, styles.onLight]}>
-        도감에 빈자리가 있어요!
-      </Text>
-      <Text style={[styles.unownedSubtitle, expanded && styles.expandedSubtitle]}>
-        {subtitle}
-      </Text>
+      <View style={[styles.copyBox, expanded && styles.copyBoxWide]}>
+        <Text numberOfLines={1} style={[styles.label, styles.onLight]}>
+          아직 만나지 못한 어종
+        </Text>
+        <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.6}
+          style={[styles.title, styles.onLight]}>
+          도감에 빈자리가 있어요!
+        </Text>
+        <Text numberOfLines={2} style={styles.unownedSubtitle}>
+          {subtitle}
+        </Text>
+      </View>
 
-      {/* ??? 는 실루엣 위에 겹쳐 올린다 — 어떤 어종인지 가리는 표시라서 */}
-      <View pointerEvents="none" style={[styles.unownedSilhouette, expanded && styles.expandedArt]}>
+      <View pointerEvents="none" style={[styles.unownedArt, expanded && styles.unownedArtCompact]}>
         <Image
           source={require('@/assets/images/home/unowned-fish.png')}
           style={styles.unownedFish}
           contentFit="contain"
           blurRadius={0.9}
         />
-        <Text style={styles.unownedMark}>???</Text>
       </View>
 
       <HeroCta
@@ -309,12 +325,18 @@ function RecommendedSpotSlide({
         style={category === '해양' ? styles.spotPhotoMarine : styles.spotPhotoInland}
         contentFit="cover"
       />
-      <Text style={[styles.label, styles.onLight]}>지금 인기 스팟</Text>
-      <Text style={[styles.title, styles.onLight]}>
+      <Text numberOfLines={1} style={[styles.label, styles.onLight]}>
+        지금 인기 스팟
+      </Text>
+      <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.6}
+        style={[styles.title, styles.onLight]}>
         {title}
       </Text>
       {spot ? (
-        <Text style={styles.spotSubtitle}>
+        <Text numberOfLines={2} style={styles.spotSubtitle}>
           {SPOT_SUBTITLE}
         </Text>
       ) : null}
@@ -342,7 +364,7 @@ function RecommendedSpotSlide({
 
 const styles = StyleSheet.create({
   card: {
-    minHeight: HERO.heroHeight,
+    height: HERO.heroHeight,
     borderRadius: HERO.heroRadius,
     overflow: 'hidden',
     // 레이아웃 측정 전 한 프레임 동안 흰 배경이 비치지 않게 한다
@@ -350,7 +372,7 @@ const styles = StyleSheet.create({
   },
   /** 그림이 옆 슬라이드로 넘치지 않게 슬라이드 단위로도 자른다 */
   slide: {
-    minHeight: HERO.heroHeight,
+    height: HERO.heroHeight,
     overflow: 'hidden',
     paddingLeft: HERO.heroPadding,
     paddingTop: HERO.heroPadding,
@@ -365,59 +387,39 @@ const styles = StyleSheet.create({
   retry: { alignSelf: 'flex-start', minHeight: 44, minWidth: 44, justifyContent: 'center' },
 
   // 그림은 오른쪽 끝을 기준으로 잡아 카드 폭이 달라져도 우측 구도를 유지한다
-  featuredTitle: { maxWidth: '52%' },
+  /** 글자 칸 — 그림과 겹치지 않게 폭을 제한한다. 글꼴이 크면 넓게 쓴다 */
+  copyBox: { maxWidth: '52%' },
+  copyBoxWide: { maxWidth: '64%' },
+  /** 그림은 오른쪽 위에 고정한다 (Figma 778:2658). 글꼴이 크면 줄여 글자 자리를 내준다 */
   featuredArt: {
     position: 'absolute',
     ...FISH_POS.featured,
     width: 162.816,
     height: 162.816,
   },
-  expandedArt: {
-    position: 'relative',
-    top: 0,
-    right: 0,
-    alignSelf: 'flex-end',
-    marginTop: 8,
-  },
-  featuredFish: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    width: 162.816,
-    height: 162.816,
-    transform: [{ rotate: '-15.29deg' }],
-  },
-  featuredFishShadow: { right: -17, top: 8, opacity: 0.2 },
-  /** ??? 를 실루엣 위에 겹쳐 올리는 칸 */
-  unownedSilhouette: {
+  featuredArtCompact: { width: 118, height: 118 },
+  unownedArt: {
     position: 'absolute',
     ...FISH_POS.unowned,
     width: 140,
     height: 140,
   },
+  unownedArtCompact: { width: 104, height: 104 },
+  featuredFish: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: '100%',
+    height: '100%',
+    transform: [{ rotate: '-15.29deg' }],
+  },
+  featuredFishShadow: { right: -17, top: 8, opacity: 0.2 },
+  /** 실루엣을 놓는 칸 */
   unownedFish: {
-    width: 140,
-    height: 140,
+    width: '100%',
+    height: '100%',
     opacity: 0.4,
     transform: [{ rotate: '-7.6deg' }],
-  },
-  /**
-   * 물고기 한가운데에 얹는다.
-   *
-   * 그림 파일(384×384)에서 물고기가 실제로 차지하는 칸은 세로 31%~70% 라
-   * 가운데가 0.507 · 약 71 이다. 글줄 높이의 절반을 빼 그 지점에 맞춘다.
-   */
-  unownedMark: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 63,
-    textAlign: 'center',
-    ...Typography.heroTitle,
-    fontSize: 14,
-    lineHeight: 16,
-    color: Brand.textHeading,
-    opacity: 0.7,
   },
   /** 그림에 가리지 않도록 글줄 폭을 잡아 둔다 */
   unownedSubtitle: {
@@ -425,10 +427,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
     marginTop: 6,
-    maxWidth: 165,
     color: Brand.textMuted,
   },
-  expandedSubtitle: { maxWidth: '100%' },
   spotSubtitle: {
     ...Typography.cardCaption,
     fontSize: 12,
