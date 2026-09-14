@@ -63,6 +63,8 @@ export type FishlogKakaoMapProps = {
   focus?: { lat: number; lng: number; nonce: number } | null;
   /** 카메라 이동(드래그·버튼·검색)이 끝났을 때의 지도 중심 */
   onCameraIdle?: (center: Coordinate & { zoomLevel: number }) => void;
+  /** 지도의 빈 곳을 눌렀을 때 (마커를 누른 경우는 오지 않는다) */
+  onMapPress?: () => void;
 };
 
 export function FishlogKakaoMap({
@@ -73,6 +75,7 @@ export function FishlogKakaoMap({
   onTourPress,
   focus,
   onCameraIdle,
+  onMapPress,
 }: FishlogKakaoMapProps) {
   const nativeAppKey = Constants.expoConfig?.extra?.kakaoNativeAppKey;
   const hasNativeAppKey = typeof nativeAppKey === 'string' && nativeAppKey.length > 0;
@@ -188,6 +191,7 @@ export function FishlogKakaoMap({
         }
       }}
       onCameraIdle={(event) => onCameraIdle?.(event.nativeEvent)}
+      onMapPress={() => onMapPress?.()}
       cameraAnimationDuration={CAMERA_ANIMATION_MS}
       cameraMinLevel={1}
       cameraMaxLevel={20}

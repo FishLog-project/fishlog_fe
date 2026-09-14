@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { Screen, ScreenHeader, SearchBar } from '@/components/common';
@@ -75,6 +75,35 @@ export default function MapScreen() {
   const [handledSpotId, setHandledSpotId] = useState<string | null>(null);
   const [focus, setFocus] = useState<{ lat: number; lng: number; nonce: number } | null>(null);
 
+  /**
+   * 다른 탭에 갔다 돌아오면 처음 상태로 되돌린다.
+   *
+   * 탭 화면은 마운트된 채 남아서, 보고 있던 시설 상세와 스팟 시트가 그대로 남아 있었다.
+   * 첫 진입은 마운트 때 이미 현재 위치를 잡으므로 건너뛴다.
+   */
+  const returned = useRef(false);
+  /**
+   * useTourFacilities 는 렌더마다 새 객체를 돌려준다.
+   * 그대로 의존성에 넣으면 렌더할 때마다 초기화가 다시 돌아, 방금 연 시설을 곧바로 닫는다.
+   */
+  const facilitiesRef = useRef(facilities);
+  useEffect(() => {
+    facilitiesRef.current = facilities;
+  }, [facilities]);
+  useFocusEffect(useCallback(() => {
+    if (!returned.current) {
+      returned.current = true;
+      return;
+    }
+    facilitiesRef.current.close();
+    setFacilitiesOpen(false);
+    setSeaInfoOpen(false);
+    setSelectedSpotId(null);
+    setFocus(null);
+    setRecenterSignal((signal) => signal + 1);
+  }, []));
+
+
   // effect 가 아니라 렌더 중에 맞춘다 — 파라미터라는 "바깥 값"에 상태를 맞추는 경우라
   // effect 로 두면 한 번 그린 뒤 다시 그리게 된다.
   if (requestedSpotId && requestKey !== handledSpotId && allSpots) {
@@ -106,6 +135,8 @@ export default function MapScreen() {
           onSpotPress={(id) => { facilities.close(); setSelectedSpotId(id); }}
           tourPlaces={facilitiesOpen ? facilities.markers : undefined}
           onTourPress={(id) => { setSelectedSpotId(null); facilities.selectPlace(id); }}
+          // 시트가 올라와 있을 때 지도를 누르면 내린다
+          onMapPress={() => { facilities.close(); setSelectedSpotId(null); }}
           focus={focus}
           onCameraIdle={rememberMapCenter}
         />

@@ -95,11 +95,16 @@ async function check() {
 
   // Render the actual screen: no screen-local override may hide a later store update.
   const screenHost = host();
-  const facilities = { markers: [{ id: 'tour-test', name: '관광지', lat: 37.4, lng: 126.6 }], close() {}, selectPlace(id) { this.selected = id; } };
+  const focusCallbacks = [];
+  const facilities = {
+    markers: [{ id: 'tour-test', name: '관광지', lat: 37.4, lng: 126.6 }],
+    close() { this.closed = (this.closed ?? 0) + 1; this.selected = null; },
+    selectPlace(id) { this.selected = id; },
+  };
   const Screen = load('src/app/(tabs)/map/index.tsx', {
     react,
     '@expo/vector-icons': { Ionicons: 'Ionicons' }, 'expo-image': { Image: 'Image' },
-    'expo-router': { useRouter: () => ({}), useLocalSearchParams: () => ({}) },
+    'expo-router': { useRouter: () => ({}), useLocalSearchParams: () => ({}), useFocusEffect: (callback) => { focusCallbacks.push(callback); } },
     'react-native': { ActivityIndicator: 'ActivityIndicator', Pressable: 'Pressable', StyleSheet: { create: (value) => value }, View: 'View' },
     '@/components/common': { Screen: 'Screen', ScreenHeader: 'ScreenHeader', SearchBar: 'SearchBar' },
     '@/constants/theme': { Brand: {}, Components: { map: { seaStrip: {} } }, Layout: {} },
@@ -134,6 +139,21 @@ async function check() {
   nodes(tree).find((item) => item.props?.label === '주변 시설').props.onPress();
   tree = render(screenHost, Screen);
   assert.equal(node(tree, 'FishlogKakaoMap').props.tourPlaces, undefined, 'closing facilities removes map markers');
+
+  // 다른 탭에 갔다 돌아오면 열려 있던 시설·상세를 닫고 현재 위치로 되돌린다
+  nodes(tree).find((item) => item.props?.label === '주변 시설').props.onPress();
+  node(tree, 'FishlogKakaoMap').props.onSpotPress(2);
+  tree = render(screenHost, Screen);
+  assert.notEqual(node(tree, 'SpotDetailSheet').props.spotId, null);
+  const beforeRecenter = node(tree, 'FishlogKakaoMap').props.recenterSignal;
+  const closedBefore = facilities.closed ?? 0;
+  focusCallbacks.at(-1)();  // 첫 포커스는 마운트와 겹쳐 건너뛴다
+  focusCallbacks.at(-1)();
+  tree = render(screenHost, Screen);
+  assert.equal(node(tree, 'SpotDetailSheet').props.spotId, null, 'returning to the tab closes the spot sheet');
+  assert.equal(node(tree, 'FishlogKakaoMap').props.tourPlaces, undefined, 'returning to the tab closes facilities');
+  assert.equal(facilities.closed, closedBefore + 1);
+  assert.equal(node(tree, 'FishlogKakaoMap').props.recenterSignal, beforeRecenter + 1, 'returning to the tab recenters');
 
   [map, mapHeart, savedHeart, savedList, failedHeart, session2, screenHost].forEach((h) => h.unmount());
   console.log('Map checks passed: shared favorites, stale refresh/session protection, duplicate taps/rollback, forecast grades and marker selection wiring.');
