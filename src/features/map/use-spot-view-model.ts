@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
   InlandDetail,
@@ -74,10 +74,6 @@ export interface SpotDetailViewModel {
   inlandRows: readonly SpotLabelValue[] | null;
 }
 
-function loadSpots(dataSource: SpotDataSource) {
-  return dataSource.getSpots();
-}
-
 function toMarkers(spots: readonly SpotSummary[]): readonly SpotMarkerViewModel[] | null {
   if (spots.length === 0) return null;
 
@@ -135,13 +131,19 @@ export function useSpotsViewModel(dataSource: SpotDataSource, sessionKey: string
  * ⚠️ 찜 목록 전용 엔드포인트가 없다 (전체 31개 중 찜은 POST/DELETE 뿐).
  *    GET /api/spots 가 로그인 토큰을 받으면 isFavorite 을 채워 주므로 그걸 걸러 쓴다.
  */
-function toSavedSpots(spots: readonly SpotSummary[]): readonly SpotMarkerViewModel[] | null {
-  const saved = spots.filter((spot) => spot.isFavorite);
-  return saved.length === 0 ? null : (toMarkers(saved) ?? null);
-}
+export function useSavedSpotsViewModel(dataSource: SpotDataSource, sessionKey: string) {
+  const [list, retry] = useSpotList(dataSource, sessionKey);
+  const [opened, setOpened] = useState<{ sessionKey: string; ids: readonly number[] } | null>(null);
+  if (list.status !== 'ready') return [list, retry] as const;
 
-export function useSavedSpotsViewModel(dataSource: SpotDataSource) {
-  return useSection(dataSource, loadSpots, toSavedSpots);
+  // 처음 보인 행은 해제 후에도 남겨 바로 되돌릴 수 있게 한다. 하트 값은 공유 목록을 따른다.
+  const ids = opened?.sessionKey === sessionKey
+    ? opened.ids : list.spots.filter((spot) => spot.isFavorite).map((spot) => spot.id);
+  if (opened?.sessionKey !== sessionKey) setOpened({ sessionKey, ids });
+  const data = toMarkers(list.spots.filter((spot) => spot.isFavorite || ids.includes(spot.id)));
+  const state: SectionState<readonly SpotMarkerViewModel[]> = data
+    ? { status: 'ready', data } : { status: 'empty' };
+  return [state, retry] as const;
 }
 
 /**
@@ -221,6 +223,14 @@ function toDateLabel(predcYmd: string): string | null {
  *    선언돼 있지 않아 그라데이션 중간값 단색으로 대신한다.
  */
 const FISHING_INDEX: Readonly<Record<string, { color: string; description: string }>> = {
+  매우좋음: {
+    color: '#0E9F6E',
+    description: '낚시 여건이 매우 좋아요.\n현장 기상도 확인하세요.',
+  },
+  매우나쁨: {
+    color: '#C93B3B',
+    description: '낚시 여건이 매우 나빠요.\n출조에 주의하세요.',
+  },
   좋음: {
     color: '#0E9F6E',
     description: '파고와 바람이 잔잔해\n나서기 좋은 날입니다.',
@@ -240,10 +250,14 @@ const FISHING_INDEX: Readonly<Record<string, { color: string; description: strin
 };
 
 function toFishingIndex(totalIndex: string): FishingIndexViewModel | null {
-  const matched = FISHING_INDEX[totalIndex];
-  if (!matched) return null;
-
-  return { label: `낚시지수 ${totalIndex}`, ...matched };
+  const grade = totalIndex.trim();
+  if (!grade) return null;
+  const normalized = grade.replace(/\s+/g, '');
+  const matched = Object.hasOwn(FISHING_INDEX, normalized) ? FISHING_INDEX[normalized] : {
+    color: '#767676',
+    description: '등급 안내가 준비 중이에요.\n현장 기상을 확인하세요.',
+  };
+  return { label: `낚시지수 ${grade}`, ...matched };
 }
 
 /** 물때 이름에 붙는 조류 세기 설명. 모르는 이름이면 배지에 이름만 남는다 */
@@ -357,7 +371,7 @@ export function useSpotDetailViewModel(dataSource: SpotDataSource, spotId: numbe
  * 찜 토글.
  *
  * 서버 응답을 기다리지 않고 하트를 먼저 뒤집고, 실패하면 되돌린다 —
- * 목록 응답(isFavorite)이 초기값이라 화면이 다시 뜨면 서버 값으로 맞춰진다.
+ * 성공하면 공유 목록을 갱신하고, 대기 중에만 낙관적인 값을 보여 준다.
  * 양쪽 엔드포인트가 idempotent 라 연타해도 상태가 어긋나지 않는다.
  */
 export function useSpotFavorite(
@@ -365,16 +379,18 @@ export function useSpotFavorite(
   spotId: number,
   initial: boolean,
   /** 목록 쪽 값이 낡지 않도록 성공했을 때만 알린다 */
-  onChange?: (spotId: number, isFavorite: boolean) => void,
+  onChange: (spotId: number, isFavorite: boolean) => void,
 ) {
   const [isFavorite, setIsFavorite] = useState(initial);
+  const busy = useRef(false);
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
 
   const toggle = useCallback(() => {
-    if (pending) return;
+    if (busy.current) return;
+    busy.current = true;
 
-    const next = !isFavorite;
+    const next = !initial;
     setIsFavorite(next);
     setPending(true);
     setFailure(null);
@@ -382,7 +398,7 @@ export function useSpotFavorite(
     const request = next ? dataSource.addFavorite(spotId) : dataSource.removeFavorite(spotId);
 
     request
-      .then(() => onChange?.(spotId, next))
+      .then(() => onChange(spotId, next))
       .catch((e: unknown) => {
         setIsFavorite(!next);
         const message =
@@ -391,8 +407,8 @@ export function useSpotFavorite(
             : '잠시 후 다시 시도해 주세요.';
         setFailure(message);
       })
-      .finally(() => setPending(false));
-  }, [dataSource, spotId, isFavorite, pending, onChange]);
+      .finally(() => { busy.current = false; setPending(false); });
+  }, [dataSource, spotId, initial, onChange]);
 
-  return { isFavorite, pending, failure, toggle };
+  return { isFavorite: pending ? isFavorite : initial, pending, failure, toggle };
 }

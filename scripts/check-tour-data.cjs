@@ -1,3 +1,4 @@
+/* global __dirname */
 // Run with: node scripts/check-tour-data.cjs
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -60,7 +61,14 @@ function hook(file, name, mocks = {}) {
       }
     },
   };
-  const run = load(file, { ...mocks, react })[name];
+  const loaded = load(file, { ...mocks, react });
+  const run = name === 'TourFacilities'
+    ? (props = {}) => {
+      const facilities = loaded.useTourFacilities(props.getSearchOrigin);
+      props.capture?.(facilities);
+      return loaded.TourFacilities({ facilities });
+    }
+    : loaded[name];
   return {
     render(...args) {
       cursor = 0;
@@ -107,7 +115,9 @@ async function checkFacilities() {
     'react-native': {
       ...Object.fromEntries(['ActivityIndicator', 'Modal', 'Pressable', 'ScrollView', 'Text', 'View'].map((name) => [name, name])),
       StyleSheet: { create: (styles) => styles, absoluteFill: {} },
+      BackHandler: { addEventListener: () => ({ remove() {} }) },
     },
+    'react-native-reanimated': { default: { View: 'AnimatedView' }, ReduceMotion: { System: 'system' }, SlideInDown: { duration: () => ({ reduceMotion: (mode) => ({ mode }) }) } },
     'expo-image': { Image: 'Image' },
     '@expo/vector-icons': { Ionicons: 'Ionicons' },
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ bottom: 0 }) },
@@ -128,13 +138,15 @@ async function checkFacilities() {
   // Load the real UI leaf without importing unrelated components from its barrel.
   mocks['@/components/common'] = load('src/components/common/screen-state.tsx', mocks);
   const ui = hook('src/features/map/tour-facilities.tsx', 'TourFacilities', mocks);
-  let tree = ui.render();
-  const render = () => { tree = ui.render(); };
+  let facilities;
+  const props = { capture: (value) => { facilities = value; } };
+  let tree = ui.render(props);
+  const render = () => { tree = ui.render(props); };
   const button = (label) => nodes(tree).find((node) => node.props?.accessibilityLabel === label);
   const rows = () => nodes(tree).filter((node) => node.props?.accessibilityLabel?.endsWith('시설 상세 보기'));
-  const detail = () => nodes(tree).find((node) => node.type === 'Modal');
+  const detail = () => nodes(tree).find((node) => node.props?.testID === 'tour-facility-detail');
   const screenState = () => nodes(tree).find((node) => node.type?.name === 'ScreenState');
-  const assertHidden = () => { assert.equal(rows().length, 0); assert.equal(detail(), undefined); };
+  const assertHidden = () => { assert.equal(rows().length, 0); assert.equal(detail(), undefined); assert.deepEqual(facilities.markers, []); };
   assert.equal(requests.length, 0);
   assert.equal(positions.length, 0, 'opening the facility layer must not request GPS');
   button('음식점 시설 보기').props.onPress();
@@ -164,12 +176,26 @@ async function checkFacilities() {
   render();
   assert.equal(rows().length, 1);
   assert.equal(rows()[0].props.accessibilityLabel, '시설, 인천, 0m. 시설 상세 보기');
+  assert.deepEqual(facilities.markers, [{ id: facilities.state.places[0].id, name: '시설', lat: origin.lat, lng: origin.lng }]);
+  facilities.selectPlace(facilities.markers[0].id); render();
+  assert.ok(detail(), 'map marker and list must open the same place');
+  assert.equal(facilities.selected, facilities.state.places[0]);
+  button('시설 목록으로 돌아가기').props.onPress(); render();
   rows()[0].props.onPress();
   render();
   assert.ok(detail());
-  assert.ok(nodes(detail()).some((node) => node.type === 'Text' && node.props.children === '시설'));
+  assert.ok(nodes(tree).some((node) => node.type === 'Text' && node.props.children === '시설'));
+  assert.equal(nodes(tree).filter((node) => node.props?.testID === 'tour-facility-sheet').length, 1);
+  assert.equal(nodes(tree).some((node) => node.type === 'Modal'), false, 'detail must stay in the same sheet');
+  button('시설 목록으로 돌아가기').props.onPress();
+  render();
+  assert.equal(rows().length, 1);
+  assert.equal(detail(), undefined);
+  rows()[0].props.onPress();
+  render();
   assert.ok(nodes(detail()).some((node) => node.props?.large && node.props.uri === item.firstImage));
 
+  const staleMarker = facilities.markers[0].id;
   button('숙박 시설 보기').props.onPress();
   render();
   assertHidden();
@@ -187,9 +213,13 @@ async function checkFacilities() {
   await flush();
   render();
   assert.equal(rows()[0].props.accessibilityLabel, '숙박 시설, 인천, 0m. 시설 상세 보기');
+  facilities.selectPlace(staleMarker); render();
+  assert.equal(detail(), undefined, 'late marker tap from previous category must not choose a new place');
   rows()[0].props.onPress();
   render();
   assert.ok(detail());
+  button('시설 목록으로 돌아가기').props.onPress();
+  render();
   button('현재 위치로 시설 다시 조회').props.onPress();
   render();
   assertHidden();
@@ -228,7 +258,9 @@ async function checkFacilitiesByMapCenter() {
     'react-native': {
       ...Object.fromEntries(['ActivityIndicator', 'Modal', 'Pressable', 'ScrollView', 'Text', 'View'].map((name) => [name, name])),
       StyleSheet: { create: (styles) => styles, absoluteFill: {} },
+      BackHandler: { addEventListener: () => ({ remove() {} }) },
     },
+    'react-native-reanimated': { default: { View: 'AnimatedView' }, ReduceMotion: { System: 'system' }, SlideInDown: { duration: () => ({ reduceMotion: (mode) => ({ mode }) }) } },
     'expo-image': { Image: 'Image' },
     '@expo/vector-icons': { Ionicons: 'Ionicons' },
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ bottom: 0 }) },
@@ -251,6 +283,7 @@ async function checkFacilitiesByMapCenter() {
   const render = () => { tree = ui.render(props); };
   const button = (label) => nodes(tree).find((node) => node.props?.accessibilityLabel === label);
   const heading = () => nodes(tree).find((node) => node.props?.accessibilityRole === 'header');
+  const sheet = () => nodes(tree).find((node) => node.props?.testID === 'tour-facility-sheet');
 
   button('음식점 시설 보기').props.onPress();
   render();
@@ -258,6 +291,12 @@ async function checkFacilitiesByMapCenter() {
   assert.equal(gpsCalls, 0, 'map center search must not wait for GPS');
   assert.deepEqual(Object.fromEntries(requests.at(-1).url.searchParams), { type: '음식점', lat: '35.1', lng: '129' });
   assert.equal(heading().props.children, '지도 중심 주변 음식점');
+  assert.equal(sheet().props.style[0].top, '50%', 'first-open sheet leaves half the map visible');
+  assert.equal(sheet().props.entering.mode, 'system', 'sheet animation respects reduced motion');
+  button('시설 시트 펼치기').props.onPress(); render();
+  assert.equal(sheet().props.style[1].top, 80);
+  button('시설 시트 접기').props.onPress(); render();
+  assert.equal(sheet().props.style[1], false);
 
   const countBefore = requests.length;
   button('지도 중심으로 시설 다시 조회').props.onPress();
