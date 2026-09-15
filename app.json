@@ -8,6 +8,15 @@
     "scheme": "fishlogfe",
     "userInterfaceStyle": "light",
     "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "UISupportedInterfaceOrientations~ipad": [
+          "UIInterfaceOrientationPortrait",
+          "UIInterfaceOrientationPortraitUpsideDown",
+          "UIInterfaceOrientationLandscapeLeft",
+          "UIInterfaceOrientationLandscapeRight"
+        ]
+      },
       "icon": "./assets/images/icon.png"
     },
     "android": {
@@ -59,7 +68,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "프로필 사진을 선택하기 위해 사진 접근 권한이 필요합니다.",
+          "photosPermission": "잡은 물고기와 프로필 사진을 선택하기 위해 사진 접근 권한이 필요해요.",
           "cameraPermission": "잡은 물고기를 촬영해 도감에 등록하기 위해 카메라를 사용해요.",
           "microphonePermission": false
         }
