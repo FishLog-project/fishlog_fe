@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     ...Typography.inputLarge,
-    height: Components.authInput.lineHeight,
+    minHeight: Components.authInput.lineHeight,
     color: Components.authInput.text,
     // 디자인 여백이 아니라 RN TextInput의 기본 안쪽 여백 제거다
     padding: 0,

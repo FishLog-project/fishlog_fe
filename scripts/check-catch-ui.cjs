@@ -10,6 +10,7 @@ let reducedMotion = false;
 let status = 'loading';
 const player = { play() { this.played = true; } };
 const screen = load('src/app/catch.tsx', {
+  '@expo/vector-icons': { Ionicons: 'Ionicons' },
   react: { ...screenHost.react, useState: videoHost.react.useState, useEffect: videoHost.react.useEffect },
   expo: { useEvent: () => ({ status }) },
   'expo-asset': {},
@@ -66,4 +67,11 @@ for (const mode of ['reduced-motion', 'analysis-error']) {
   step = mode === 'analysis-error' ? 'error' : 'analyzing';
   assert.ok(!nodes(analysis()).some((node) => node.type?.name === 'AnalysisAnimation'), `${mode}: do not mount a player`);
 }
-console.log('catch UI checks passed: analysis video, first-frame/error fallback, reduced motion and failed-analysis stop');
+for (const [nextStep, fullWidth] of [
+  ['capture', true], ['analyzing', true], ['error', true],
+  ['candidates', false], ['result', false], ['registered', false],
+]) {
+  step = nextStep;
+  assert.equal(screenHost.render(screen).props.fullWidth, fullWidth, `${step}: camera/media keep the viewport while forms use the shared content width`);
+}
+console.log('catch UI checks passed: analysis video, first-frame/error fallback, reduced motion, failed-analysis stop and tablet content width');

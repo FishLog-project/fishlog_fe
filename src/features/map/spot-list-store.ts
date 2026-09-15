@@ -78,6 +78,21 @@ function fetchSpots(dataSource: SpotDataSource, sessionKey: string) {
   );
 }
 
+/** 성공한 찜 변경을 공유한다. 이미 진행 중인 목록 응답은 변경 전 값일 수 있어 버린다. */
+export function setSpotFavorite(sessionKey: string, spotId: number, isFavorite: boolean) {
+  if (entry?.sessionKey !== sessionKey || entry.state.status !== 'ready') return;
+  commit({
+    ...entry,
+    request: ++lastRequest,
+    state: {
+      ...entry.state,
+      spots: entry.state.spots.map((spot) => spot.id === spotId ? { ...spot, isFavorite } : spot),
+      refreshing: false,
+      refreshFailed: false,
+    },
+  });
+}
+
 /**
  * @param sessionKey 로그인 세션을 구분하는 값. 바뀌면 캐시를 버리고 새로 받는다.
  */

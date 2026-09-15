@@ -25,6 +25,8 @@ type ScreenProps = {
    * 그 안에서 여백이 필요하면 Layout.screenPadding을 참조한다.
    */
   edgeToEdge?: boolean;
+  /** 지도·촬영처럼 태블릿에서도 화면 전체 폭을 쓰는 본문 */
+  fullWidth?: boolean;
   /** 키보드가 올라올 때 본문을 밀어 올린다 (입력이 있는 화면) */
   keyboardAvoiding?: boolean;
   /** false면 키보드가 떠도 하단 footer를 화면 위로 끌어올리지 않는다. */
@@ -54,6 +56,7 @@ export function Screen({
   footer,
   scroll = false,
   edgeToEdge = false,
+  fullWidth = false,
   keyboardAvoiding = false,
   footerAvoidsKeyboard = true,
   hideFooterWhenKeyboard = false,
@@ -114,7 +117,7 @@ export function Screen({
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: background }]} edges={edges}>
-      <Animated.View style={[styles.fill, keyboardStyle]}>
+      <Animated.View style={[styles.fill, !fullWidth && styles.content, keyboardStyle]}>
         {header}
         {body}
         {footer && !(hideFooterWhenKeyboard && keyboardVisible) ? (
@@ -128,6 +131,7 @@ export function Screen({
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   fill: { flex: 1 },
+  content: { width: '100%', maxWidth: Layout.maxContentWidth, alignSelf: 'center' },
   scrollContent: { flexGrow: 1, paddingBottom: Layout.scrollPaddingBottom },
   footer: {
     paddingHorizontal: Layout.screenPadding,

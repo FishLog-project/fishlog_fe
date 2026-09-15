@@ -1,6 +1,6 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Brand, Components, Typography } from '@/constants/theme';
+import { Brand, Components, Typography, Fonts } from '@/constants/theme';
 
 type ScreenStateProps = {
   variant: 'loading' | 'empty' | 'error';
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
   },
   description: {
     ...Typography.caption,
-    fontWeight: '400',
+    fontFamily: Fonts.regular,
     maxWidth: 340,
     color: Brand.textMuted,
     lineHeight: 20,

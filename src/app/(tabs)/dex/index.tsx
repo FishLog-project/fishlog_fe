@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { Screen, ScreenHeader, ScreenState, SearchBar } from '@/components/common';
 import { Brand, Components, Layout, Typography } from '@/constants/theme';
@@ -38,16 +38,13 @@ const SEARCH_LIST_TOP = 51;
 /** 완성도 카드와 첫 줄 사이 (Figma 296 → 316). rowGap 위에 얹는 값이다 */
 const SUMMARY_GAP = DEX.rowGap;
 
-/**
- * 완성도 막대 안에 "%"가 들어갈 만큼 채워졌는지 판단하는 기준.
- * 이보다 적게 찼으면 글자가 채움 밖으로 삐져나가므로 트랙 가운데에 흰 글씨로 얹는다.
- */
-const LABEL_FITS_PERCENT = 15;
-
-/** 격자 열 수 (Figma 3열) */
-const COLUMNS = 3;
-
 export default function DexScreen() {
+  const { fontScale } = useWindowDimensions();
+  const [gridWidth, setGridWidth] = useState(0);
+  // 일반 폰은 3열을 유지하고, 좁은 화면·큰 글씨는 열을 줄인다. 태블릿은 남는 폭을 쓴다.
+  const columns = gridWidth > 0
+    ? Math.max(1, Math.floor((gridWidth - 2 * Layout.screenPadding + DEX.columnGap) / (96 * Math.max(1, fontScale) + DEX.columnGap)))
+    : 3;
   const { token } = useAuth();
   const dataSource = useMemo(
     () => (USE_FIXTURE ? createFixtureDexDataSource() : createApiDexDataSource(token)),
@@ -76,11 +73,11 @@ export default function DexScreen() {
    */
   const gridData = useMemo(() => {
     if (!results) return null;
-    const missing = (COLUMNS - (results.length % COLUMNS)) % COLUMNS;
+    const missing = (columns - (results.length % columns)) % columns;
     return missing === 0
       ? results
       : [...results, ...Array<null>(missing).fill(null)];
-  }, [results]);
+  }, [results, columns]);
 
   return (
     <Screen edgeToEdge header={<ScreenHeader title="도감" />}>
@@ -96,12 +93,13 @@ export default function DexScreen() {
       {/* 화면 전체가 수조다 — 테두리 띠 + 안쪽 물색, 그 위에 뚜껑을 얹는다 */}
       <View style={styles.tankArea}>
         <View style={styles.tankRim}>
-          <View style={styles.tankWater}>
+          <View style={styles.tankWater} onLayout={(e) => setGridWidth(e.nativeEvent.layout.width)}>
             {gridData ? (
               <FlatList
+                key={columns}
                 data={gridData}
                 keyExtractor={(item, index) => (item ? `${item.custom ? 'custom' : 'fish'}-${item.id}` : `filler-${index}`)}
-                numColumns={COLUMNS}
+                numColumns={columns}
                 renderItem={({ item }) =>
                   item ? (
                     <SpeciesCard species={item} onPress={setSelected} />
@@ -109,7 +107,7 @@ export default function DexScreen() {
                     <View style={styles.filler} />
                   )
                 }
-                columnWrapperStyle={styles.row}
+                columnWrapperStyle={columns > 1 ? styles.row : undefined}
                 contentContainerStyle={[
                   styles.listContent,
                   isSearching && styles.listContentSearching,
@@ -174,7 +172,13 @@ function CompletionSummary({
   total: number;
   percent: number;
 }) {
-  const labelFits = percent >= LABEL_FITS_PERCENT;
+  const { fontScale } = useWindowDimensions();
+  const [trackWidth, setTrackWidth] = useState(0);
+  const barPadding = (DEX.barInset + 1) * 2;
+  const barHeight = Math.max(DEX.barHeight, Typography.microLabel.lineHeight * fontScale + barPadding);
+  // 숫자·%마다 한 글자 크기의 폭을 확보해, 좁은 트랙에서도 글자가 채움을 벗어나지 않게 한다.
+  const labelWidth = `${percent}%`.length * Typography.microLabel.fontSize * fontScale;
+  const labelFits = (trackWidth - barPadding) * percent / 100 >= labelWidth + barPadding;
 
   return (
     <View
@@ -189,12 +193,14 @@ function CompletionSummary({
         </Text>
       </View>
 
-      <View style={styles.barTrack}>
+      <View
+        style={[styles.barTrack, { height: barHeight, minWidth: Math.max(96, labelWidth + barPadding) }]}
+        onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}>
         <LinearGradient
           colors={[...DEX.barFill]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
-          style={[styles.barFill, { width: `${percent}%` }]}
+          style={[styles.barFill, { width: `${percent}%`, height: barHeight - barPadding }]}
         />
         {/* 채움이 좁으면 글자가 잘리므로 트랙 가운데에 흰 글씨로 얹는다 */}
         <Text
@@ -256,14 +262,16 @@ const styles = StyleSheet.create({
 
   // 완성도 카드
   summary: {
-    height: DEX.summaryHeight,
+    minHeight: DEX.summaryHeight,
     borderRadius: DEX.summaryRadius,
     backgroundColor: DEX.summaryBg,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     // Figma 39/347 — 막대 쪽이 조금 더 안쪽으로 들어온다
     paddingLeft: 19,
     paddingRight: 23,
+    paddingVertical: 8,
     gap: 21,
     // gap(rowGap=16) 위에 얹어 Figma의 20pt를 맞춘다
     marginBottom: SUMMARY_GAP - DEX.rowGap + 4,
@@ -273,7 +281,6 @@ const styles = StyleSheet.create({
 
   barTrack: {
     flex: 1,
-    height: DEX.barHeight,
     borderRadius: DEX.barRadius,
     backgroundColor: DEX.barTrack,
     borderWidth: 1,
@@ -282,7 +289,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   barFill: {
-    height: DEX.barHeight - (DEX.barInset + 1) * 2,
     borderRadius: DEX.barRadius,
   },
   /** 채움 폭 안에서 가운데 정렬된다 (채움이 넓을 때) */

@@ -47,7 +47,7 @@ export function AnimatedSplashOverlay({ onHidden }: { onHidden?: () => void } = 
       }}
       pointerEvents="none"
       style={[styles.splashOverlay, animatedStyle]}>
-      <Image style={styles.image} source={require('@/assets/images/splash-logo.png')} />
+      <Image style={styles.image} source={require('@/assets/images/fishlog_logo.png')} />
     </Animated.View>
   );
 }

@@ -88,10 +88,12 @@ async function main() {
   const art = load('src/features/dex/fish-art.tsx', {
     react: artworkHost.react, 'expo-image': { Image: 'Image' }, '@/constants/theme': theme,
   });
+  let fontScale = 1;
   const uiImports = {
     'react-native': {
       ...Object.fromEntries(['ActivityIndicator', 'Pressable', 'ScrollView', 'Text', 'View'].map((name) => [name, name])),
       StyleSheet: { create: (styles) => styles, absoluteFill: {} },
+      useWindowDimensions: () => ({ width: 390, height: 844, fontScale }),
     },
     '@expo/vector-icons': { Ionicons: 'Ionicons' },
     'expo-image': { Image: 'Image' },
@@ -139,7 +141,37 @@ async function main() {
   assert.equal(readySlide.some((node) => node.props?.accessibilityLabel === '추천 어종 다시 시도'), false);
   const artwork = readySlide.find((node) => node.type === art.FishArtwork && node.props.tintColor === undefined);
   assert.equal(artwork.props.imageUrl, banner[0].imageUrl);
-  const displayed = artworkHost.render(art.FishArtwork, artwork.props);
+  let carouselTree = carouselHost.render(carousel.HeroCarousel, heroElement.props);
+  carouselTree.props.onLayout({ nativeEvent: { layout: { width: 350 } } });
+  carouselTree = carouselHost.render(carousel.HeroCarousel, heroElement.props);
+  const featuredNode = (tree) => nodes(tree).find((node) => node.type?.name === 'FeaturedSpeciesSlide');
+  assert.equal(featuredNode(carouselTree).props.expanded, false, 'normal size preserves Figma art placement');
+  fontScale = 2;
+  carouselTree = carouselHost.render(carousel.HeroCarousel, heroElement.props);
+  assert.equal(featuredNode(carouselTree).props.expanded, true, 'large text must move the artwork below the title');
+  for (const slide of nodes(carouselTree).filter((node) => /SpeciesSlide|SpotSlide/.test(node.type?.name))) {
+    const content = nodes(slide.type(slide.props));
+    if (slide.props.section.status === 'ready' || slide.type.name === 'UnownedSpeciesSlide') {
+      assert.ok(content.some((node) => node.type?.name === 'HeroCta'), 'large text must retain the slide action');
+    }
+    for (const text of content.filter((node) => node.type === 'Text')) {
+      assert.equal(text.props.numberOfLines, undefined, 'large text must wrap instead of losing the banner copy');
+    }
+  }
+  let scrolledTo;
+  const scroll = nodes(carouselTree).find((node) => node.type === 'ScrollView');
+  scroll.props.ref.current = { scrollTo: (position) => { scrolledTo = position; } };
+  scroll.props.onMomentumScrollEnd({ nativeEvent: { contentOffset: { x: 350 } } });
+  carouselTree = carouselHost.render(carousel.HeroCarousel, heroElement.props);
+  carouselTree.props.onLayout({ nativeEvent: { layout: { width: 760 } } });
+  carouselTree = carouselHost.render(carousel.HeroCarousel, heroElement.props);
+  nodes(carouselTree).find((node) => node.type === 'ScrollView').props.onContentSizeChange();
+  assert.equal(scrolledTo.x, 760, 'rotation must keep the second slide rather than an offset between slides');
+  fontScale = 1;
+  carouselTree.props.onLayout({ nativeEvent: { layout: { width: 280 } } });
+  carouselTree = carouselHost.render(carousel.HeroCarousel, heroElement.props);
+  assert.equal(featuredNode(carouselTree).props.expanded, true, 'small phones need room for the full banner title');
+    const displayed = artworkHost.render(art.FishArtwork, artwork.props);
   assert.equal(displayed.props.source, banner[0].imageUrl);
 
   // 마운트 직후의 첫 포커스는 이미 보낸 요청을 되풀이하지 않는다.

@@ -108,13 +108,14 @@ async function main() {
   const requests = [];
   let failurePath = null;
   let waitingFish = null;
+  let waitingDex = null;
   const { ApiError } = load('src/lib/api/client.ts', { 'expo/fetch': {} });
   const apiModule = load('src/features/dex/dex-api.ts', {
     '@/lib/api/client': { apiRequest: async (route, options) => {
       requests.push({ route, ...options });
       if (route === failurePath) throw new ApiError(401, 'expired');
       switch (route) {
-        case '/api/collections/dex': return options.token ? normal : {
+        case '/api/collections/dex': return options.token ? waitingDex ?? normal : {
           ...normal, caughtCount: 0, fishes: normal.fishes.map((fish) => ({ ...fish, caught: false })),
         };
         case '/api/collections/custom/dex': return { fishes: [
@@ -276,10 +277,12 @@ async function main() {
   assert.equal(image.props.source, customImageUrl, 'custom artwork must not be replaced by a name-based asset');
   assert.equal(image.props.tintColor, null);
   imageHost.unmount();
+  let fontScale = 1;
   const uiImports = {
     react: uiHost.react,
     'react-native': {
       ...Object.fromEntries(['FlatList', 'Image', 'Modal', 'Pressable', 'Text', 'View'].map((name) => [name, name])),
+      useWindowDimensions: () => ({ fontScale, width: 390, height: 844 }),
       StyleSheet: { create: (styles) => styles, absoluteFill: {} },
     },
     'expo-image': { Image: 'Image' },
@@ -292,9 +295,10 @@ async function main() {
   const cards = load('src/features/dex/components/species-card.tsx', uiImports);
   const dialogs = load('src/features/dex/components/species-detail-dialog.tsx', uiImports);
   let uiToken = 'test-token';
+  let onFocus;
   const screen = load('src/app/(tabs)/dex/index.tsx', {
     ...uiImports,
-    'expo-router': { useRouter: () => ({}), useFocusEffect: () => {} },
+    'expo-router': { useRouter: () => ({}), useFocusEffect: (effect) => { onFocus = effect; } },
     '@/features/auth': { useAuth: () => ({ token: uiToken }) },
     '@/features/dex/dex-api': apiModule,
     '@/features/dex/dex-data': dex,
@@ -303,9 +307,24 @@ async function main() {
     '@/lib/data-source-mode': { USE_FIXTURE: false },
   }).default;
   uiHost.render(screen);
+  onFocus();
   await flush();
   let tree = uiHost.render(screen);
   const grid = nodes(tree).find((node) => node.type === 'FlatList').props;
+  for (const [width, scale, columns] of [[375, 1, 3], [320, 1, 2], [768, 1, 6], [800, 1, 7], [375, 2, 1]]) {
+    fontScale = scale;
+    nodes(tree).find((node) => node.props?.onLayout).props.onLayout({ nativeEvent: { layout: { width } } });
+    tree = uiHost.render(screen);
+    const responsiveGrid = nodes(tree).find((node) => node.type === 'FlatList');
+    assert.equal(responsiveGrid.props.numColumns, columns, `${width}px / font scale ${scale}`);
+    if (columns === 1) {
+      assert.equal(responsiveGrid.props.columnWrapperStyle, undefined, 'native FlatList rejects columnWrapperStyle for a single column');
+    }
+    assert.equal(responsiveGrid.key, String(columns), 'changing columns must remount the native list');
+    assert.equal(responsiveGrid.props.data.length % columns, 0, 'pad the last row for the current column count');
+  }
+  fontScale = 1;
+  tree = uiHost.render(screen);
   const normalEntry = grid.data.find((fish) => fish?.id === 1 && !fish.custom);
   const customEntry = grid.data.find((fish) => fish?.id === 1 && fish.custom);
   assert.equal(grid.keyExtractor(normalEntry), 'fish-1');
@@ -335,6 +354,24 @@ async function main() {
     assert.equal(loader.props.custom, !!species.custom);
   }
   assert.notEqual(...dialogKeys, 'switching same-ID species kinds must remount their detail loader');
+
+  const newlyCaught = normal.fishes.find((fish) => !fish.caught);
+  assert.equal(grid.data.find((fish) => fish?.id === newlyCaught.id && !fish.custom).label, '???');
+  // Model a successful registration reflected by the next authenticated dex response.
+  normal.fishes = normal.fishes.map((fish) => fish.id === newlyCaught.id ? { ...fish, caught: true } : fish);
+  normal.caughtCount++;
+  onFocus();
+  uiHost.render(screen);
+  await flush();
+  tree = uiHost.render(screen);
+  const refreshed = nodes(tree).find((node) => node.type === 'FlatList').props.data;
+  assert.equal(refreshed.find((fish) => fish?.id === newlyCaught.id && !fish.custom).label, newlyCaught.name, 'returning after registration must reveal the caught name');
+  assert.ok(refreshed.filter((fish) => fish && !fish.caught).every((fish) => fish.label === '???'), 'other species stay locked');
+
+  let finishOldDex;
+  waitingDex = new Promise((resolve) => { finishOldDex = resolve; });
+  onFocus();
+  uiHost.render(screen);
   uiToken = null;
   uiHost.render(screen);
   await flush();
@@ -344,8 +381,41 @@ async function main() {
   assert.equal(guestGrid.props.data.length, 24);
   assert.ok(guestGrid.props.data.every((fish) => !fish.caught && fish.label === '???' && !fish.custom));
   assert.equal(guestGrid.props.ListHeaderComponent.props.collected, 0);
+  finishOldDex(normal);
+  await flush();
+  tree = uiHost.render(screen);
+  assert.ok(nodes(tree).find((node) => node.type === 'FlatList').props.data.every((fish) => fish.label === '???'), 'a late authenticated response must not reveal names after logout');
+  waitingDex = null;
+  uiToken = 'test-token';
+  uiHost.render(screen);
+  await flush();
+  tree = uiHost.render(screen);
+  assert.equal(nodes(tree).find((node) => node.type === 'FlatList').props.data.find((fish) => fish?.id === newlyCaught.id && !fish.custom).label, newlyCaught.name, 'logging back in must restore caught names');
+  const summary = nodes(tree).find((node) => node.type === 'FlatList').props.ListHeaderComponent;
   uiHost.unmount();
-  console.log('dex checks passed: server artwork/fallback, custom DTO/photos, ID/detail separation, completion/search, guest/errors, stale responses and route keys');
+  // Exercise measured track widths after unmounting the screen; native screenshots still verify glyph bounds.
+  for (const [width, scale, percent, centeredOnTrack] of [
+    [96, 1, 15, true],
+    [200, 1, 54, false],
+    [96, 3.12, 54, true],
+    [540, 3.12, 54, false],
+    [140, 3.12, 100, false],
+  ]) {
+    fontScale = scale;
+    const renderSummary = () => uiHost.render(summary.type, { ...summary.props, percent });
+    nodes(renderSummary()).find((node) => node.props?.onLayout).props.onLayout({ nativeEvent: { layout: { width } } });
+    const rendered = nodes(renderSummary());
+    const track = flatten(rendered.find((node) => node.props?.onLayout).props.style);
+    const fill = flatten(rendered.find((node) => node.type === 'LinearGradient').props.style);
+    const value = flatten(rendered.find((node) => node.type === 'Text' && flatten(node.props.style).position === 'absolute').props.style);
+    const padding = (theme.Components.dex.barInset + 1) * 2;
+    assert.ok(track.height >= theme.Typography.microLabel.lineHeight * scale + padding, 'track must contain scaled percent text');
+    assert.equal(fill.height + padding, track.height, 'fill must grow with its track');
+    assert.ok(track.minWidth >= `${percent}%`.length * theme.Typography.microLabel.fontSize * scale + padding, '100% must fit even in the narrowest large-text track');
+    if (scale === 1) assert.equal(track.height, 22, 'default bar height stays unchanged');
+    assert.equal(value.right === 0, centeredOnTrack, 'place the label using available pixels, not a fixed percent threshold');
+  }
+  console.log('dex checks passed: registration focus refresh, caught/locked names, login/logout races, server artwork/fallback, custom DTO/photos, ID separation, completion/search and route keys');
 }
 
 module.exports = { load, host, flush, nodes };
