@@ -38,12 +38,6 @@ const SEARCH_LIST_TOP = 51;
 /** 완성도 카드와 첫 줄 사이 (Figma 296 → 316). rowGap 위에 얹는 값이다 */
 const SUMMARY_GAP = DEX.rowGap;
 
-/**
- * 완성도 막대 안에 "%"가 들어갈 만큼 채워졌는지 판단하는 기준.
- * 이보다 적게 찼으면 글자가 채움 밖으로 삐져나가므로 트랙 가운데에 흰 글씨로 얹는다.
- */
-const LABEL_FITS_PERCENT = 15;
-
 export default function DexScreen() {
   const { fontScale } = useWindowDimensions();
   const [gridWidth, setGridWidth] = useState(0);
@@ -178,7 +172,13 @@ function CompletionSummary({
   total: number;
   percent: number;
 }) {
-  const labelFits = percent >= LABEL_FITS_PERCENT;
+  const { fontScale } = useWindowDimensions();
+  const [trackWidth, setTrackWidth] = useState(0);
+  const barPadding = (DEX.barInset + 1) * 2;
+  const barHeight = Math.max(DEX.barHeight, Typography.microLabel.lineHeight * fontScale + barPadding);
+  // 숫자·%마다 한 글자 크기의 폭을 확보해, 좁은 트랙에서도 글자가 채움을 벗어나지 않게 한다.
+  const labelWidth = `${percent}%`.length * Typography.microLabel.fontSize * fontScale;
+  const labelFits = (trackWidth - barPadding) * percent / 100 >= labelWidth + barPadding;
 
   return (
     <View
@@ -193,12 +193,14 @@ function CompletionSummary({
         </Text>
       </View>
 
-      <View style={styles.barTrack}>
+      <View
+        style={[styles.barTrack, { height: barHeight, minWidth: Math.max(96, labelWidth + barPadding) }]}
+        onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}>
         <LinearGradient
           colors={[...DEX.barFill]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
-          style={[styles.barFill, { width: `${percent}%` }]}
+          style={[styles.barFill, { width: `${percent}%`, height: barHeight - barPadding }]}
         />
         {/* 채움이 좁으면 글자가 잘리므로 트랙 가운데에 흰 글씨로 얹는다 */}
         <Text
@@ -279,8 +281,6 @@ const styles = StyleSheet.create({
 
   barTrack: {
     flex: 1,
-    minWidth: 96,
-    height: DEX.barHeight,
     borderRadius: DEX.barRadius,
     backgroundColor: DEX.barTrack,
     borderWidth: 1,
@@ -289,7 +289,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   barFill: {
-    height: DEX.barHeight - (DEX.barInset + 1) * 2,
     borderRadius: DEX.barRadius,
   },
   /** 채움 폭 안에서 가운데 정렬된다 (채움이 넓을 때) */

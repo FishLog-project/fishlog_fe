@@ -70,6 +70,7 @@ const styles = StyleSheet.create({
   tile: {
     width: '100%',
     maxWidth: DEX.tileSize,
+    maxHeight: DEX.tileSize,
     // 카드 폭이 기기마다 달라도 그림 칸은 정사각을 유지한다 (Figma 88x88)
     aspectRatio: 1,
     marginTop: 12,

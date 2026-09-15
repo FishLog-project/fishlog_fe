@@ -391,7 +391,30 @@ async function main() {
   await flush();
   tree = uiHost.render(screen);
   assert.equal(nodes(tree).find((node) => node.type === 'FlatList').props.data.find((fish) => fish?.id === newlyCaught.id && !fish.custom).label, newlyCaught.name, 'logging back in must restore caught names');
+  const summary = nodes(tree).find((node) => node.type === 'FlatList').props.ListHeaderComponent;
   uiHost.unmount();
+  // Exercise measured track widths after unmounting the screen; native screenshots still verify glyph bounds.
+  for (const [width, scale, percent, centeredOnTrack] of [
+    [96, 1, 15, true],
+    [200, 1, 54, false],
+    [96, 3.12, 54, true],
+    [540, 3.12, 54, false],
+    [140, 3.12, 100, false],
+  ]) {
+    fontScale = scale;
+    const renderSummary = () => uiHost.render(summary.type, { ...summary.props, percent });
+    nodes(renderSummary()).find((node) => node.props?.onLayout).props.onLayout({ nativeEvent: { layout: { width } } });
+    const rendered = nodes(renderSummary());
+    const track = flatten(rendered.find((node) => node.props?.onLayout).props.style);
+    const fill = flatten(rendered.find((node) => node.type === 'LinearGradient').props.style);
+    const value = flatten(rendered.find((node) => node.type === 'Text' && flatten(node.props.style).position === 'absolute').props.style);
+    const padding = (theme.Components.dex.barInset + 1) * 2;
+    assert.ok(track.height >= theme.Typography.microLabel.lineHeight * scale + padding, 'track must contain scaled percent text');
+    assert.equal(fill.height + padding, track.height, 'fill must grow with its track');
+    assert.ok(track.minWidth >= `${percent}%`.length * theme.Typography.microLabel.fontSize * scale + padding, '100% must fit even in the narrowest large-text track');
+    if (scale === 1) assert.equal(track.height, 22, 'default bar height stays unchanged');
+    assert.equal(value.right === 0, centeredOnTrack, 'place the label using available pixels, not a fixed percent threshold');
+  }
   console.log('dex checks passed: registration focus refresh, caught/locked names, login/logout races, server artwork/fallback, custom DTO/photos, ID separation, completion/search and route keys');
 }
 
