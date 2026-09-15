@@ -113,7 +113,7 @@ export default function DexScreen() {
                     <View style={styles.filler} />
                   )
                 }
-                columnWrapperStyle={styles.row}
+                columnWrapperStyle={columns > 1 ? styles.row : undefined}
                 contentContainerStyle={[
                   styles.listContent,
                   isSearching && styles.listContentSearching,

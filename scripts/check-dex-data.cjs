@@ -317,6 +317,9 @@ async function main() {
     tree = uiHost.render(screen);
     const responsiveGrid = nodes(tree).find((node) => node.type === 'FlatList');
     assert.equal(responsiveGrid.props.numColumns, columns, `${width}px / font scale ${scale}`);
+    if (columns === 1) {
+      assert.equal(responsiveGrid.props.columnWrapperStyle, undefined, 'native FlatList rejects columnWrapperStyle for a single column');
+    }
     assert.equal(responsiveGrid.key, String(columns), 'changing columns must remount the native list');
     assert.equal(responsiveGrid.props.data.length % columns, 0, 'pad the last row for the current column count');
   }
