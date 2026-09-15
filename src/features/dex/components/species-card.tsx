@@ -44,7 +44,7 @@ export function SpeciesCard({
           contentFit="contain"
         />
       </LinearGradient>
-      <Text numberOfLines={1} style={styles.name}>
+      <Text style={styles.name}>
         {species.label}
       </Text>
     </Pressable>
@@ -53,14 +53,15 @@ export function SpeciesCard({
 
 const styles = StyleSheet.create({
   card: {
-    // 폭은 3열 격자가 남는 자리를 나눠 정한다 (Figma 108 @390pt)
+    // 화면 폭·글자 크기에 맞춘 격자가 남는 자리를 나눠 정한다.
     flex: 1,
-    height: DEX.cardHeight,
+    minHeight: DEX.cardHeight,
     borderRadius: DEX.cardRadius,
     backgroundColor: DEX.cardBg,
     alignItems: 'center',
     // Figma 108 카드에서 그림 칸이 좌우로 10씩 물러난 만큼
     paddingHorizontal: DEX.tileInset,
+    paddingBottom: 8,
     // Figma의 바깥 그림자. RN 0.76+ 새 아키텍처에서 지원한다.
     boxShadow: `0px 0px 4.9px -1px ${DEX.cardShadow}`,
   },
@@ -83,6 +84,8 @@ const styles = StyleSheet.create({
   name: {
     ...Typography.cardTitle,
     marginTop: 6,
+    textAlign: 'center',
+    alignSelf: 'stretch',
     color: Brand.textAccent,
   },
 });

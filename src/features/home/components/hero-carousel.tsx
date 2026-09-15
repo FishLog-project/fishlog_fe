@@ -90,7 +90,7 @@ export function HeroCarousel({
   const slides = [
     <FeaturedSpeciesSlide key="featured" width={width} expanded={expanded} section={featured} onRetry={onRetryFeatured} />,
     <UnownedSpeciesSlide key="unowned" width={width} expanded={expanded} section={collectionProgress} />,
-    <RecommendedSpotSlide key="spot" width={width} section={recommendedSpots} />,
+    <RecommendedSpotSlide key="spot" width={width} expanded={expanded} section={recommendedSpots} />,
   ];
 
   // 탭 화면은 마운트된 채 남으므로 다른 탭에 가 있는 동안엔 돌리지 않는다
@@ -117,6 +117,8 @@ export function HeroCarousel({
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
+        // 회전 뒤 슬라이드 폭이 실제로 반영된 다음 현재 페이지에 다시 맞춘다.
+        onContentSizeChange={() => scrollRef.current?.scrollTo({ x: index * width, animated: false })}
         onScrollBeginDrag={() => setAutoPlay(false)}
         onMomentumScrollEnd={syncIndex}>
         {slides}
@@ -186,15 +188,14 @@ function FeaturedSpeciesSlide({
         end={GLOW_END}
         style={StyleSheet.absoluteFill}
       />
-      {/* 글자 칸은 그림과 겹치지 않게 폭을 제한하고, 제목은 항상 한 줄이다 */}
+      {/* 기본 배치는 유지하고 큰 글씨·작은 화면에서는 본문과 그림을 위아래로 놓는다. */}
       <View style={[styles.copyBox, expanded && styles.copyBoxWide]}>
-        <Text numberOfLines={1} style={[styles.label, styles.onDark]}>
+        <Text numberOfLines={expanded ? undefined : 1} style={[styles.label, styles.onDark]}>
           {FEATURED_LABEL}
         </Text>
-        {/* 어종 이름이 길거나 글꼴이 커도 줄을 바꾸지 않고 글자를 줄인다 */}
         <Text
-          numberOfLines={1}
-          adjustsFontSizeToFit
+          numberOfLines={expanded ? undefined : 1}
+          adjustsFontSizeToFit={!expanded}
           minimumFontScale={0.6}
           style={[styles.title, styles.onDark]}>
           {title}
@@ -271,17 +272,17 @@ function UnownedSpeciesSlide({
       />
 
       <View style={[styles.copyBox, expanded && styles.copyBoxWide]}>
-        <Text numberOfLines={1} style={[styles.label, styles.onLight]}>
+        <Text numberOfLines={expanded ? undefined : 1} style={[styles.label, styles.onLight]}>
           아직 만나지 못한 어종
         </Text>
         <Text
-          numberOfLines={1}
-          adjustsFontSizeToFit
+          numberOfLines={expanded ? undefined : 1}
+          adjustsFontSizeToFit={!expanded}
           minimumFontScale={0.6}
           style={[styles.title, styles.onLight]}>
           도감에 빈자리가 있어요!
         </Text>
-        <Text numberOfLines={2} style={styles.unownedSubtitle}>
+        <Text numberOfLines={expanded ? undefined : 2} style={styles.unownedSubtitle}>
           {subtitle}
         </Text>
       </View>
@@ -308,9 +309,11 @@ function UnownedSpeciesSlide({
 
 function RecommendedSpotSlide({
   width,
+  expanded,
   section,
 }: {
   width: number;
+  expanded: boolean;
   section: HomeSectionState<readonly RecommendedSpotViewModel[]>;
 }) {
   const router = useRouter();
@@ -325,18 +328,18 @@ function RecommendedSpotSlide({
         style={category === '해양' ? styles.spotPhotoMarine : styles.spotPhotoInland}
         contentFit="cover"
       />
-      <Text numberOfLines={1} style={[styles.label, styles.onLight]}>
+      <Text numberOfLines={expanded ? undefined : 1} style={[styles.label, styles.onLight]}>
         지금 인기 스팟
       </Text>
       <Text
-        numberOfLines={1}
-        adjustsFontSizeToFit
+        numberOfLines={expanded ? undefined : 1}
+        adjustsFontSizeToFit={!expanded}
         minimumFontScale={0.6}
         style={[styles.title, styles.onLight]}>
         {title}
       </Text>
       {spot ? (
-        <Text numberOfLines={2} style={styles.spotSubtitle}>
+        <Text numberOfLines={expanded ? undefined : 2} style={styles.spotSubtitle}>
           {SPOT_SUBTITLE}
         </Text>
       ) : null}
@@ -364,7 +367,7 @@ function RecommendedSpotSlide({
 
 const styles = StyleSheet.create({
   card: {
-    height: HERO.heroHeight,
+    minHeight: HERO.heroHeight,
     borderRadius: HERO.heroRadius,
     overflow: 'hidden',
     // 레이아웃 측정 전 한 프레임 동안 흰 배경이 비치지 않게 한다
@@ -372,7 +375,7 @@ const styles = StyleSheet.create({
   },
   /** 그림이 옆 슬라이드로 넘치지 않게 슬라이드 단위로도 자른다 */
   slide: {
-    height: HERO.heroHeight,
+    minHeight: HERO.heroHeight,
     overflow: 'hidden',
     paddingLeft: HERO.heroPadding,
     paddingTop: HERO.heroPadding,
@@ -389,22 +392,22 @@ const styles = StyleSheet.create({
   // 그림은 오른쪽 끝을 기준으로 잡아 카드 폭이 달라져도 우측 구도를 유지한다
   /** 글자 칸 — 그림과 겹치지 않게 폭을 제한한다. 글꼴이 크면 넓게 쓴다 */
   copyBox: { maxWidth: '52%' },
-  copyBoxWide: { maxWidth: '64%' },
-  /** 그림은 오른쪽 위에 고정한다 (Figma 778:2658). 글꼴이 크면 줄여 글자 자리를 내준다 */
+  copyBoxWide: { maxWidth: '100%' },
+  /** 기본 그림은 오른쪽 위에, 큰 글씨에서는 본문 아래에 놓는다. */
   featuredArt: {
     position: 'absolute',
     ...FISH_POS.featured,
     width: 162.816,
     height: 162.816,
   },
-  featuredArtCompact: { width: 118, height: 118 },
+  featuredArtCompact: { position: 'relative', top: 0, right: 0, alignSelf: 'flex-end', marginTop: 8, width: 118, height: 118 },
   unownedArt: {
     position: 'absolute',
     ...FISH_POS.unowned,
     width: 140,
     height: 140,
   },
-  unownedArtCompact: { width: 104, height: 104 },
+  unownedArtCompact: { position: 'relative', top: 0, right: 0, alignSelf: 'flex-end', marginTop: 8, width: 104, height: 104 },
   featuredFish: {
     position: 'absolute',
     top: 0,

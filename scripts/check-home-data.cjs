@@ -149,6 +149,24 @@ async function main() {
   fontScale = 2;
   carouselTree = carouselHost.render(carousel.HeroCarousel, heroElement.props);
   assert.equal(featuredNode(carouselTree).props.expanded, true, 'large text must move the artwork below the title');
+  for (const slide of nodes(carouselTree).filter((node) => /SpeciesSlide|SpotSlide/.test(node.type?.name))) {
+    const content = nodes(slide.type(slide.props));
+    if (slide.props.section.status === 'ready' || slide.type.name === 'UnownedSpeciesSlide') {
+      assert.ok(content.some((node) => node.type?.name === 'HeroCta'), 'large text must retain the slide action');
+    }
+    for (const text of content.filter((node) => node.type === 'Text')) {
+      assert.equal(text.props.numberOfLines, undefined, 'large text must wrap instead of losing the banner copy');
+    }
+  }
+  let scrolledTo;
+  const scroll = nodes(carouselTree).find((node) => node.type === 'ScrollView');
+  scroll.props.ref.current = { scrollTo: (position) => { scrolledTo = position; } };
+  scroll.props.onMomentumScrollEnd({ nativeEvent: { contentOffset: { x: 350 } } });
+  carouselTree = carouselHost.render(carousel.HeroCarousel, heroElement.props);
+  carouselTree.props.onLayout({ nativeEvent: { layout: { width: 760 } } });
+  carouselTree = carouselHost.render(carousel.HeroCarousel, heroElement.props);
+  nodes(carouselTree).find((node) => node.type === 'ScrollView').props.onContentSizeChange();
+  assert.equal(scrolledTo.x, 760, 'rotation must keep the second slide rather than an offset between slides');
   fontScale = 1;
   carouselTree.props.onLayout({ nativeEvent: { layout: { width: 280 } } });
   carouselTree = carouselHost.render(carousel.HeroCarousel, heroElement.props);

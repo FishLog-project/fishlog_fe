@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { Screen, ScreenHeader, ScreenState, SearchBar } from '@/components/common';
 import { Brand, Components, Layout, Typography } from '@/constants/theme';
@@ -44,10 +44,13 @@ const SUMMARY_GAP = DEX.rowGap;
  */
 const LABEL_FITS_PERCENT = 15;
 
-/** 격자 열 수 (Figma 3열) */
-const COLUMNS = 3;
-
 export default function DexScreen() {
+  const { fontScale } = useWindowDimensions();
+  const [gridWidth, setGridWidth] = useState(0);
+  // 일반 폰은 3열을 유지하고, 좁은 화면·큰 글씨는 열을 줄인다. 태블릿은 남는 폭을 쓴다.
+  const columns = gridWidth > 0
+    ? Math.max(1, Math.floor((gridWidth - 2 * Layout.screenPadding + DEX.columnGap) / (96 * Math.max(1, fontScale) + DEX.columnGap)))
+    : 3;
   const { token } = useAuth();
   const dataSource = useMemo(
     () => (USE_FIXTURE ? createFixtureDexDataSource() : createApiDexDataSource(token)),
@@ -76,11 +79,11 @@ export default function DexScreen() {
    */
   const gridData = useMemo(() => {
     if (!results) return null;
-    const missing = (COLUMNS - (results.length % COLUMNS)) % COLUMNS;
+    const missing = (columns - (results.length % columns)) % columns;
     return missing === 0
       ? results
       : [...results, ...Array<null>(missing).fill(null)];
-  }, [results]);
+  }, [results, columns]);
 
   return (
     <Screen edgeToEdge header={<ScreenHeader title="도감" />}>
@@ -96,12 +99,13 @@ export default function DexScreen() {
       {/* 화면 전체가 수조다 — 테두리 띠 + 안쪽 물색, 그 위에 뚜껑을 얹는다 */}
       <View style={styles.tankArea}>
         <View style={styles.tankRim}>
-          <View style={styles.tankWater}>
+          <View style={styles.tankWater} onLayout={(e) => setGridWidth(e.nativeEvent.layout.width)}>
             {gridData ? (
               <FlatList
+                key={columns}
                 data={gridData}
                 keyExtractor={(item, index) => (item ? `${item.custom ? 'custom' : 'fish'}-${item.id}` : `filler-${index}`)}
-                numColumns={COLUMNS}
+                numColumns={columns}
                 renderItem={({ item }) =>
                   item ? (
                     <SpeciesCard species={item} onPress={setSelected} />
@@ -256,14 +260,16 @@ const styles = StyleSheet.create({
 
   // 완성도 카드
   summary: {
-    height: DEX.summaryHeight,
+    minHeight: DEX.summaryHeight,
     borderRadius: DEX.summaryRadius,
     backgroundColor: DEX.summaryBg,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     // Figma 39/347 — 막대 쪽이 조금 더 안쪽으로 들어온다
     paddingLeft: 19,
     paddingRight: 23,
+    paddingVertical: 8,
     gap: 21,
     // gap(rowGap=16) 위에 얹어 Figma의 20pt를 맞춘다
     marginBottom: SUMMARY_GAP - DEX.rowGap + 4,
@@ -273,6 +279,7 @@ const styles = StyleSheet.create({
 
   barTrack: {
     flex: 1,
+    minWidth: 96,
     height: DEX.barHeight,
     borderRadius: DEX.barRadius,
     backgroundColor: DEX.barTrack,
