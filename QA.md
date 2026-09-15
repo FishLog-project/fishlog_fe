@@ -1,3 +1,27 @@
+# 인증 분석 영상 화질 개선 (2026-09-15)
+
+`dev`의 `3f5d7c2`를 기준으로 한 `fix/catch-analysis-quality`다. 영상 교체는 지도·출시 준비 패치와 독립적이다.
+
+- `assets/videos/catch-analysis.mp4`를 사용자 제공 `인증.gif` 원본(1440×2560)에서 다시 인코딩했다.
+- 기존 406×720 / 1,260,586 bytes → 1080×1920 / 4,486,881 bytes. H.264 `yuv420p`, 24fps, 124프레임, 약 5.17초다.
+- 무음 재생에 불필요한 오디오 트랙을 제거했다. 원화·동작과 기존 반복 재생, 첫 프레임/오류 대체 이미지, 동작 줄이기 처리는 유지한다.
+- GIF 원본의 미세한 디더링은 남는다. 낮은 해상도의 MP4를 확대하지 않고 고해상도 원본을 사용했다.
+
+원본 GIF SHA-256: `f401ea85a02c1226ccb1b3f85208678624d5cb75aae0cc9c2b9700c8f47c968b`
+
+```sh
+ffmpeg -i 인증.gif -vf 'scale=1080:1920:flags=lanczos,fps=24' \
+  -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p -an \
+  -movflags +faststart assets/videos/catch-analysis.mp4
+```
+
+- [x] 동일 영상과 재생 컴포넌트를 사용하는 기존 최신 개발 빌드에서 iPhone 17 Pro / iOS 26.5 교체 전후 화면 및 서로 다른 재생 프레임 확인
+- [x] `slow` fixture로 분석 화면 재생 확인; 확인 후 `USE_FIXTURE=false` 복원
+- [x] `dev` 기준 `scripts/check-*.cjs` 6개, 타입 검사, 린트, `git diff --check`
+- [x] `dev` 기준 iOS·Android·웹 production export 및 MP4 전체 프레임 디코딩 검사
+
+---
+
 # PR #19 · #20 · #21 통합 QA
 
 2026-09-11 기준 로컬 브랜치 `qa/pr19-20-21`.
