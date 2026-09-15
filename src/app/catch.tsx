@@ -108,7 +108,7 @@ export default function CatchScreen() {
     <Screen
       edges={['top', 'bottom']}
       edgeToEdge
-      fullWidth
+      fullWidth={state.step === 'capture' || state.step === 'analyzing' || state.step === 'error'}
       header={
         <ScreenHeader
           title={TITLE[state.step]}
