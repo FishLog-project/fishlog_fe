@@ -375,6 +375,7 @@ const styles = StyleSheet.create({
   },
   /** 그림이 옆 슬라이드로 넘치지 않게 슬라이드 단위로도 자른다 */
   slide: {
+    flexGrow: 1,
     minHeight: HERO.heroHeight,
     overflow: 'hidden',
     paddingLeft: HERO.heroPadding,
