@@ -62,15 +62,17 @@ function mount(source) {
       '@/lib/use-section': {},
     }),
   });
+  let minAnalyzingMs = 0;
   const render = (nextSource = source) => {
     source = nextSource;
     cursor = 0;
-    const result = runHook(source);
+    const result = runHook(source, minAnalyzingMs);
     effects.splice(0).forEach((effect) => effect());
     return result;
   };
   render.unmount = () => slots.forEach((slot) => slot?.cleanup?.());
   render.updateCount = () => updates;
+  render.setMinAnalyzingMs = (ms) => { minAnalyzingMs = ms; };
   return render;
 }
 
@@ -169,6 +171,34 @@ async function checkBackgroundDetails() {
       }
     }
   }
+}
+
+
+// 분석이 곧바로 끝나도 분석 화면(애니메이션)이 최소 시간만큼은 남는다.
+async function checkAnalysisHold() {
+  const source = {
+    classify: async () => ({ candidates: [{ fishId: 1, name: '광어', sizeCm: 20 }] }),
+    listSpecies: async () => [{ id: 1, name: '광어' }],
+    verify: async () => assert.fail('hold check must not register'),
+    getFish: async () => assert.fail('hold check must not fetch details'),
+  };
+  const render = mount(source);
+  render.setMinAnalyzingMs(300);
+  const startedAt = Date.now();
+  const analyzing = render().analyze('photo');
+  await flush();
+  assert.equal(render().state.step, 'analyzing', 'fast responses must keep the analyzing animation on screen');
+  await analyzing;
+  assert.ok(Date.now() - startedAt >= 300, 'analyzing screen must stay for the minimum time');
+  assert.equal(render().state.step, 'candidates');
+
+  // 분석 중 취소(뒤로가기)하면 최소 시간을 기다린 뒤에도 화면을 되돌리지 않는다
+  const cancelled = mount(source);
+  cancelled.setMinAnalyzingMs(300);
+  const pending = cancelled().analyze('photo');
+  cancelled().retake();
+  await pending;
+  assert.equal(cancelled().state.step, 'capture', 'cancelling during the hold must keep the capture screen');
 }
 
 async function main() {
@@ -451,7 +481,8 @@ async function main() {
   assert.deepEqual(await emptyHome.getSeasonalFish(), []);
   assert.deepEqual(await emptyHome.getPopularSpots(), []);
   await checkBackgroundDetails();
-  console.log('catch checks passed: normal/custom registration, retry, cancellation, validation, nonblocking/stale detail, web/native multipart');
+  await checkAnalysisHold();
+  console.log('catch checks passed: normal/custom registration, retry, cancellation, validation, nonblocking/stale detail, web/native multipart, analyzing hold');
 }
 
 main().catch((error) => { console.error(error); process.exitCode = 1; });

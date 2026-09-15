@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { Screen, ScreenHeader, SearchBar } from '@/components/common';
@@ -13,7 +13,8 @@ import { FishlogKakaoMap } from '@/features/map/kakao-map';
 import { createApiSpotDataSource } from '@/features/map/spot-api';
 import { createFixtureSpotDataSource } from '@/features/map/spot-data';
 import type { Coords } from '@/features/map/tour-data';
-import { TourFacilities } from '@/features/map/tour-facilities';
+import { TourFacilities, useTourFacilities } from '@/features/map/tour-facilities';
+import { setSpotFavorite } from '@/features/map/spot-list-store';
 import { useSpotsViewModel } from '@/features/map/use-spot-view-model';
 import { USE_FIXTURE } from '@/lib/data-source-mode';
 
@@ -47,15 +48,11 @@ export default function MapScreen() {
     mapCenter.current = { lat: center.lat, lng: center.lng };
   }, []);
   const [selectedSpotId, setSelectedSpotId] = useState<number | null>(null);
-  /**
-   * 찜을 토글해도 목록(GET /api/spots)의 isFavorite 은 그대로라,
-   * 같은 스팟을 다시 열면 하트가 예전 상태로 보인다. 바뀐 값만 여기에 덮어 둔다.
-   */
-  const [favoriteOverrides, setFavoriteOverrides] = useState<Record<number, boolean>>({});
-
+  const sessionKey = USE_FIXTURE ? 'fixture' : `session-${sessionId}`;
   const rememberFavorite = useCallback((spotId: number, isFavorite: boolean) => {
-    setFavoriteOverrides((current) => ({ ...current, [spotId]: isFavorite }));
-  }, []);
+    setSpotFavorite(sessionKey, spotId, isFavorite);
+  }, [sessionKey]);
+  const facilities = useTourFacilities(getMapCenter);
 
   const dataSource = useMemo(
     () => (USE_FIXTURE ? createFixtureSpotDataSource() : createApiSpotDataSource(token)),
@@ -63,13 +60,10 @@ export default function MapScreen() {
   );
   const { markers, allSpots, refresh, refreshing } = useSpotsViewModel(
     dataSource,
-    USE_FIXTURE ? 'fixture' : `session-${sessionId}`,
+    sessionKey,
   );
   const selectedSpot = allSpots?.find((spot) => spot.id === selectedSpotId) ?? null;
-  const selectedIsFavorite =
-    (selectedSpotId !== null ? favoriteOverrides[selectedSpotId] : undefined) ??
-    selectedSpot?.isFavorite ??
-    false;
+  const selectedIsFavorite = selectedSpot?.isFavorite ?? false;
 
   /**
    * 검색 화면에서 고른 스팟을 연다.
@@ -80,6 +74,35 @@ export default function MapScreen() {
   const requestKey = requestedSpotId ? `${requestedSpotId}:${searchRequest ?? ''}` : null;
   const [handledSpotId, setHandledSpotId] = useState<string | null>(null);
   const [focus, setFocus] = useState<{ lat: number; lng: number; nonce: number } | null>(null);
+
+  /**
+   * 다른 탭에 갔다 돌아오면 처음 상태로 되돌린다.
+   *
+   * 탭 화면은 마운트된 채 남아서, 보고 있던 시설 상세와 스팟 시트가 그대로 남아 있었다.
+   * 첫 진입은 마운트 때 이미 현재 위치를 잡으므로 건너뛴다.
+   */
+  const returned = useRef(false);
+  /**
+   * useTourFacilities 는 렌더마다 새 객체를 돌려준다.
+   * 그대로 의존성에 넣으면 렌더할 때마다 초기화가 다시 돌아, 방금 연 시설을 곧바로 닫는다.
+   */
+  const facilitiesRef = useRef(facilities);
+  useEffect(() => {
+    facilitiesRef.current = facilities;
+  }, [facilities]);
+  useFocusEffect(useCallback(() => {
+    if (!returned.current) {
+      returned.current = true;
+      return;
+    }
+    facilitiesRef.current.close();
+    setFacilitiesOpen(false);
+    setSeaInfoOpen(false);
+    setSelectedSpotId(null);
+    setFocus(null);
+    setRecenterSignal((signal) => signal + 1);
+  }, []));
+
 
   // effect 가 아니라 렌더 중에 맞춘다 — 파라미터라는 "바깥 값"에 상태를 맞추는 경우라
   // effect 로 두면 한 번 그린 뒤 다시 그리게 된다.
@@ -109,7 +132,11 @@ export default function MapScreen() {
         <FishlogKakaoMap
           recenterSignal={recenterSignal}
           spots={markers ?? undefined}
-          onSpotPress={setSelectedSpotId}
+          onSpotPress={(id) => { facilities.close(); setSelectedSpotId(id); }}
+          tourPlaces={facilitiesOpen ? facilities.markers : undefined}
+          onTourPress={(id) => { setSelectedSpotId(null); facilities.selectPlace(id); }}
+          // 시트가 올라와 있을 때 지도를 누르면 내린다
+          onMapPress={() => { facilities.close(); setSelectedSpotId(null); }}
           focus={focus}
           onCameraIdle={rememberMapCenter}
         />
@@ -127,7 +154,7 @@ export default function MapScreen() {
               }
               onPress={
                 action.key === 'facilities'
-                  ? () => setFacilitiesOpen((open) => !open)
+                  ? () => { facilities.close(); setFacilitiesOpen((open) => !open); }
                   : action.key === 'sea'
                     ? () => setSeaInfoOpen((open) => !open)
                     : action.key === 'fish'
@@ -177,10 +204,11 @@ export default function MapScreen() {
             contentFit="contain"
           />
         </Pressable>
-        {facilitiesOpen ? <TourFacilities getSearchOrigin={getMapCenter} /> : null}
+        {facilitiesOpen ? <TourFacilities facilities={facilities} /> : null}
       </View>
 
       <SpotDetailSheet
+        key={sessionKey}
         dataSource={dataSource}
         spotId={selectedSpotId}
         isFavorite={selectedIsFavorite}

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { FormError } from '@/components/common';
-import { Brand, Typography } from '@/constants/theme';
+import { Brand, Typography, Fonts } from '@/constants/theme';
 import { authApi, OtpInput, StepScreen, usePasswordReset } from '@/features/auth';
 
 const CODE_LENGTH = 6;
@@ -74,6 +74,6 @@ export default function PasswordVerifyScreen() {
 
 const styles = StyleSheet.create({
   otpBlock: { gap: 12 },
-  resend: { ...Typography.footnote, fontWeight: '500', color: Brand.textMuted },
+  resend: { ...Typography.footnote, fontFamily: Fonts.medium, color: Brand.textMuted },
   resendDisabled: { opacity: 0.5 },
 });
