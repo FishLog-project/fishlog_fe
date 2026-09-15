@@ -1,5 +1,8 @@
+/* global __dirname */
 // Run: node scripts/check-native-map.cjs — controlled camera intents and real native prop routing.
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const { load, host, flush } = require('./check-dex-data.cjs');
 const deferred = () => { let resolve; const promise = new Promise((done) => { resolve = done; }); return { promise, resolve }; };
 
@@ -23,6 +26,7 @@ async function main() {
     tourPlaces: [{ id: '7', name: '관광지', lat: 33.1, lng: 126.1 }],
     onSpotPress: (id) => pressed.push(['spot', id]),
     onTourPress: (id) => pressed.push(['tour', id]),
+    onMapPress: () => pressed.push(['map']),
   };
   const render = () => { hooks.render(FishlogKakaoMap, props); return hooks.render(FishlogKakaoMap, props); };
   render();
@@ -33,6 +37,14 @@ async function main() {
   map.props.onSpotPress({ nativeEvent: { id: 'tour:7' } });
   map.props.onSpotPress({ nativeEvent: { id: 'spot:NaN' } });
   assert.deepEqual(pressed, [['spot', 7], ['tour', '7']]);
+  map.props.onMapPress({ nativeEvent: {} });
+  assert.deepEqual(pressed.at(-1), ['map']);
+
+  // JS mocks cannot execute the SDK. Guard both native routes in the committed installation patch.
+  const patch = fs.readFileSync(path.join(__dirname, '../patches/@react-native-kakao+map+2.2.7.patch'), 'utf8');
+  assert.match(patch, /setOnTerrainClickListener[^\n]+emitMapPress/);
+  assert.match(patch, /terrainDidTappedWithKakaoMap:[^\n]+\n\+\s+\[self\.target terrainDidTappedWithKakaoMap:map position:position\]/);
+  assert.match(patch, /terrainDidTappedWithKakaoMap:[^\n]+\n\+\s+if \(_eventEmitter\)[^\n]+onMapPress\(\{\}\)/);
 
   // Search wins even when both the cached lookup and fresh GPS resolve after selection.
   props = { ...props, focus: { lat: 35, lng: 129, nonce: 1 } };

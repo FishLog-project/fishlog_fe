@@ -17,7 +17,7 @@ index c3a003d..d9ab736 100644
      reactContext: ReactApplicationContext,
 diff --git a/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapView.kt b/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapView.kt
 new file mode 100644
-index 0000000..220f35f
+index 0000000..5f75be0
 --- /dev/null
 +++ b/node_modules/@react-native-kakao/map/android/src/main/java/net/mjstudio/rnkakao/map/RNCKakaoMapView.kt
 @@ -0,0 +1,465 @@
@@ -169,7 +169,7 @@ index 0000000..220f35f
 +          map.setOnLabelClickListener { _, _, label ->
 +            (label.tag as? String)?.let(::emitSpotPress)
 +          }
-+          map.setOnMapClickListener { _, _, _, _ -> emitMapPress() }
++          map.setOnTerrainClickListener { _, _, _ -> emitMapPress() }
 +          map.setOnCameraMoveEndListener { _, position, _ ->
 +            emitCameraIdle(position)
 +            // 레이아웃 패스 없이 viewport 만 어긋난 경우도 사용자가 지도를 만지면 바로잡는다
@@ -574,7 +574,7 @@ index 0000000..cb40f9c
 +/** JS util/Const.ts 의 nullNumber. codegen 이 값을 채우지 않은 필드를 뜻한다. */
 +private const val NULL_NUMBER = -123123123.0
 diff --git a/node_modules/@react-native-kakao/map/ios/Component/Map/RNCKakaoMapView.mm b/node_modules/@react-native-kakao/map/ios/Component/Map/RNCKakaoMapView.mm
-index 1a67c76..d9efeff 100644
+index 1a67c76..823106c 100644
 --- a/node_modules/@react-native-kakao/map/ios/Component/Map/RNCKakaoMapView.mm
 +++ b/node_modules/@react-native-kakao/map/ios/Component/Map/RNCKakaoMapView.mm
 @@ -7,6 +7,7 @@
@@ -585,7 +585,7 @@ index 1a67c76..d9efeff 100644
  
  using namespace facebook::react;
  
-@@ -15,7 +16,20 @@ NSString* MAP_VIEW_INFO_SKYVIEW_NAME = @"skyview";
+@@ -15,7 +16,23 @@
  NSString* MAP_VIEW_INFO_MAP_NAME = @"map";
  NSString* APP_NAME = @"openmap";
  
@@ -604,10 +604,13 @@ index 1a67c76..d9efeff 100644
 +- (void)poiDidTappedWithKakaoMap:(KakaoMap*)map layerID:(NSString*)layerID poiID:(NSString*)poiID position:(MapPoint*)position {
 +  [self.target poiDidTappedWithKakaoMap:map layerID:layerID poiID:poiID position:position];
 +}
++- (void)terrainDidTappedWithKakaoMap:(KakaoMap*)map position:(MapPoint*)position {
++  [self.target terrainDidTappedWithKakaoMap:map position:position];
++}
  @end
  
  @implementation RNCKakaoMapView {
-@@ -23,6 +37,11 @@ NSString* APP_NAME = @"openmap";
+@@ -23,6 +40,11 @@ @implementation RNCKakaoMapView {
    KMViewContainer* _container;
    KMController* _controller;
    BOOL _shouldForceUpdatePropsForInitialRender;
@@ -619,7 +622,7 @@ index 1a67c76..d9efeff 100644
  }
  
  - (instancetype)initWithFrame:(CGRect)frame {
-@@ -43,6 +62,7 @@ NSString* APP_NAME = @"openmap";
+@@ -43,6 +65,7 @@ - (instancetype)initWithFrame:(CGRect)frame {
  }
  
  - (void)dealloc {
@@ -627,7 +630,7 @@ index 1a67c76..d9efeff 100644
    [_controller pauseEngine];
    [_controller resetEngine];
  }
-@@ -87,6 +107,9 @@ NSString* APP_NAME = @"openmap";
+@@ -87,6 +110,9 @@ - (void)updateProps:(Props::Shared const&)props oldProps:(Props::Shared const&)o
      }
    }
  
@@ -637,7 +640,7 @@ index 1a67c76..d9efeff 100644
    if (check(p.camera != n.camera))
      [self moveCamera:n.camera noAnimation:_shouldForceUpdatePropsForInitialRender];
    if (check(p.cameraMinLevel != n.cameraMinLevel && isValidNumber(n.cameraMinLevel)))
-@@ -127,6 +150,115 @@ NSString* APP_NAME = @"openmap";
+@@ -127,6 +153,120 @@ - (void)updateProps:(Props::Shared const&)props oldProps:(Props::Shared const&)o
    }
  }
  
@@ -750,10 +753,15 @@ index 1a67c76..d9efeff 100644
 +  std::static_pointer_cast<const RNCKakaoMapViewEventEmitter>(_eventEmitter)->onSpotPress({.id = std::string(poiID.UTF8String)});
 +}
 +
++// Terrain excludes POI taps, so choosing a marker cannot immediately hide its sheet.
++- (void)terrainDidTappedWithKakaoMap:(KakaoMap*)map position:(MapPoint*)position {
++  if (_eventEmitter) std::static_pointer_cast<const RNCKakaoMapViewEventEmitter>(_eventEmitter)->onMapPress({});
++}
++
  - (void)moveCamera:(const RNCKakaoMapViewCameraStruct&)c noAnimation:(BOOL)noAnimation {
    CameraUpdate* update =
        [CameraUpdate makeWithTarget:makePoint(c.lat, c.lng)
-@@ -180,8 +312,13 @@ NSString* APP_NAME = @"openmap";
+@@ -180,8 +320,13 @@ - (void)authenticationFailed:(NSInteger)errorCode desc:(NSString*)desc {
  
  - (void)addViewSucceeded:(NSString*)viewName viewInfoName:(NSString*)viewInfoName {
    if ([viewName isEqualToString:MAP_VIEW_NAME]) {
@@ -767,7 +775,7 @@ index 1a67c76..d9efeff 100644
    }
  }
  - (void)addViewFailed:(NSString*)viewName viewInfoName:(NSString*)viewInfoName {
-@@ -189,6 +326,7 @@ NSString* APP_NAME = @"openmap";
+@@ -189,6 +334,7 @@ - (void)addViewFailed:(NSString*)viewName viewInfoName:(NSString*)viewInfoName {
  }
  - (void)containerDidResized:(CGSize)size {
    self.map.viewRect = CGRectMake(0, 0, size.width, size.height);

@@ -137,7 +137,7 @@ async function checkFacilities() {
     'react-native-gesture-handler': {
       GestureHandlerRootView: 'GestureHandlerRootView',
       GestureDetector: 'GestureDetector',
-      Gesture: { Pan: () => { const chain = { onChange: () => chain, onEnd: () => chain }; return chain; } },
+      Gesture: { Pan: () => { const chain = { onChange: (fn) => { chain.change = fn; return chain; }, onEnd: (fn) => { chain.end = fn; return chain; } }; return chain; } },
     },
     'expo-image': { Image: 'Image' },
     '@expo/vector-icons': { Ionicons: 'Ionicons' },
@@ -203,9 +203,25 @@ async function checkFacilities() {
   assert.equal(rows().length, 1);
   assert.equal(rows()[0].props.accessibilityLabel, '시설, 인천, 0m. 시설 상세 보기');
   assert.deepEqual(facilities.markers, [{ id: facilities.state.places[0].id, name: '시설', lat: origin.lat, lng: origin.lng }]);
+  const loadedMarkers = facilities.markers;
+  const loadedRequests = requests.length;
+  button('시설 목록 닫기').props.onPress(); render();
+  assert.equal(nodes(tree).some((node) => node.props?.testID === 'tour-facility-sheet'), false);
+  assert.deepEqual(facilities.markers, loadedMarkers, 'hiding the sheet keeps the loaded markers');
+  assert.equal(facilities.category, '음식점');
+  button('음식점 시설 보기').props.onPress(); render();
+  assert.equal(rows().length, 1, 'selected category reopens a hidden list');
+  assert.equal(requests.length, loadedRequests, 'reopening must reuse the same result');
+  facilities.hide(); render();
   facilities.selectPlace(facilities.markers[0].id); render();
   assert.ok(detail(), 'map marker and list must open the same place');
   assert.equal(facilities.selected, facilities.state.places[0]);
+  assert.equal(tree.type, 'View', 'the full map overlay must not be a gesture-handler root');
+  assert.equal(tree.props.pointerEvents, 'box-none');
+  assert.equal(nodes(tree).find((node) => node.props?.testID === 'tour-facility-dim').props.pointerEvents, 'none', 'detail dim must pass touches through to the map');
+  assert.equal(nodes(tree).some((node) => node.props?.accessibilityLabel === '시설 상세 닫기'), false, 'no full-map pressable may block map gestures or other markers');
+  const renderedSheet = nodes(tree).find((node) => node.props?.testID === 'tour-facility-sheet');
+  assert.equal(nodes(renderedSheet).filter((node) => node.type === 'GestureHandlerRootView').length, 1, 'gesture root stays inside the sheet');
   button('시설 목록으로 돌아가기').props.onPress(); render();
   rows()[0].props.onPress();
   render();
@@ -221,6 +237,14 @@ async function checkFacilities() {
   render();
   assert.equal(rows().length, 1);
   assert.equal(detail(), undefined);
+  const drag = nodes(tree).find((node) => node.type === 'GestureDetector').props.gesture;
+  drag.change({ changeY: 350 });
+  drag.end(); render();
+  assert.equal(nodes(tree).some((node) => node.props?.testID === 'tour-facility-sheet'), false, 'dragging below the collapsed snap hides the sheet');
+  assert.deepEqual(facilities.markers, loadedMarkers, 'drag dismissal keeps the same markers');
+  button('음식점 시설 보기').props.onPress(); render(); render();
+  assert.equal(rows().length, 1);
+  assert.equal(requests.length, loadedRequests);
   rows()[0].props.onPress();
   render();
   assert.ok(nodes(detail()).some((node) => node.props?.large && node.props.uri === item.firstImage));
@@ -310,7 +334,7 @@ async function checkFacilitiesByMapCenter() {
     'react-native-gesture-handler': {
       GestureHandlerRootView: 'GestureHandlerRootView',
       GestureDetector: 'GestureDetector',
-      Gesture: { Pan: () => { const chain = { onChange: () => chain, onEnd: () => chain }; return chain; } },
+      Gesture: { Pan: () => { const chain = { onChange: (fn) => { chain.change = fn; return chain; }, onEnd: (fn) => { chain.end = fn; return chain; } }; return chain; } },
     },
     'expo-image': { Image: 'Image' },
     '@expo/vector-icons': { Ionicons: 'Ionicons' },

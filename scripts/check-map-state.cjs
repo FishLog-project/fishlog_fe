@@ -99,6 +99,7 @@ async function check() {
   const facilities = {
     markers: [{ id: 'tour-test', name: '관광지', lat: 37.4, lng: 126.6 }],
     close() { this.closed = (this.closed ?? 0) + 1; this.selected = null; },
+    hide() { this.hidden = (this.hidden ?? 0) + 1; this.selected = null; },
     selectPlace(id) { this.selected = id; },
   };
   const Screen = load('src/app/(tabs)/map/index.tsx', {
@@ -136,6 +137,15 @@ async function check() {
   tree = render(screenHost, Screen);
   assert.equal(facilities.selected, 'tour-test');
   assert.equal(node(tree, 'SpotDetailSheet').props.spotId, null);
+  const closedBeforeHide = facilities.closed ?? 0;
+  node(tree, 'FishlogKakaoMap').props.onMapPress();
+  tree = render(screenHost, Screen);
+  assert.equal(facilities.selected, null);
+  assert.equal(node(tree, 'FishlogKakaoMap').props.tourPlaces, facilities.markers, 'map tap hides the sheet without removing markers');
+  assert.equal(facilities.closed ?? 0, closedBeforeHide, 'map tap must not clear the active category');
+  node(tree, 'FishlogKakaoMap').props.onSpotPress(2);
+  tree = render(screenHost, Screen);
+  assert.equal(node(tree, 'FishlogKakaoMap').props.tourPlaces, facilities.markers, 'spot selection also keeps facility markers');
   nodes(tree).find((item) => item.props?.label === '주변 시설').props.onPress();
   tree = render(screenHost, Screen);
   assert.equal(node(tree, 'FishlogKakaoMap').props.tourPlaces, undefined, 'closing facilities removes map markers');

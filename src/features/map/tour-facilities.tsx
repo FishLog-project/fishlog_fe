@@ -23,7 +23,7 @@ import { useCurrentLocation } from '@/features/map/use-current-location';
 import { useNearbyTours, type TourPlaceViewModel } from '@/features/map/use-nearby-tours';
 
 const source = createApiTourDataSource();
-/** 시트 높이 — 지도 영역 기준. 처음엔 절반, 끝까지 끌면 칩 줄만 남긴다 */
+/** 시트 높이 — 지도 영역 기준. 절반/확장 사이로 조절하고 아래로 더 끌면 숨긴다. */
 const SHEET_COLLAPSED_RATIO = 0.5;
 const SHEET_EXPANDED_RATIO = 0.85;
 const ICONS = {
@@ -41,6 +41,7 @@ const ICONS = {
  */
 export function useTourFacilities(getSearchOrigin?: () => Coords | null) {
   const [category, setCategory] = useState<TourCategory | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [location, locate] = useCurrentLocation();
   /** 지도 중심으로 찾을 때 고정해 둔 좌표. null 이면 GPS 로 찾는다 */
   const [mapOrigin, setMapOrigin] = useState<Coords | null>(null);
@@ -59,8 +60,14 @@ export function useTourFacilities(getSearchOrigin?: () => Coords | null) {
   };
   const selectCategory = (next: TourCategory) => {
     setSelectedPlace(null);
-    setCategory(next === category ? null : next);
-    if (next === category) return;
+    if (next === category) {
+      // 숨긴 목록은 같은 칩으로 다시 연다. 열린 상태에서 다시 누르면 필터를 해제한다.
+      setSheetOpen(!sheetOpen);
+      if (sheetOpen) setCategory(null);
+      return;
+    }
+    setCategory(next);
+    setSheetOpen(true);
     if (!pinMapOrigin() && location.status === 'idle') void locate();
   };
   const refreshLocation = () => {
@@ -69,23 +76,26 @@ export function useTourFacilities(getSearchOrigin?: () => Coords | null) {
     if (pinMapOrigin()) retry();
     else void locate();
   };
-  const close = () => { setSelectedPlace(null); setCategory(null); };
+  // 시트 표시와 조회 수명을 분리한다. 숨겨도 분류·응답·마커는 유지한다.
+  const hide = () => { setSelectedPlace(null); setSheetOpen(false); };
+  const close = () => { hide(); setCategory(null); };
   const back = () => setSelectedPlace(null);
   const selectPlace = (id: string) => {
-    if (state.status === 'ready') setSelectedPlace(state.places.find((place) => place.id === id) ?? null);
+    const place = state.status === 'ready' ? state.places.find((item) => item.id === id) : null;
+    if (place) { setSelectedPlace(place); setSheetOpen(true); }
   };
   const markers = useMemo(() => state.status === 'ready'
     ? state.places.flatMap((place) => place.coords ? [{ id: place.id, name: place.name, ...place.coords }] : [])
     : [], [state]);
 
-  return { category, location, origin, state, selected, markers, byMapCenter: mapOrigin !== null,
-    selectCategory, refreshLocation, retry, selectPlace, back, close };
+  return { category, sheetOpen, location, origin, state, selected, markers, byMapCenter: mapOrigin !== null,
+    selectCategory, refreshLocation, retry, selectPlace, back, hide, close };
 }
 
 /** 지도 마커·목록·상세가 같은 요청 결과와 선택 상태를 쓴다. */
 export function TourFacilities({ facilities }: { facilities: ReturnType<typeof useTourFacilities> }) {
-  const { category, location, origin, state, selected, byMapCenter,
-    selectCategory, refreshLocation, retry, selectPlace, back, close } = facilities;
+  const { category, sheetOpen, location, origin, state, selected, byMapCenter,
+    selectCategory, refreshLocation, retry, selectPlace, back, hide } = facilities;
   const [expanded, setExpanded] = useState(false);
 
   // 손잡이·헤더를 끌어 시트를 올리고 내린다 (스팟 상세 시트와 같은 방식).
@@ -105,11 +115,15 @@ export function TourFacilities({ facilities }: { facilities: ReturnType<typeof u
   const drag = Gesture.Pan()
     .onChange((event) => {
       const next = sheetHeight.value - event.changeY;
-        sheetHeight.value = Math.min(Math.max(next, collapsedHeight), expandedHeight);
+      sheetHeight.value = Math.min(Math.max(next, 0), expandedHeight);
     })
     .onEnd(() => {
+      if (sheetHeight.value < collapsedHeight / 2) {
+        runOnJS(hide)();
+        return;
+      }
       const goesUp = sheetHeight.value > (collapsedHeight + expandedHeight) / 2;
-        sheetHeight.value = withTiming(goesUp ? expandedHeight : collapsedHeight, { duration: 200 });
+      sheetHeight.value = withTiming(goesUp ? expandedHeight : collapsedHeight, { duration: 200 });
       runOnJS(setExpanded)(goesUp);
     });
 
@@ -117,35 +131,30 @@ export function TourFacilities({ facilities }: { facilities: ReturnType<typeof u
   useEffect(() => {
     if (layoutHeight === 0) return;
     sheetHeight.value = expanded ? expandedHeight : collapsedHeight;
-  }, [layoutHeight, expanded, expandedHeight, collapsedHeight, sheetHeight]);
+  }, [layoutHeight, expanded, expandedHeight, collapsedHeight, sheetHeight, sheetOpen]);
 
   const sheetStyle = useAnimatedStyle(() => ({ height: sheetHeight.value }));
   useEffect(() => {
-    if (!category) return;
+    if (!sheetOpen) return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if (selected) back();
-      else close();
+      else hide();
       return true;
     });
     return () => subscription.remove();
-  }, [category, selected, back, close]);
+  }, [sheetOpen, selected, back, hide]);
 
   return (
-    <GestureHandlerRootView style={StyleSheet.absoluteFill} pointerEvents="box-none">
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       {/* 시트 높이 기준이 되는 지도 영역 크기를 잰다 */}
       <View
         pointerEvents="none"
         style={StyleSheet.absoluteFill}
         onLayout={(event) => setLayoutHeight(event.nativeEvent.layout.height)}
       />
-      {/* 상세는 지도를 가리고 집중해서 본다. 목록은 지도를 함께 보므로 막을 깔지 않는다 */}
-      {selected ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="시설 상세 닫기"
-          onPress={back}
-          style={[StyleSheet.absoluteFill, styles.backdrop]}
-        />
+      {/* 상세의 딤은 유지하되 노출된 지도의 드래그·마커 선택은 통과시킨다. */}
+      {selected && sheetOpen ? (
+        <View pointerEvents="none" testID="tour-facility-dim" style={[StyleSheet.absoluteFill, styles.backdrop]} />
       ) : null}
       <ScrollView
         horizontal
@@ -166,12 +175,14 @@ export function TourFacilities({ facilities }: { facilities: ReturnType<typeof u
         ))}
       </ScrollView>
 
-      {category ? (
+      {category && sheetOpen ? (
         <Animated.View
           key={category}
           testID="tour-facility-sheet"
           entering={SlideInDown.duration(220).reduceMotion(ReduceMotion.System)}
           style={[styles.sheet, measured ? sheetStyle : styles.sheetUnmeasured]}>
+          {/* 제스처 루트도 시트 안으로 한정해 노출된 지도의 터치를 가로채지 않는다. */}
+          <GestureHandlerRootView style={styles.viewport}>
           {/* 손잡이와 헤더를 잡고 끌면 시트가 오르내린다 */}
           <GestureDetector gesture={drag}>
             <View>
@@ -216,7 +227,7 @@ export function TourFacilities({ facilities }: { facilities: ReturnType<typeof u
             <Pressable accessibilityRole="button" accessibilityLabel={expanded ? '시설 시트 접기' : '시설 시트 펼치기'} accessibilityState={{ expanded }} onPress={() => snapTo(!expanded)} style={styles.iconButton}>
               <Ionicons name={expanded ? 'chevron-down' : 'chevron-up'} size={24} color={Brand.textStrong} />
             </Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel="시설 목록 닫기" onPress={close} style={[styles.iconButton, styles.edgeEnd]}>
+            <Pressable accessibilityRole="button" accessibilityLabel="시설 목록 닫기" onPress={hide} style={[styles.iconButton, styles.edgeEnd]}>
               <Ionicons name="close" size={24} color={Brand.textStrong} />
             </Pressable>
               </View>
@@ -267,9 +278,10 @@ export function TourFacilities({ facilities }: { facilities: ReturnType<typeof u
               />
             )}
           </ScrollView>
+          </GestureHandlerRootView>
         </Animated.View>
       ) : null}
-    </GestureHandlerRootView>
+    </View>
   );
 }
 

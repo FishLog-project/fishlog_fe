@@ -116,7 +116,7 @@ export default function MapScreen() {
   }
 
   return (
-    <Screen edgeToEdge header={<ScreenHeader title="지도" />}>
+    <Screen edgeToEdge fullWidth header={<ScreenHeader title="지도" />}>
       {/* 검색은 별도 화면에서 한다 — 여기서는 들어가는 입구 역할만 */}
       <Pressable
         accessibilityRole="button"
@@ -132,11 +132,11 @@ export default function MapScreen() {
         <FishlogKakaoMap
           recenterSignal={recenterSignal}
           spots={markers ?? undefined}
-          onSpotPress={(id) => { facilities.close(); setSelectedSpotId(id); }}
+          onSpotPress={(id) => { facilities.hide(); setSelectedSpotId(id); }}
           tourPlaces={facilitiesOpen ? facilities.markers : undefined}
           onTourPress={(id) => { setSelectedSpotId(null); facilities.selectPlace(id); }}
           // 시트가 올라와 있을 때 지도를 누르면 내린다
-          onMapPress={() => { facilities.close(); setSelectedSpotId(null); }}
+          onMapPress={() => { facilities.hide(); setSelectedSpotId(null); }}
           focus={focus}
           onCameraIdle={rememberMapCenter}
         />
