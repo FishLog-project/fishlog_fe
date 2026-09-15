@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useEvent } from 'expo';
 import { Asset } from 'expo-asset';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -107,6 +108,7 @@ export default function CatchScreen() {
     <Screen
       edges={['top', 'bottom']}
       edgeToEdge
+      fullWidth
       header={
         <ScreenHeader
           title={TITLE[state.step]}
@@ -184,6 +186,7 @@ function CaptureStep({
   const [cameraReady, setCameraReady] = useState(false);
   const [mountFailed, setMountFailed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [permissionDismissed, setPermissionDismissed] = useState(false);
   const libraryAfterDismiss = useRef(false);
@@ -196,7 +199,8 @@ function CaptureStep({
 
   // OS가 다시 물을 수 있는 경우에만 요청하고, 거부해도 보관함 대안을 남긴다.
   const requestCameraAccess = async () => {
-    if (busy || !permission?.canAskAgain) return;
+    if (busyRef.current || !permission?.canAskAgain) return;
+    busyRef.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -205,13 +209,15 @@ function CaptureStep({
     } catch {
       setError('카메라 권한을 요청하지 못했어요. 사진 보관함에서 선택해 주세요.');
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   };
 
-  /** 권한 거부·시뮬레이터처럼 카메라를 못 쓸 때의 대체 경로 */
+  /** 촬영 대신 저장된 사진을 선택한다. 카메라 권한과 무관하게 쓸 수 있다. */
   const pickFromLibrary = async () => {
-    if (busy) return;
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -223,12 +229,13 @@ function CaptureStep({
     } catch {
       setError('사진을 불러오지 못했어요. 다시 시도해 주세요.');
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   };
 
   const openLibrary = () => {
-    if (busy) return;
+    if (busyRef.current) return;
     setPermissionDismissed(true);
     // iOS 사진 선택기는 다른 Modal이 닫히는 중이면 표시되지 않을 수 있다.
     if (Platform.OS === 'ios' && permissionDialogVisible) {
@@ -239,11 +246,12 @@ function CaptureStep({
   };
 
   const takePhoto = async () => {
-    if (busy || !canCapture) return;
+    if (busyRef.current || !canCapture) return;
     if (fixturePhotoUri) {
       onCaptured(fixturePhotoUri);
       return;
     }
+    busyRef.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -252,6 +260,7 @@ function CaptureStep({
     } catch {
       setError('촬영하지 못했어요. 다시 시도해 주세요.');
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   };
@@ -300,32 +309,36 @@ function CaptureStep({
                   <Text style={styles.placeholderLink}>카메라 권한 안내 보기</Text>
                 </Pressable>
               ) : null}
-              <Pressable
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityState={{ disabled: busy }}
-                disabled={busy}
-                onPress={openLibrary}>
-                <Text style={styles.placeholderLink}>사진 보관함에서 선택하기</Text>
-              </Pressable>
             </View>
           )}
           {error ? <Text style={styles.cameraError}>{error}</Text> : null}
         </View>
 
-        <Pressable
-          style={({ pressed }) => [
-            styles.shutter,
-            (!canCapture || busy) && styles.disabledControl,
-            pressed && styles.pressed,
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="촬영하기"
-          accessibilityState={{ disabled: !canCapture || busy, busy }}
-          disabled={!canCapture || busy}
-          onPress={takePhoto}>
-          <Image source={SHUTTER} style={StyleSheet.absoluteFill} contentFit="contain" />
-        </Pressable>
+        <View style={styles.captureActions}>
+          <Pressable
+            style={({ pressed }) => [styles.galleryButton, busy && styles.disabledControl, pressed && styles.pressed]}
+            accessibilityRole="button"
+            accessibilityLabel="사진 보관함에서 선택하기"
+            accessibilityState={{ disabled: busy, busy }}
+            disabled={busy}
+            onPress={openLibrary}>
+            <Ionicons name="images-outline" size={28} color={Brand.textStrong} accessible={false} />
+            <Text style={styles.galleryLabel}>사진 선택</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [
+              styles.shutter,
+              (!canCapture || busy) && styles.disabledControl,
+              pressed && styles.pressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="촬영하기"
+            accessibilityState={{ disabled: !canCapture || busy, busy }}
+            disabled={!canCapture || busy}
+            onPress={takePhoto}>
+            <Image source={SHUTTER} style={StyleSheet.absoluteFill} contentFit="contain" />
+          </Pressable>
+        </View>
       </View>
 
       <AppDialog
@@ -773,13 +786,24 @@ const styles = StyleSheet.create({
     backgroundColor: Brand.scrim,
     textAlign: 'center',
   },
-  shutter: {
-    width: CATCH.shutterSize,
-    height: CATCH.shutterSize,
+  captureActions: {
     marginTop: 32,
     marginBottom: 14,
-    alignSelf: 'center',
+    alignItems: 'center',
   },
+  shutter: { width: CATCH.shutterSize, height: CATCH.shutterSize },
+  galleryButton: {
+    position: 'absolute',
+    left: 24,
+    top: 0,
+    bottom: 0,
+    minWidth: 64,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  galleryLabel: { ...Typography.footnote, color: Brand.textStrong },
   disabledControl: { opacity: 0.45 },
   pressed: { opacity: 0.82 },
 

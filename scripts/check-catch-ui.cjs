@@ -10,6 +10,7 @@ let reducedMotion = false;
 let status = 'loading';
 const player = { play() { this.played = true; } };
 const screen = load('src/app/catch.tsx', {
+  '@expo/vector-icons': { Ionicons: 'Ionicons' },
   react: { ...screenHost.react, useState: videoHost.react.useState, useEffect: videoHost.react.useEffect },
   expo: { useEvent: () => ({ status }) },
   'expo-asset': {},

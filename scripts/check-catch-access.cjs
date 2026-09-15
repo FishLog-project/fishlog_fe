@@ -7,13 +7,14 @@ const find = (tree, type) => nodes(tree).find((node) => node.type === type);
 const copy = (tree) => nodes(tree).flatMap((node) =>
   Array.isArray(node.props?.children) ? node.props.children : [node.props?.children]);
 
-function catchStep(step, { permission = null, platform = 'ios' } = {}) {
+function catchStep(step, { permission = null, platform = 'ios', pick } = {}) {
   const view = host();
   let requests = 0;
   let picks = 0;
   let captured;
   const flow = { state: { step, fishName: '광어', sizeCm: null, manual: false }, analyze: (uri) => { captured = uri; } };
   const Screen = load('src/app/catch.tsx', {
+    '@expo/vector-icons': { Ionicons: 'Ionicons' },
     react: { ...view.react, useMemo: (fn) => fn() },
     expo: {}, 'expo-asset': {},
     'expo-camera': {
@@ -25,9 +26,10 @@ function catchStep(step, { permission = null, platform = 'ios' } = {}) {
       }],
     },
     'expo-image': { Image: 'Image' },
-    'expo-image-picker': { launchImageLibraryAsync: async () => {
+    'expo-image-picker': { launchImageLibraryAsync: async (options) => {
       picks++;
-      return { canceled: false, assets: [{ uri: 'chosen-fish.jpg' }] };
+      assert.deepEqual(options.mediaTypes, ['images']);
+      return pick ? pick() : { canceled: false, assets: [{ uri: 'chosen-fish.jpg' }] };
     } },
     'expo-router': { useRouter: () => ({}), useLocalSearchParams: () => ({}) },
     'expo-router/react-navigation': { usePreventRemove() {} },
@@ -58,6 +60,46 @@ async function main() {
   const granted = catchStep('capture', { permission: { granted: true, canAskAgain: true } });
   assert.equal(find(granted.render(), 'AppDialog').props.visible, false);
   assert.ok(find(granted.render(), 'CameraView'));
+
+  const gallery = (tree) => nodes(tree).find((node) => node.props?.accessibilityLabel === '사진 보관함에서 선택하기');
+  for (const platform of ['ios', 'android', 'web']) {
+    let finish;
+    let first = true;
+    const pendingPick = new Promise((resolve) => { finish = resolve; });
+    const camera = catchStep('capture', {
+      permission: { granted: true, canAskAgain: true }, platform,
+      pick: () => {
+        if (first) { first = false; return pendingPick; }
+        return { canceled: false, assets: [{ uri: 'chosen-fish.jpg' }] };
+      },
+    });
+    find(camera.render(), 'CameraView').props.onCameraReady();
+    const button = gallery(camera.render());
+    assert.ok(button, `${platform}: the gallery stays visible beside a working camera`);
+    assert.equal(button.props.disabled, false);
+    button.props.onPress();
+    button.props.onPress();
+    assert.equal(camera.counts().picks, 1, 'rapid taps must open only one picker before React re-renders');
+    assert.equal(gallery(camera.render()).props.disabled, true);
+    assert.equal(nodes(camera.render()).find((node) => node.props?.accessibilityLabel === '촬영하기').props.disabled, true);
+    finish({ canceled: true, assets: null });
+    await new Promise(setImmediate);
+    assert.equal(camera.counts().captured, undefined, 'cancelling must keep the capture step');
+    assert.ok(find(camera.render(), 'CameraView'));
+    assert.equal(gallery(camera.render()).props.disabled, false);
+    gallery(camera.render()).props.onPress();
+    await new Promise(setImmediate);
+    assert.deepEqual(camera.counts(), { requests: 0, picks: 2, captured: 'chosen-fish.jpg' });
+  }
+  const failedPick = catchStep('capture', {
+    permission: { granted: true, canAskAgain: true },
+    pick: async () => { throw new Error('picker unavailable'); },
+  });
+  gallery(failedPick.render()).props.onPress();
+  await new Promise(setImmediate);
+  assert.equal(failedPick.counts().captured, undefined);
+  assert.equal(gallery(failedPick.render()).props.disabled, false, 'picker failure must allow retry');
+  assert.ok(copy(failedPick.render()).some((text) => typeof text === 'string' && text.includes('사진을 불러오지 못했어요')));
 
   const ask = catchStep('capture', { permission: { granted: false, canAskAgain: true } });
   let dialog = find(ask.render(), 'AppDialog');
@@ -113,6 +155,6 @@ async function main() {
   assert.equal(route, '/auth/login');
   token = 'qa';
   assert.equal(typeof find(history(), 'ScreenState').props.onRetry, 'function', 'authenticated failures still retry');
-  console.log('catch access checks passed: camera permission states, iOS modal/library ordering, required size guidance, guest login');
+  console.log('catch access checks passed: persistent gallery, cancellation/duplicate taps/failure, camera permission states, iOS modal ordering, required size guidance, guest login');
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });
