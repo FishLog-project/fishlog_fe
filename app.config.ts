@@ -16,6 +16,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     './plugins/with-kakao-maven',
     './plugins/with-spot-marker-drawable',
     './plugins/with-release-signing',
+    './plugins/with-release-optimization',
   ],
   extra: {
     ...config.extra,
