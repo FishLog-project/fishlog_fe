@@ -257,7 +257,9 @@ async function main() {
   assert.equal(list.results.length, 1);
   assert.equal(list.results[0].custom, true);
   list.setQuery('돌돔');
-  assert.equal(vmHost.render(models.useDexViewModel, api).results.length, 0, 'locked species must not leak through search');
+  const lockedSearchResult = vmHost.render(models.useDexViewModel, api).results;
+  assert.equal(lockedSearchResult.length, 1, 'uncaught species must remain searchable by their public name');
+  assert.equal(lockedSearchResult[0].caught, false);
   vmHost.unmount();
 
   const detailHost = host();
@@ -270,6 +272,13 @@ async function main() {
   const normalDetail = detailHost.render(detailModels.useDexDetailViewModel, api, 1, false)[0].data;
   assert.equal(normalDetail.custom, undefined);
   assert.equal(normalDetail.imageUrl, normalFish.imageUrl);
+  requests.length = 0;
+  assert.equal(detailHost.render(detailModels.useDexDetailViewModel, api, 1, false, false)[0].status, 'loading');
+  await flush();
+  const lockedDetail = detailHost.render(detailModels.useDexDetailViewModel, api, 1, false, false)[0].data;
+  assert.deepEqual(requests.map((request) => request.route), ['/api/fish/1'], 'uncaught detail must only request public species information');
+  assert.equal(lockedDetail.catchLabel, '잡은 횟수: 0회');
+  assert.deepEqual(lockedDetail.photos, []);
   requests.length = 0;
   assert.equal(detailHost.render(detailModels.useDexDetailViewModel, api, 1, true)[0].status, 'loading');
   await flush();
@@ -353,10 +362,15 @@ async function main() {
   const cards = load('src/features/dex/components/species-card.tsx', uiImports);
   const dialogs = load('src/features/dex/components/species-detail-dialog.tsx', uiImports);
   let uiToken = 'test-token';
+  let routeParams = {};
   let onFocus;
   const screen = load('src/app/(tabs)/dex/index.tsx', {
     ...uiImports,
-    'expo-router': { useRouter: () => ({}), useFocusEffect: (effect) => { onFocus = effect; } },
+    'expo-router': {
+      useRouter: () => ({}),
+      useLocalSearchParams: () => routeParams,
+      useFocusEffect: (effect) => { onFocus = effect; },
+    },
     '@/features/auth': { useAuth: () => ({ token: uiToken }) },
     '@/features/dex/dex-api': apiModule,
     '@/features/dex/dex-data': dex,
@@ -397,8 +411,9 @@ async function main() {
     assert.equal(artwork.props.locked, !species.caught);
     assert.equal(artwork.props.tintColor, undefined);
     assert.equal(flatten(artwork.props.style).opacity, undefined);
-    assert.equal(card.props.disabled, !species.caught);
-    if (species.caught) { card.props.onPress(); assert.equal(pressed, species); }
+    assert.equal(card.props.disabled, undefined);
+    card.props.onPress();
+    assert.equal(pressed, species, 'caught and uncaught species cards must both open details');
   }
   const dialogKeys = [];
   for (const species of [normalEntry, customEntry]) {
@@ -407,14 +422,51 @@ async function main() {
     const dialog = nodes(tree).find((node) => node.type === dialogs.SpeciesDetailDialog);
     assert.equal(dialog.props.fishId, 1);
     assert.equal(dialog.props.custom, species.custom);
+    assert.equal(dialog.props.caught, true);
     const loader = nodes(dialogs.SpeciesDetailDialog(dialog.props)).find((node) => node.type?.name === 'SpeciesDetailLoader');
     dialogKeys.push(loader.key);
     assert.equal(loader.props.custom, !!species.custom);
   }
   assert.notEqual(...dialogKeys, 'switching same-ID species kinds must remount their detail loader');
 
+  const lockedEntry = grid.data.find((fish) => fish && !fish.caught);
+  grid.renderItem({ item: lockedEntry }).props.onPress(lockedEntry);
+  tree = uiHost.render(screen);
+  const lockedDialog = nodes(tree).find((node) => node.type === dialogs.SpeciesDetailDialog);
+  assert.equal(lockedDialog.props.fishId, lockedEntry.id);
+  assert.equal(lockedDialog.props.caught, false);
+  assert.equal(lockedDialog.props.lockedImageUrl, lockedEntry.imageUrl);
+  let authenticationStarted = false;
+  const lockedCard = dialogs.SpeciesDetailCard({
+    species: lockedDetail,
+    locked: true,
+    onAuthenticate: () => { authenticationStarted = true; },
+  });
+  assert.equal(nodes(lockedCard).find((node) => node.type === art.FishArtwork).props.locked, true);
+  assert.ok(nodes(lockedCard).some((node) => node.type === 'Text' && node.props.children === '낚시 인증을 하면 이 어종이 열려요.'));
+  const authenticate = nodes(lockedCard).find((node) => node.props?.accessibilityLabel === '이 어종 인증하러 가기');
+  assert.ok(authenticate);
+  authenticate.props.onPress();
+  assert.equal(authenticationStarted, true);
+  assert.equal(nodes(lockedCard).some((node) => node.props?.accessibilityLabel === '인증 사진 없음'), false);
+
+  lockedDialog.props.onClose();
+  tree = uiHost.render(screen);
+  routeParams = { fishId: '1', fishType: 'DEX', openRequest: 'record-1' };
+  tree = uiHost.render(screen);
+  let routedDialog = nodes(tree).find((node) => node.type === dialogs.SpeciesDetailDialog);
+  assert.equal(routedDialog.props.fishId, normalEntry.id, 'history route must open the normal dex detail');
+  assert.equal(routedDialog.props.custom, undefined);
+  routedDialog.props.onClose();
+  tree = uiHost.render(screen);
+  routeParams = { fishId: '1', fishType: 'CUSTOM', openRequest: 'record-2' };
+  tree = uiHost.render(screen);
+  routedDialog = nodes(tree).find((node) => node.type === dialogs.SpeciesDetailDialog);
+  assert.equal(routedDialog.props.fishId, customEntry.id, 'history route must open the custom dex detail');
+  assert.equal(routedDialog.props.custom, true);
+
   const newlyCaught = normal.fishes.find((fish) => !fish.caught);
-  assert.equal(grid.data.find((fish) => fish?.id === newlyCaught.id && !fish.custom).label, '???');
+  assert.equal(grid.data.find((fish) => fish?.id === newlyCaught.id && !fish.custom).label, newlyCaught.name);
   // Model a successful registration reflected by the next authenticated dex response.
   normal.fishes = normal.fishes.map((fish) => fish.id === newlyCaught.id ? { ...fish, caught: true } : fish);
   normal.caughtCount++;
@@ -424,7 +476,7 @@ async function main() {
   tree = uiHost.render(screen);
   const refreshed = nodes(tree).find((node) => node.type === 'FlatList').props.data;
   assert.equal(refreshed.find((fish) => fish?.id === newlyCaught.id && !fish.custom).label, newlyCaught.name, 'returning after registration must reveal the caught name');
-  assert.ok(refreshed.filter((fish) => fish && !fish.caught).every((fish) => fish.label === '???'), 'other species stay locked');
+  assert.ok(refreshed.filter((fish) => fish && !fish.caught).every((fish) => fish.label === fish.name), 'uncaught species keep their public names');
 
   let finishOldDex;
   waitingDex = new Promise((resolve) => { finishOldDex = resolve; });
@@ -437,12 +489,12 @@ async function main() {
   const guestGrid = nodes(tree).find((node) => node.type === 'FlatList');
   assert.ok(guestGrid, 'guest screen must render the public dex instead of a login gate');
   assert.equal(guestGrid.props.data.length, 24);
-  assert.ok(guestGrid.props.data.every((fish) => !fish.caught && fish.label === '???' && !fish.custom));
+  assert.ok(guestGrid.props.data.every((fish) => !fish.caught && fish.label === fish.name && !fish.custom));
   assert.equal(guestGrid.props.ListHeaderComponent.props.collected, 0);
   finishOldDex(normal);
   await flush();
   tree = uiHost.render(screen);
-  assert.ok(nodes(tree).find((node) => node.type === 'FlatList').props.data.every((fish) => fish.label === '???'), 'a late authenticated response must not reveal names after logout');
+  assert.ok(nodes(tree).find((node) => node.type === 'FlatList').props.data.every((fish) => fish.label === fish.name), 'a late authenticated response must keep public names after logout');
   waitingDex = null;
   uiToken = 'test-token';
   uiHost.render(screen);
@@ -473,7 +525,7 @@ async function main() {
     if (scale === 1) assert.equal(track.height, 22, 'default bar height stays unchanged');
     assert.equal(value.right === 0, centeredOnTrack, 'place the label using available pixels, not a fixed percent threshold');
   }
-  console.log('dex checks passed: registration focus refresh, caught/locked names, login/logout races, server artwork/fallback, custom DTO/photos, ID separation, completion/search and route keys');
+  console.log('dex checks passed: registration focus refresh, public names and locked artwork, login/logout races, server artwork/fallback, custom DTO/photos, ID separation, completion/search and route keys');
 }
 
 module.exports = { load, host, flush, nodes };

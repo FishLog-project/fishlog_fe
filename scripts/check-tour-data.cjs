@@ -406,6 +406,7 @@ async function checkFacilitiesByMapCenter() {
   button('지도 중심으로 시설 다시 조회').props.onPress();
   render();
   await flush();
+  assert.equal(requests.length, countBefore + 2, 'moving the map must issue only one request for the new center');
   assert.deepEqual(Object.fromEntries(requests.at(-1).url.searchParams), { type: '음식점', lat: '37.56', lng: '126.97' });
   assert.equal(gpsCalls, 0);
   assert.equal(nodes(tree).some((node) => node.type?.name === 'PlaceLink'), false, 'list rows have no place link');

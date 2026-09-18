@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { FlatList, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
@@ -39,6 +39,12 @@ const SEARCH_LIST_TOP = 51;
 const SUMMARY_GAP = DEX.rowGap;
 
 export default function DexScreen() {
+  const router = useRouter();
+  const route = useLocalSearchParams<{
+    fishId?: string | string[];
+    fishType?: string | string[];
+    openRequest?: string | string[];
+  }>();
   const { fontScale } = useWindowDimensions();
   const [gridWidth, setGridWidth] = useState(0);
   // 일반 폰은 3열을 유지하고, 좁은 화면·큰 글씨는 열을 줄인다. 태블릿은 남는 폭을 쓴다.
@@ -64,8 +70,18 @@ export default function DexScreen() {
     retry();
   }, [retry]));
 
-  // 상세 카드를 연 어종. 잠금 카드는 눌리지 않으므로 획득한 어종만 들어온다.
+  // 상세 카드를 연 어종. 미획득 어종도 설명과 인증 진입점을 보여 준다.
   const [selected, setSelected] = useState<DexSpeciesViewModel | null>(null);
+  const [dismissedOpenRequest, setDismissedOpenRequest] = useState<string | null>(null);
+  const rawRouteId = Array.isArray(route.fishId) ? route.fishId[0] : route.fishId;
+  const rawRouteType = Array.isArray(route.fishType) ? route.fishType[0] : route.fishType;
+  const openRequest = Array.isArray(route.openRequest) ? route.openRequest[0] : route.openRequest;
+  const routeFishId = Number(rawRouteId);
+  const routeSelected = state.status === 'ready' && openRequest && openRequest !== dismissedOpenRequest
+    && Number.isSafeInteger(routeFishId)
+    ? state.data.species.find((fish) => fish.id === routeFishId && !!fish.custom === (rawRouteType === 'CUSTOM')) ?? null
+    : null;
+  const activeSelected = selected ?? routeSelected;
 
   /**
    * 마지막 줄이 덜 차면 flex:1 카드가 남은 자리를 나눠 갖느라 넓어진다.
@@ -154,9 +170,19 @@ export default function DexScreen() {
 
       <SpeciesDetailDialog
         dataSource={dataSource}
-        fishId={selected?.id ?? null}
-        custom={selected?.custom}
-        onClose={() => setSelected(null)}
+        fishId={activeSelected?.id ?? null}
+        custom={activeSelected?.custom}
+        caught={activeSelected?.caught}
+        lockedImageUrl={activeSelected?.caught === false ? activeSelected.imageUrl : undefined}
+        onAuthenticate={() => {
+          setSelected(null);
+          if (openRequest) setDismissedOpenRequest(openRequest);
+          router.push('/catch');
+        }}
+        onClose={() => {
+          setSelected(null);
+          if (openRequest) setDismissedOpenRequest(openRequest);
+        }}
       />
     </Screen>
   );

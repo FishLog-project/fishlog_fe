@@ -16,7 +16,7 @@ const RECORDS = Components.profile.records;
  * 낚시 인증 기록 조회 (Figma 634:3205).
  *
  * 마이페이지 "기타"에서 들어온다. 날짜별로 묶어 최신 날짜를 위에 두고,
- * 한 줄에 "어종 (크기)"만 보여준다 — 시안에 화살표가 없어 항목은 누를 수 없다.
+ * 한 줄에 "어종 (크기)"를 보여주고 누르면 해당 도감 상세로 이동한다.
  */
 export default function CatchRecordsScreen() {
   const router = useRouter();
@@ -54,6 +54,14 @@ export default function CatchRecordsScreen() {
                     key={`${item.recordType}-${item.recordId}`}
                     label={item.label}
                     showChevron={false}
+                    onPress={() => router.push({
+                      pathname: '/dex',
+                      params: {
+                        fishId: String(item.fishId),
+                        fishType: item.recordType,
+                        openRequest: `${item.recordId}-${Date.now()}`,
+                      },
+                    })}
                   />
                 ))}
               </View>

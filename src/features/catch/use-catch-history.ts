@@ -9,6 +9,7 @@ import { useSection } from '@/lib/use-section';
 export interface CatchRecordItemViewModel {
   recordId: number;
   recordType: CatchRecordType;
+  fishId: number;
   /** "감성돔 (32cm)" */
   label: string;
 }
@@ -49,6 +50,7 @@ function toItem(record: CatchHistoryRecord): CatchRecordItemViewModel {
   return {
     recordId: record.recordId,
     recordType: record.recordType,
+    fishId: record.fishId,
     label: `${record.fishName} (${toSizeLabel(record.size)})`,
   };
 }

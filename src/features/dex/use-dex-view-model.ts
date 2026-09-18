@@ -15,7 +15,7 @@ export interface DexSpeciesViewModel {
   id: number;
   name: string;
   custom?: boolean;
-  /** 잠금 카드는 이름을 감춘다 — 화면이 아니라 여기서 결정한다 */
+  /** 카드에 표시할 어종명 */
   label: string;
   /** null이면 화면이 기본 그림을 쓴다 */
   imageUrl: string | null;
@@ -23,8 +23,7 @@ export interface DexSpeciesViewModel {
   accessibilityLabel: string;
   /**
    * 검색이 훑는 텍스트 ("어종명 서식지").
-   * 미획득 어종은 빈 문자열이라 어떤 검색어에도 안 걸린다 —
-   * 화면에 이름이 '???'로 나오는데 이름으로 검색되면 정답을 흘리는 셈이라서다.
+   * 획득 여부와 관계없이 공개된 어종명과 서식지로 검색한다.
    */
   searchText: string;
 }
@@ -52,9 +51,6 @@ export interface DexViewModel {
   progressPercent: number;
 }
 
-/** 미획득 어종 카드에 이름 대신 넣는 문구 */
-const LOCKED_LABEL = '???';
-
 // 로더·매퍼는 모듈 레벨 상수라 참조가 안정적이다.
 // (useSection 의존성에 들어가므로 렌더마다 새로 만들면 무한 재요청이 된다)
 
@@ -69,13 +65,11 @@ function toDexSpecies(entry: DexEntry): DexSpeciesViewModel {
     id: entry.id,
     name: entry.name,
     custom: entry.custom,
-    label: entry.caught ? entry.name : LOCKED_LABEL,
+    label: entry.name,
     imageUrl: entry.imageUrl,
     caught: entry.caught,
-    accessibilityLabel: entry.caught
-      ? `${entry.name}${habitat ? `, 서식지 ${habitat}` : ''}`
-      : '아직 잡지 못한 어종',
-    searchText: entry.caught ? `${entry.name} ${habitat}`.trim() : '',
+    accessibilityLabel: `${entry.name}${habitat ? `, 서식지 ${habitat}` : ''}${entry.caught ? '' : ', 아직 잡지 못한 어종'}`,
+    searchText: `${entry.name} ${habitat}`.trim(),
   };
 }
 
@@ -161,10 +155,15 @@ interface DetailSource {
   dataSource: DexDataSource;
   fishId: number;
   custom: boolean;
+  caught: boolean;
 }
 
-async function loadDetail({ dataSource, fishId, custom }: DetailSource) {
+async function loadDetail({ dataSource, fishId, custom, caught }: DetailSource) {
   if (custom) return toCustomSpeciesDetail(await dataSource.getCustomFish(fishId));
+  if (!caught) {
+    const fish = await dataSource.getFish(fishId);
+    return toDexSpeciesDetail(fish, { habitat: fish.habitat, catchCount: 0, recentCatches: [] });
+  }
   const [fish, record] = await Promise.all([dataSource.getFish(fishId), dataSource.getCatchRecord(fishId)]);
   return toDexSpeciesDetail(fish, record);
 }
@@ -179,7 +178,12 @@ function toDetail(detail: DexSpeciesDetailViewModel) {
  *
  * fishId나 로그인 세션이 바뀌면 이전 응답을 버리고 다시 받는다.
  */
-export function useDexDetailViewModel(dataSource: DexDataSource, fishId: number, custom = false) {
-  const source = useMemo(() => ({ dataSource, fishId, custom }), [dataSource, fishId, custom]);
+export function useDexDetailViewModel(
+  dataSource: DexDataSource,
+  fishId: number,
+  custom = false,
+  caught = true,
+) {
+  const source = useMemo(() => ({ dataSource, fishId, custom, caught }), [dataSource, fishId, custom, caught]);
   return useSection(source, loadDetail, toDetail);
 }

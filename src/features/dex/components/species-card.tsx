@@ -11,24 +11,22 @@ const DEX = Components.dex;
  * 도감 격자 한 칸 (Figma Collection/MiniCard 978:3090 · 미획득 978:3089).
  *
  * 획득 카드는 물색 그라데이션 칸에 어종 그림 + 이름,
- * 미획득 카드는 서버가 내려준 그림자를 표시하고 이름을 "???"로 가린다.
+ * 미획득 카드는 서버가 내려준 그림자를 표시하되 어종명은 그대로 보여 준다.
  */
 export function SpeciesCard({
   species,
   onPress,
 }: {
   species: DexSpeciesViewModel;
-  /** 획득한 어종만 상세가 열린다. 잠금 카드는 눌러도 아무 일이 없다 */
+  /** 카드를 누르면 획득 여부와 관계없이 어종 상세가 열린다. */
   onPress: (species: DexSpeciesViewModel) => void;
 }) {
   return (
     <Pressable
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-      // 잠금 카드는 버튼이 아니다 — 스크린리더에도 누를 수 있는 것처럼 읽히면 안 된다
-      accessibilityRole={species.caught ? 'button' : undefined}
+      accessibilityRole="button"
       accessible
       accessibilityLabel={species.accessibilityLabel}
-      disabled={!species.caught}
       onPress={() => onPress(species)}>
       <LinearGradient
         colors={[...DEX.tileFill]}

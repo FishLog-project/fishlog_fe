@@ -72,9 +72,18 @@ export function useTourFacilities(getSearchOrigin?: () => Coords | null) {
   };
   const refreshLocation = () => {
     setSelectedPlace(null);
-    // 지도를 안 옮겼으면 좌표가 같아 요청 키가 그대로라 retry 로 새로 받는다
-    if (pinMapOrigin()) retry();
-    else void locate();
+    // 현재 지도 중심을 새 조회 기준으로 고정한다.
+    const center = getSearchOrigin?.() ?? null;
+    if (!center) {
+      setMapOrigin(null);
+      void locate();
+      return;
+    }
+
+    // 중심이 달라지면 origin 변경 자체가 새 요청을 만든다. 상태가 반영되기 전에
+    // retry까지 호출하면 이전 지도 중심으로도 한 번 더 요청하게 된다.
+    if (mapOrigin?.lat === center.lat && mapOrigin.lng === center.lng) retry();
+    else setMapOrigin(center);
   };
   // 시트 표시와 조회 수명을 분리한다. 숨겨도 분류·응답·마커는 유지한다.
   const hide = () => { setSelectedPlace(null); setSheetOpen(false); };

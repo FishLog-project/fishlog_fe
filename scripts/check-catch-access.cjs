@@ -136,6 +136,7 @@ async function main() {
 
   let token = null;
   let route;
+  let historyState = { status: 'error' };
   const history = load('src/app/settings/catch-records.tsx', {
     react: { useMemo: (fn) => fn() },
     'expo-router': { useRouter: () => ({ push: (next) => { route = next; } }) },
@@ -145,7 +146,7 @@ async function main() {
     '@/features/auth': { useAuth: () => ({ token }) },
     '@/features/catch/catch-history-api': { createApiCatchHistoryDataSource: () => ({}) },
     '@/features/catch/catch-history-data': {},
-    '@/features/catch/use-catch-history': { useCatchHistory: () => [{ status: 'error' }, () => {}] },
+    '@/features/catch/use-catch-history': { useCatchHistory: () => [historyState, () => {}] },
     '@/lib/data-source-mode': { USE_FIXTURE: false },
   }).default;
   const guest = find(history(), 'ScreenState');
@@ -155,6 +156,21 @@ async function main() {
   assert.equal(route, '/auth/login');
   token = 'qa';
   assert.equal(typeof find(history(), 'ScreenState').props.onRetry, 'function', 'authenticated failures still retry');
+  historyState = { status: 'ready', data: [{
+    date: '2026-09-18',
+    dateLabel: '2026년 9월 18일',
+    items: [
+      { recordId: 11, recordType: 'DEX', fishId: 3, label: '돌돔 (25cm)' },
+      { recordId: 12, recordType: 'CUSTOM', fishId: 2, label: '직접 등록 어종 (31cm)' },
+    ],
+  }] };
+  const historyRows = nodes(history()).filter((node) => node.type === 'SettingsListItem');
+  historyRows[0].props.onPress();
+  assert.equal(route.pathname, '/dex');
+  assert.deepEqual({ fishId: route.params.fishId, fishType: route.params.fishType }, { fishId: '3', fishType: 'DEX' });
+  assert.match(route.params.openRequest, /^11-\d+$/);
+  historyRows[1].props.onPress();
+  assert.deepEqual({ fishId: route.params.fishId, fishType: route.params.fishType }, { fishId: '2', fishType: 'CUSTOM' });
   console.log('catch access checks passed: persistent gallery, cancellation/duplicate taps/failure, camera permission states, iOS modal ordering, required size guidance, guest login');
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });
