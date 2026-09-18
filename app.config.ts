@@ -17,6 +17,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     './plugins/with-spot-marker-drawable',
     './plugins/with-release-signing',
     './plugins/with-adaptive-icon-inset',
+    './plugins/with-release-optimization',
   ],
   extra: {
     ...config.extra,
