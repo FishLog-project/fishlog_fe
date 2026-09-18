@@ -2,10 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Screen, ScreenHeader, SearchBar } from '@/components/common';
-import { Brand, Components, Layout } from '@/constants/theme';
+import { Brand, Components, Layout, Typography } from '@/constants/theme';
 import { useAuth } from '@/features/auth';
 import { SeaInfoStrip } from '@/features/map/components/sea-info-strip';
 import { SpotDetailSheet } from '@/features/map/components/spot-detail-sheet';
@@ -14,6 +14,7 @@ import { FishlogKakaoMap } from '@/features/map/kakao-map';
 import { createApiSpotDataSource } from '@/features/map/spot-api';
 import { createFixtureSpotDataSource } from '@/features/map/spot-data';
 import type { Coords } from '@/features/map/tour-data';
+import { allZones, toZonePolygons } from '@/features/map/prohibited-zones';
 import { TourFacilities, useTourFacilities } from '@/features/map/tour-facilities';
 import { setSpotFavorite } from '@/features/map/spot-list-store';
 import { useSpotsViewModel } from '@/features/map/use-spot-view-model';
@@ -21,15 +22,24 @@ import { USE_FIXTURE } from '@/lib/data-source-mode';
 
 const MAP = Components.map;
 
+/**
+ * 금지 구역을 켜면 구역이 모여 있는 곳으로 카메라를 옮긴다.
+ *
+ * 자료(국립해양조사원)의 24곳 중 21곳이 부산·울산·경남 해역 75x64km 안에 몰려 있다.
+ * 전국을 한 화면에 담으면 구역 하나가 1px 도 안 돼 아무것도 안 보인다.
+ * 남은 3곳은 북한·러시아 근해라 이 화면 밖이지만 실제로 갈 수 있는 곳이 아니다.
+ */
+const ZONE_OVERVIEW = { lat: 35.137, lng: 129.051, zoomLevel: 10 };
+
 /** 주변 시설·해양 정보는 토글이다 (Figma 634:1495) — 금지 구역은 아직 동작이 정해지지 않았다 */
 const MAP_ACTIONS: readonly { key: string; icon: number; label: string }[] = [
   { key: 'facilities', icon: require('@/assets/images/map/grid.svg'), label: '주변 시설' },
   // { key: 'sea', icon: require('@/assets/images/map/sea-info.svg'), label: '해양 정보 보기' },
-  // {
-  //   key: 'prohibited',
-  //   icon: require('@/assets/images/map/fishing-disabled.svg'),
-  //   label: '낚시 금지 구역 보기',
-  // },
+  {
+    key: 'prohibited',
+    icon: require('@/assets/images/map/fishing-disabled.svg'),
+    label: '낚시 금지 구역 보기',
+  },
   { key: 'fish', icon: require('@/assets/images/map/fish-scan.svg'), label: '물고기 인증하기' },
 ] as const;
 
@@ -39,6 +49,7 @@ export default function MapScreen() {
   const [recenterSignal, setRecenterSignal] = useState(0);
   const [seaInfoOpen, setSeaInfoOpen] = useState(false);
   const [facilitiesOpen, setFacilitiesOpen] = useState(false);
+  const [zonesOpen, setZonesOpen] = useState(false);
   /**
    * 카메라가 멈출 때마다 바뀌는 지도 중심. 시설을 조회하는 순간에만 읽으므로
    * 드래그마다 화면을 다시 그리지 않게 state 가 아니라 ref 에 둔다.
@@ -55,6 +66,22 @@ export default function MapScreen() {
   }, [sessionKey]);
   const facilities = useTourFacilities(getMapCenter);
 
+  const zonePolygons = useMemo(
+    () => (zonesOpen ? toZonePolygons(allZones()) : []),
+    [zonesOpen],
+  );
+  /**
+   * 구역을 켜면 전국 뷰로 빼 준다. 금지 구역은 해안 곳곳에 흩어져 있어서
+   * 보던 자리에 그대로 두면 근처에 하나도 없는 경우가 대부분이다.
+   */
+  const toggleZones = useCallback(() => {
+    setZonesOpen((open) => {
+      const next = !open;
+      if (next) setFocus({ ...ZONE_OVERVIEW, nonce: Date.now() });
+      return next;
+    });
+  }, []);
+
   const dataSource = useMemo(
     () => (USE_FIXTURE ? createFixtureSpotDataSource() : createApiSpotDataSource(token)),
     [token],
@@ -65,6 +92,10 @@ export default function MapScreen() {
   );
   const selectedSpot = allSpots?.find((spot) => spot.id === selectedSpotId) ?? null;
   const selectedIsFavorite = selectedSpot?.isFavorite ?? false;
+  const refreshMap = () => {
+    refresh();
+    if (facilitiesOpen && facilities.category) facilities.refreshLocation();
+  };
 
   /**
    * 홈·검색·저장 목록에서 고른 스팟을 연다.
@@ -75,7 +106,9 @@ export default function MapScreen() {
   const requestKey = requestedSpotId ? `${requestedSpotId}:${searchRequest ?? ''}` : null;
   const handledSpotRequest = useRef<string | null>(null);
   const focusNonce = useRef(0);
-  const [focus, setFocus] = useState<{ lat: number; lng: number; nonce: number } | null>(null);
+  const [focus, setFocus] = useState<
+    { lat: number; lng: number; nonce: number; zoomLevel?: number } | null
+  >(null);
 
   /**
    * 다른 탭에 갔다 돌아오면 처음 상태로 되돌린다.
@@ -153,6 +186,7 @@ export default function MapScreen() {
           // 시트가 올라와 있을 때 지도를 누르면 내린다
           onMapPress={() => { facilities.hide(); setSelectedSpotId(null); }}
           focus={focus}
+          zones={zonePolygons}
           onCameraIdle={rememberMapCenter}
         />
         <View pointerEvents="none" style={styles.mapShade} />
@@ -165,16 +199,19 @@ export default function MapScreen() {
               label={action.label}
               selected={
                 (action.key === 'facilities' && facilitiesOpen) ||
-                (action.key === 'sea' && seaInfoOpen)
+                (action.key === 'sea' && seaInfoOpen) ||
+                (action.key === 'prohibited' && zonesOpen)
               }
               onPress={
                 action.key === 'facilities'
                   ? () => { facilities.close(); setFacilitiesOpen((open) => !open); }
                   : action.key === 'sea'
                     ? () => setSeaInfoOpen((open) => !open)
-                    : action.key === 'fish'
-                      ? () => router.push('/catch')
-                      : undefined
+                    : action.key === 'prohibited'
+                      ? () => toggleZones()
+                      : action.key === 'fish'
+                        ? () => router.push('/catch')
+                        : undefined
               }
             />
           ))}
@@ -184,6 +221,16 @@ export default function MapScreen() {
           ⚠️ 시안(634:1495)은 지도 위쪽에 풍속·돌풍·기온·강수를 띄우지만,
              지도 영역 단위의 날씨 엔드포인트가 아직 없다. 값이 없으면 '-'로 자리만 지킨다.
         */}
+        {/*
+          자료가 바다만 다루고 그마저도 부산·울산에 몰려 있다. 구역이 없는 지역에서
+          아무 반응이 없으면 버튼이 고장난 것처럼 보이므로 이유를 알려 준다.
+        */}
+        {zonesOpen && zonePolygons.length === 0 ? (
+          <View pointerEvents="none" style={styles.zoneNotice}>
+            <Text style={styles.zoneNoticeText}>이 지역에는 등록된 해상 낚시 금지구역이 없어요</Text>
+          </View>
+        ) : null}
+
         {seaInfoOpen ? (
           <View style={styles.seaStrip}>
             <SeaInfoStrip values={null} />
@@ -196,10 +243,10 @@ export default function MapScreen() {
         */}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="낚시터 목록 새로고침"
+          accessibilityLabel="지도 정보 새로고침"
           accessibilityState={{ busy: refreshing, disabled: refreshing }}
           disabled={refreshing}
-          onPress={refresh}
+          onPress={refreshMap}
           style={({ pressed }) => [styles.locationButton, styles.refreshButton, pressed && styles.pressed]}>
           {refreshing ? (
             <ActivityIndicator color={Brand.primary} />
@@ -300,6 +347,21 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: MAP.seaStrip.top,
     right: MAP.overlayInset,
+  },
+  zoneNotice: {
+    position: 'absolute',
+    top: MAP.seaStrip.top,
+    left: MAP.overlayInset,
+    right: MAP.overlayInset,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: 'rgba(17, 24, 32, 0.78)',
+  },
+  zoneNoticeText: {
+    ...Typography.caption,
+    color: '#FFFFFF',
+    textAlign: 'center',
   },
   actionButton: {
     width: MAP.actionSize,

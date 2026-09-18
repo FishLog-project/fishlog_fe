@@ -115,9 +115,11 @@ async function check() {
     './useNavigation': { useNavigation: () => navigation },
   });
   const facilities = {
+    category: '음식점',
     markers: [{ id: 'tour-test', name: '관광지', lat: 37.4, lng: 126.6 }],
     close() { this.closed = (this.closed ?? 0) + 1; this.selected = null; },
     hide() { this.hidden = (this.hidden ?? 0) + 1; this.selected = null; },
+    refreshLocation() { this.refreshed = (this.refreshed ?? 0) + 1; },
     selectPlace(id) { this.selected = id; },
   };
   const Screen = load('src/app/(tabs)/map/index.tsx', {
@@ -129,7 +131,7 @@ async function check() {
     },
     'react-native': { ActivityIndicator: 'ActivityIndicator', Pressable: 'Pressable', StyleSheet: { create: (value) => value }, View: 'View' },
     '@/components/common': { Screen: 'Screen', ScreenHeader: 'ScreenHeader', SearchBar: 'SearchBar' },
-    '@/constants/theme': { Brand: {}, Components: { map: { seaStrip: {} } }, Layout: {} },
+    '@/constants/theme': { Brand: {}, Components: { map: { seaStrip: {} } }, Layout: {}, Typography: { caption: {} } },
     '@/features/auth': { useAuth: () => ({ token: 'fixture', sessionId: screenSession }) },
     '@/features/map/components/sea-info-strip': { SeaInfoStrip: 'SeaInfoStrip' },
     '@/features/map/components/spot-detail-sheet': { SpotDetailSheet: 'SpotDetailSheet' },
@@ -138,6 +140,8 @@ async function check() {
     '@/features/map/spot-api': { createApiSpotDataSource: () => screenSource },
     '@/features/map/spot-data': fixture,
     '@/features/map/spot-list-store': store,
+    // 구역 자료는 실제 파일을 그대로 읽어, 번들된 좌표까지 함께 검증한다
+    '@/features/map/prohibited-zones': require('./check-zone-data.cjs').zoneModule(),
     '@/features/map/tour-facilities': { TourFacilities: 'TourFacilities', useTourFacilities: () => facilities },
     '@/features/map/use-spot-view-model': vm,
     '@/lib/data-source-mode': { USE_FIXTURE: false },
@@ -155,6 +159,9 @@ async function check() {
   nodes(tree).find((item) => item.props?.label === '주변 시설').props.onPress();
   tree = render(screenHost, Screen);
   assert.equal(node(tree, 'FishlogKakaoMap').props.tourPlaces, facilities.markers);
+  const facilityRefreshes = facilities.refreshed ?? 0;
+  nodes(tree).find((item) => item.props?.accessibilityLabel === '지도 정보 새로고침').props.onPress();
+  assert.equal(facilities.refreshed, facilityRefreshes + 1, 'map refresh must re-query the selected facility category');
   node(tree, 'FishlogKakaoMap').props.onTourPress('tour-test');
   tree = render(screenHost, Screen);
   assert.equal(facilities.selected, 'tour-test');
@@ -219,7 +226,7 @@ async function check() {
     lastNonce = selectedFocus.nonce;
     node(tree, 'SpotDetailSheet').props.onClose();
     tree = render(screenHost, Screen);
-    nodes(tree).find((item) => item.props?.accessibilityLabel === '낚시터 목록 새로고침').props.onPress();
+    nodes(tree).find((item) => item.props?.accessibilityLabel === '지도 정보 새로고침').props.onPress();
     await flush();
     tree = render(screenHost, Screen);
     assert.equal(node(tree, 'SpotDetailSheet').props.spotId, null, 'refresh must not reopen an already handled request');

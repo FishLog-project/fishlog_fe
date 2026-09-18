@@ -6,6 +6,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Brand, Typography } from '@/constants/theme';
 import { distanceMeters } from '@/features/map/geo';
 import { getQuickLocation, requestFreshLocation } from '@/features/map/location-store';
+import type { ZonePolygonProps } from '@/features/map/prohibited-zones';
 
 const DEFAULT_CAMERA = {
   lat: 33.3617,
@@ -22,6 +23,7 @@ const CAMERA_ANIMATION_MS = 150;
 /** 기본값을 매 렌더 새로 만들지 않도록 모듈 상수로 둔다 */
 const EMPTY_SPOTS: readonly SpotMarker[] = [];
 const EMPTY_TOURS: readonly TourMarker[] = [];
+const EMPTY_ZONES: readonly ZonePolygonProps[] = [];
 
 let kakaoMapInitialization: Promise<unknown> | undefined;
 
@@ -60,11 +62,14 @@ export type FishlogKakaoMapProps = {
   tourPlaces?: readonly TourMarker[];
   onTourPress?: (tourId: string) => void;
   /** 검색에서 고른 스팟으로 카메라를 옮긴다. nonce 가 바뀔 때만 움직인다 */
-  focus?: { lat: number; lng: number; nonce: number } | null;
+  /** zoomLevel 을 주면 검색 기본 줌 대신 그 값으로 옮긴다 (금지 구역 전국 보기 등) */
+  focus?: { lat: number; lng: number; nonce: number; zoomLevel?: number } | null;
   /** 카메라 이동(드래그·버튼·검색)이 끝났을 때의 지도 중심 */
   onCameraIdle?: (center: Coordinate & { zoomLevel: number }) => void;
   /** 지도의 빈 곳을 눌렀을 때 (마커를 누른 경우는 오지 않는다) */
   onMapPress?: () => void;
+  /** 낚시 금지 구역 폴리곤. 빈 배열이면 그리지 않는다 */
+  zones?: readonly ZonePolygonProps[];
 };
 
 export function FishlogKakaoMap({
@@ -76,6 +81,7 @@ export function FishlogKakaoMap({
   focus,
   onCameraIdle,
   onMapPress,
+  zones = EMPTY_ZONES,
 }: FishlogKakaoMapProps) {
   const nativeAppKey = Constants.expoConfig?.extra?.kakaoNativeAppKey;
   const hasNativeAppKey = typeof nativeAppKey === 'string' && nativeAppKey.length > 0;
@@ -156,7 +162,7 @@ export function FishlogKakaoMap({
   const [appliedFocus, setAppliedFocus] = useState<number | null>(null);
   if (focus && focus.nonce !== appliedFocus) {
     setAppliedFocus(focus.nonce);
-    setCamera({ lat: focus.lat, lng: focus.lng, zoomLevel: SEARCH_LOCATION_ZOOM, nonce: focus.nonce });
+    setCamera({ lat: focus.lat, lng: focus.lng, zoomLevel: focus.zoomLevel ?? SEARCH_LOCATION_ZOOM, nonce: focus.nonce });
   }
 
   if (status === 'initializing') {
@@ -183,6 +189,7 @@ export function FishlogKakaoMap({
       camera={camera}
       currentLocation={currentLocation}
       spots={markers}
+      zones={zones}
       onSpotPress={({ nativeEvent: { id } }) => {
         if (id.startsWith('tour:')) onTourPress?.(id.slice(5));
         else if (id.startsWith('spot:')) {
