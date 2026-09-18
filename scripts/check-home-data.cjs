@@ -7,18 +7,28 @@ async function main() {
   let bannerAttempts = 0;
   let banner = [{ fishId: 7, name: '광어', imageUrl: 'https://example.test/server-fish.png?rev=1' }];
   let waitingBanner = null;
-  const apiModule = load('src/features/home/home-api.ts', {
-    '@/lib/api/client': { apiRequest: async (route, options = {}) => {
+  let popularSpots = [];
+  const client = {
+    ...load('src/lib/api/client.ts', { 'expo/fetch': {} }),
+    apiRequest: async (route, options = {}) => {
       requests.push({ route, ...options });
       switch (route) {
         case '/api/banner/seasonal-fish':
           if (++bannerAttempts === 1) throw new Error('temporary offline');
           return waitingBanner ?? banner;
-        case '/api/collections/dex': return { totalCount: 24, caughtCount: 6 };
-        case '/api/spots/popular': return [];
+        case '/api/collections/custom/dex': return { fishes: [] };
+        case '/api/collections/dex': return { totalCount: 24, caughtCount: 6, fishes: [] };
+        case '/api/spots/popular': return popularSpots;
         default: throw new Error(`Unexpected route: ${route}`);
       }
-    } },
+    },
+  };
+  const apiModule = load('src/features/home/home-api.ts', {
+    '@/lib/api/client': client,
+    '@/features/dex/dex-api': load('src/features/dex/dex-api.ts', {
+      '@/lib/api/client': client,
+      '@/lib/api/result': load('src/lib/api/result.ts', { './client': client }),
+    }),
   });
   const source = apiModule.createApiFishLogDataSource('test-token');
   const sectionHost = host();
@@ -35,6 +45,7 @@ async function main() {
   assert.equal(current.viewModel.recommendedSpots.status, 'empty');
   const count = (route) => requests.filter((request) => request.route === route).length;
   assert.equal(requests.find((request) => request.route === '/api/collections/dex').token, 'test-token');
+  assert.deepEqual(requests.filter((request) => request.route.startsWith('/api/collections/')).map((request) => request.route), ['/api/collections/custom/dex', '/api/collections/dex'], 'home must establish the session before reading personalized public progress');
   assert.equal(requests.find((request) => request.route === '/api/banner/seasonal-fish').token, undefined);
   assert.equal(typeof current.retryFeaturedSpecies, 'function');
   current.retryFeaturedSpecies();
@@ -76,6 +87,9 @@ async function main() {
   // Follow the real HomeScreen -> HeroCarousel -> retry Pressable callback back into the hook.
   requests.length = 0;
   bannerAttempts = 0;
+  popularSpots = [{ id: 12, name: '인기 낚시터', lat: 37, lot: 127, category: '해양', majorFishes: ['광어'], viewCount: 100 }];
+  const navigations = [];
+  const router = { navigate: (target) => navigations.push(target) };
   const colors = load('src/constants/colors.ts');
   const theme = {
     ...colors,
@@ -102,13 +116,13 @@ async function main() {
     '@/features/dex/fish-art': art,
   };
   const carousel = load('src/features/home/components/hero-carousel.tsx', {
-    ...uiImports, react: carouselHost.react, 'expo-router': { useIsFocused: () => false, useRouter: () => ({}) },
+    ...uiImports, react: carouselHost.react, 'expo-router': { useIsFocused: () => false, useRouter: () => router },
   });
   let onFocus;
   const screen = load('src/app/(tabs)/home/index.tsx', {
     ...uiImports,
     react: uiHost.react,
-    'expo-router': { useRouter: () => ({}), useFocusEffect: (callback) => { onFocus = callback; } },
+    'expo-router': { useRouter: () => router, useFocusEffect: (callback) => { onFocus = callback; } },
     '@/components/common': Object.fromEntries(['Screen', 'ScreenHeader', 'ScreenState', 'SectionTitle'].map((name) => [name, name])),
     '@/features/auth': { useAuth: () => ({ token: 'test-token' }) },
     '@/features/home/home-api': apiModule,
@@ -142,6 +156,16 @@ async function main() {
   const artwork = readySlide.find((node) => node.type === art.FishArtwork && node.props.tintColor === undefined);
   assert.equal(artwork.props.imageUrl, banner[0].imageUrl);
   let carouselTree = carouselHost.render(carousel.HeroCarousel, heroElement.props);
+  const spotSlide = nodes(carouselTree).find((node) => node.type?.name === 'RecommendedSpotSlide');
+  nodes(spotSlide.type(spotSlide.props)).find((node) => node.type?.name === 'HeroCta').props.onPress();
+  const row = nodes(uiHost.render(screen)).find((node) => node.props?.accessibilityLabel?.startsWith('1위 인기 낚시터'));
+  row.props.onPress();
+  assert.equal(navigations.length, 2);
+  for (const target of navigations) {
+    assert.equal(target.pathname, '/map');
+    assert.equal(target.params.spotId, '12', 'banner and recommended row must pass the actual API spot ID');
+    assert.ok(target.params.searchRequest, 'each selection must identify a new map request');
+  }
   carouselTree.props.onLayout({ nativeEvent: { layout: { width: 350 } } });
   carouselTree = carouselHost.render(carousel.HeroCarousel, heroElement.props);
   const featuredNode = (tree) => nodes(tree).find((node) => node.type?.name === 'FeaturedSpeciesSlide');

@@ -116,12 +116,16 @@ async function checkFacilities() {
   const placeUrl = 'https://place.map.kakao.com/13569455';
   void opened; void lookups;
   const positions = [];
+  let backHandler;
   const mocks = {
     'react-native': {
       ...Object.fromEntries(['ActivityIndicator', 'Modal', 'Pressable', 'ScrollView', 'Text', 'View'].map((name) => [name, name])),
       StyleSheet: { create: (styles) => styles, absoluteFill: {} },
       useWindowDimensions: () => ({ width: 390, height: 844 }),
-      BackHandler: { addEventListener: () => ({ remove() {} }) },
+      BackHandler: { addEventListener: (_event, handler) => {
+        backHandler = handler;
+        return { remove() { backHandler = undefined; } };
+      } },
     },
     'react-native-reanimated': {
       default: { View: 'AnimatedView' },
@@ -205,6 +209,19 @@ async function checkFacilities() {
   assert.deepEqual(facilities.markers, [{ id: facilities.state.places[0].id, name: '시설', lat: origin.lat, lng: origin.lng }]);
   const loadedMarkers = facilities.markers;
   const loadedRequests = requests.length;
+  rows()[0].props.onPress(); render();
+  assert.equal(backHandler(), true, 'Android back closes facility detail before leaving the map');
+  render();
+  assert.equal(detail(), undefined);
+  assert.equal(rows().length, 1, 'first back returns to the same facility list');
+  assert.equal(backHandler(), true, 'second back hides the list');
+  render();
+  assert.equal(facilities.sheetOpen, false);
+  assert.equal(facilities.markers, loadedMarkers, 'Android back preserves marker identity and loaded results');
+  assert.equal(backHandler, undefined, 'hidden facilities must not trap later Android back presses');
+  facilities.selectPlace(loadedMarkers[0].id); render();
+  assert.ok(detail(), 'the retained marker must reopen detail after Android back');
+  button('시설 목록으로 돌아가기').props.onPress(); render();
   button('시설 목록 닫기').props.onPress(); render();
   assert.equal(nodes(tree).some((node) => node.props?.testID === 'tour-facility-sheet'), false);
   assert.deepEqual(facilities.markers, loadedMarkers, 'hiding the sheet keeps the loaded markers');

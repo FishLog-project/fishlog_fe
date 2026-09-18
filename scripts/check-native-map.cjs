@@ -11,6 +11,7 @@ async function main() {
   const quick = deferred();
   const fresh = deferred();
   const pressed = [];
+  const centers = [];
   const { FishlogKakaoMap } = load('src/features/map/kakao-map.tsx', {
     react: { ...hooks.react, useLayoutEffect: hooks.react.useEffect },
     '@react-native-kakao/map': { KakaoMap: { initializeKakaoMapSDK: async () => {} }, KakaoMapView: 'NativeMap' },
@@ -27,6 +28,7 @@ async function main() {
     onSpotPress: (id) => pressed.push(['spot', id]),
     onTourPress: (id) => pressed.push(['tour', id]),
     onMapPress: () => pressed.push(['map']),
+    onCameraIdle: (center) => centers.push(center),
   };
   const render = () => { hooks.render(FishlogKakaoMap, props); return hooks.render(FishlogKakaoMap, props); };
   render();
@@ -56,6 +58,20 @@ async function main() {
   map = render();
   assert.deepEqual(map.props.camera, { lat: 35, lng: 129, zoomLevel: 15, nonce: 1 });
   assert.deepEqual(map.props.currentLocation, { lat: 34, lng: 127 }, 'GPS still updates location dot');
+
+  // Panning is owned by the SDK. Facility updates and sheet rerenders must not send a new camera intent.
+  const searchCamera = map.props.camera;
+  const panned = { lat: 36, lng: 128, zoomLevel: 16 };
+  map.props.onCameraIdle({ nativeEvent: panned });
+  props = { ...props, tourPlaces: [{ id: '8', name: '새 관광지', lat: 36, lng: 128 }] };
+  map = render();
+  assert.deepEqual(centers, [panned]);
+  assert.equal(map.props.camera, searchCamera, 'new facility markers must not recenter the panned map');
+  const facilityMarkers = map.props.spots;
+  props = { ...props, onTourPress: (id) => pressed.push(['tour', id]) };
+  map = render();
+  assert.equal(map.props.spots, facilityMarkers, 'sheet selection must not rebuild native markers');
+  assert.equal(map.props.camera, searchCamera, 'sheet selection must not interrupt native map gestures');
 
   // A subsequent explicit recenter wins over the old search; repeating coordinates still changes nonce.
   props = { ...props, recenterSignal: 1 };

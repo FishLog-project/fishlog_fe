@@ -9,6 +9,7 @@ import { Brand, Components, Layout } from '@/constants/theme';
 import { useAuth } from '@/features/auth';
 import { SeaInfoStrip } from '@/features/map/components/sea-info-strip';
 import { SpotDetailSheet } from '@/features/map/components/spot-detail-sheet';
+import { isValidCoords } from '@/features/map/geo';
 import { FishlogKakaoMap } from '@/features/map/kakao-map';
 import { createApiSpotDataSource } from '@/features/map/spot-api';
 import { createFixtureSpotDataSource } from '@/features/map/spot-data';
@@ -66,13 +67,14 @@ export default function MapScreen() {
   const selectedIsFavorite = selectedSpot?.isFavorite ?? false;
 
   /**
-   * 검색 화면에서 고른 스팟을 연다.
+   * 홈·검색·저장 목록에서 고른 스팟을 연다.
    *
    * 같은 spotId 로 목록이 다시 들어와도 시트를 또 열지 않도록 처리한 값을 기억한다.
    */
   const { spotId: requestedSpotId, searchRequest } = useLocalSearchParams<{ spotId?: string; searchRequest?: string }>();
   const requestKey = requestedSpotId ? `${requestedSpotId}:${searchRequest ?? ''}` : null;
-  const [handledSpotId, setHandledSpotId] = useState<string | null>(null);
+  const handledSpotRequest = useRef<string | null>(null);
+  const focusNonce = useRef(0);
   const [focus, setFocus] = useState<{ lat: number; lng: number; nonce: number } | null>(null);
 
   /**
@@ -90,30 +92,43 @@ export default function MapScreen() {
   useEffect(() => {
     facilitiesRef.current = facilities;
   }, [facilities]);
+
+  const applySpotRequest = useCallback(() => {
+    if (!requestKey || requestKey === handledSpotRequest.current) return;
+    const id = Number(requestedSpotId);
+    if (!Number.isSafeInteger(id) || id <= 0) return;
+    const spot = allSpots?.find((item) => item.id === id);
+    if (!spot || !isValidCoords(spot)) return;
+
+    handledSpotRequest.current = requestKey;
+    setSelectedSpotId(spot.id);
+    // 복귀 시 focus가 null이 되어도 nonce를 재사용하지 않아 같은 스팟으로 다시 이동할 수 있다.
+    setFocus({ lat: spot.lat, lng: spot.lng, nonce: ++focusNonce.current });
+  }, [allSpots, requestKey, requestedSpotId]);
+  const mapFocused = useRef(false);
+  const spotRequestRef = useRef(applySpotRequest);
+  useEffect(() => {
+    spotRequestRef.current = applySpotRequest;
+    // 목록·파라미터가 늦게 도착해도, 복귀 초기화가 끝난 화면에서만 선택한다.
+    if (mapFocused.current) applySpotRequest();
+  }, [applySpotRequest]);
+
+  // 초기화와 선택은 같은 focus callback에서 순서대로 실행한다.
+  // 별도 focus effects는 파라미터 렌더와 navigation 이벤트 순서에 따라 선택을 다시 지울 수 있다.
   useFocusEffect(useCallback(() => {
-    if (!returned.current) {
-      returned.current = true;
-      return;
+    mapFocused.current = true;
+    if (returned.current) {
+      facilitiesRef.current.close();
+      setFacilitiesOpen(false);
+      setSeaInfoOpen(false);
+      setSelectedSpotId(null);
+      setFocus(null);
+      setRecenterSignal((signal) => signal + 1);
     }
-    facilitiesRef.current.close();
-    setFacilitiesOpen(false);
-    setSeaInfoOpen(false);
-    setSelectedSpotId(null);
-    setFocus(null);
-    setRecenterSignal((signal) => signal + 1);
+    returned.current = true;
+    spotRequestRef.current();
+    return () => { mapFocused.current = false; };
   }, []));
-
-
-  // effect 가 아니라 렌더 중에 맞춘다 — 파라미터라는 "바깥 값"에 상태를 맞추는 경우라
-  // effect 로 두면 한 번 그린 뒤 다시 그리게 된다.
-  if (requestedSpotId && requestKey !== handledSpotId && allSpots) {
-    const spot = allSpots.find((item) => item.id === Number(requestedSpotId));
-    if (spot) {
-      setHandledSpotId(requestKey);
-      setSelectedSpotId(spot.id);
-      setFocus({ lat: spot.lat, lng: spot.lng, nonce: (focus?.nonce ?? 0) + 1 });
-    }
-  }
 
   return (
     <Screen edgeToEdge fullWidth header={<ScreenHeader title="지도" />}>

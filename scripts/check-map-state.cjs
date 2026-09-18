@@ -95,7 +95,25 @@ async function check() {
 
   // Render the actual screen: no screen-local override may hide a later store update.
   const screenHost = host();
-  const focusCallbacks = [];
+  let mapFocused = true;
+  let routeParams = {};
+  let screenSession = 2;
+  let screenSource = source;
+  const listeners = { focus: new Set(), blur: new Set() };
+  const navigation = {
+    isFocused: () => mapFocused,
+    addListener: (event, callback) => {
+      listeners[event].add(callback);
+      return () => listeners[event].delete(callback);
+    },
+  };
+  const emit = (event) => [...listeners[event]].forEach((callback) => callback());
+  // Use Expo's real hook: isFocused() may become true before the parent focus event arrives.
+  const { useFocusEffect } = load('node_modules/expo-router/build/useFocusEffect.js', {
+    react,
+    './link/useLoadedNavigation': { useOptionalNavigation: () => navigation },
+    './useNavigation': { useNavigation: () => navigation },
+  });
   const facilities = {
     markers: [{ id: 'tour-test', name: '관광지', lat: 37.4, lng: 126.6 }],
     close() { this.closed = (this.closed ?? 0) + 1; this.selected = null; },
@@ -105,15 +123,19 @@ async function check() {
   const Screen = load('src/app/(tabs)/map/index.tsx', {
     react,
     '@expo/vector-icons': { Ionicons: 'Ionicons' }, 'expo-image': { Image: 'Image' },
-    'expo-router': { useRouter: () => ({}), useLocalSearchParams: () => ({}), useFocusEffect: (callback) => { focusCallbacks.push(callback); } },
+    'expo-router': {
+      useRouter: () => ({}), useLocalSearchParams: () => routeParams,
+      useFocusEffect,
+    },
     'react-native': { ActivityIndicator: 'ActivityIndicator', Pressable: 'Pressable', StyleSheet: { create: (value) => value }, View: 'View' },
     '@/components/common': { Screen: 'Screen', ScreenHeader: 'ScreenHeader', SearchBar: 'SearchBar' },
     '@/constants/theme': { Brand: {}, Components: { map: { seaStrip: {} } }, Layout: {} },
-    '@/features/auth': { useAuth: () => ({ token: 'fixture', sessionId: 2 }) },
+    '@/features/auth': { useAuth: () => ({ token: 'fixture', sessionId: screenSession }) },
     '@/features/map/components/sea-info-strip': { SeaInfoStrip: 'SeaInfoStrip' },
     '@/features/map/components/spot-detail-sheet': { SpotDetailSheet: 'SpotDetailSheet' },
     '@/features/map/kakao-map': { FishlogKakaoMap: 'FishlogKakaoMap' },
-    '@/features/map/spot-api': { createApiSpotDataSource: () => source },
+    '@/features/map/geo': load('src/features/map/geo.ts'),
+    '@/features/map/spot-api': { createApiSpotDataSource: () => screenSource },
     '@/features/map/spot-data': fixture,
     '@/features/map/spot-list-store': store,
     '@/features/map/tour-facilities': { TourFacilities: 'TourFacilities', useTourFacilities: () => facilities },
@@ -157,16 +179,84 @@ async function check() {
   assert.notEqual(node(tree, 'SpotDetailSheet').props.spotId, null);
   const beforeRecenter = node(tree, 'FishlogKakaoMap').props.recenterSignal;
   const closedBefore = facilities.closed ?? 0;
-  focusCallbacks.at(-1)();  // 첫 포커스는 마운트와 겹쳐 건너뛴다
-  focusCallbacks.at(-1)();
+  mapFocused = false;
+  emit('blur');
+  render(screenHost, Screen);
+  mapFocused = true;
+  emit('focus');
   tree = render(screenHost, Screen);
   assert.equal(node(tree, 'SpotDetailSheet').props.spotId, null, 'returning to the tab closes the spot sheet');
   assert.equal(node(tree, 'FishlogKakaoMap').props.tourPlaces, undefined, 'returning to the tab closes facilities');
   assert.equal(facilities.closed, closedBefore + 1);
   assert.equal(node(tree, 'FishlogKakaoMap').props.recenterSignal, beforeRecenter + 1, 'returning to the tab recenters');
 
-  [map, mapHeart, savedHeart, savedList, failedHeart, session2, screenHost].forEach((h) => h.unmount());
-  console.log('Map checks passed: shared favorites, stale refresh/session protection, duplicate taps/rollback, forecast grades and marker selection wiring.');
+  // Home/search can update a mounted map's params before its tab receives focus.
+  // The tab reset must run before the selection, and each visit needs a fresh native camera nonce.
+  const target = oldSpots.find((spot) => spot.id === 2);
+  let lastNonce = 0;
+  for (const searchRequest of ['popular-1', 'popular-2', 'focus-before-params', 'params-before-focus-event']) {
+    mapFocused = false;
+    emit('blur');
+    tree = render(screenHost, Screen);
+    if (searchRequest === 'focus-before-params') {
+      mapFocused = true;
+      emit('focus');
+    }
+    routeParams = { spotId: '2', searchRequest };
+    if (searchRequest === 'params-before-focus-event') mapFocused = true;
+    tree = render(screenHost, Screen);
+    if (searchRequest !== 'focus-before-params') {
+      assert.equal(node(tree, 'SpotDetailSheet').props.spotId, null, 'pending focus must not consume the request before reset');
+      mapFocused = true;
+      emit('focus');
+    }
+    tree = render(screenHost, Screen);
+    assert.equal(node(tree, 'SpotDetailSheet').props.spotId, 2, 'tab reset must not erase the selected spot');
+    const selectedFocus = node(tree, 'FishlogKakaoMap').props.focus;
+    assert.equal(selectedFocus.lat, target.lat);
+    assert.equal(selectedFocus.lng, target.lot);
+    assert.ok(selectedFocus.nonce > lastNonce, 'returning to the same spot must issue a new camera movement');
+    lastNonce = selectedFocus.nonce;
+    node(tree, 'SpotDetailSheet').props.onClose();
+    tree = render(screenHost, Screen);
+    nodes(tree).find((item) => item.props?.accessibilityLabel === '낚시터 목록 새로고침').props.onPress();
+    await flush();
+    tree = render(screenHost, Screen);
+    assert.equal(node(tree, 'SpotDetailSheet').props.spotId, null, 'refresh must not reopen an already handled request');
+    assert.equal(node(tree, 'FishlogKakaoMap').props.focus.nonce, lastNonce);
+  }
+  mapFocused = false;
+  emit('blur');
+  render(screenHost, Screen);
+  mapFocused = true;
+  emit('focus');
+  tree = render(screenHost, Screen);
+  assert.equal(node(tree, 'FishlogKakaoMap').props.focus, null, 'plain tab return must not replay old route params');
+  screenHost.unmount();
+
+  const delayedList = deferred();
+  screenSource = { ...source, getSpots: () => delayedList.promise };
+  screenSession = 3;
+  routeParams = { spotId: '2', searchRequest: 'cold-start' };
+  const coldMap = host();
+  tree = render(coldMap, Screen);
+  assert.equal(node(tree, 'SpotDetailSheet').props.spotId, null);
+  delayedList.resolve([...oldSpots, { ...target, id: 91, lat: 0, lot: 0 }, { ...target, id: 92, lat: NaN }]);
+  await flush();
+  tree = render(coldMap, Screen);
+  assert.equal(node(tree, 'SpotDetailSheet').props.spotId, 2, 'first map visit waits for the spot list then selects');
+  for (const spotId of ['NaN', '-1', '1.5', '999999', '92']) {
+    node(tree, 'SpotDetailSheet').props.onClose();
+    routeParams = { spotId, searchRequest: `invalid-${spotId}` };
+    tree = render(coldMap, Screen);
+    assert.equal(node(tree, 'SpotDetailSheet').props.spotId, null, 'invalid/missing spots must not reach the native camera');
+  }
+  routeParams = { spotId: '91', searchRequest: 'zero-coordinate' };
+  tree = render(coldMap, Screen);
+  assert.deepEqual(node(tree, 'FishlogKakaoMap').props.focus, { lat: 0, lng: 0, nonce: 2 }, 'zero is a valid coordinate, not a missing value');
+
+  [map, mapHeart, savedHeart, savedList, failedHeart, session2, coldMap].forEach((h) => h.unmount());
+  console.log('Map checks passed: shared favorites, stale refresh/session protection, duplicate taps/rollback, forecast grades, marker wiring and cold/repeated spot navigation.');
 }
 
 check().catch((error) => { console.error(error); process.exitCode = 1; });

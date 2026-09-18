@@ -82,6 +82,63 @@ function viewModels(react) {
   });
 }
 
+async function checkExpiredSession(normal) {
+  const client = load('src/lib/api/client.ts', { 'expo/fetch': {} });
+  const api = load('src/features/dex/dex-api.ts', {
+    '@/lib/api/client': client,
+    '@/lib/api/result': load('src/lib/api/result.ts', { './client': client }),
+  });
+  const home = load('src/features/home/home-api.ts', {
+    '@/lib/api/client': client,
+    '@/features/dex/dex-api': api,
+  });
+  let token = 'expired';
+  let refreshes = 0;
+  let canRefresh = true;
+  const uninstall = client.installApiSessionResolver(() => ({
+    token,
+    isCurrent: () => true,
+    refresh: async () => { refreshes++; if (!canRefresh) return null; token = 'fresh'; return token; },
+    expire: () => assert.fail('a valid refresh must keep the session'),
+  }));
+  const previousFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, options) => {
+    const route = new URL(url).pathname;
+    const authenticated = options.headers.Authorization === 'Bearer fresh';
+    calls.push({ route, authenticated });
+    // The public dex returns 200 + locked entries even with an expired token.
+    // Only the protected custom dex returns 401 and triggers the real client refresh.
+    const status = route === '/api/collections/custom/dex' && !authenticated ? 401 : 200;
+    const data = route === '/api/collections/custom/dex' ? { fishes: [] } : authenticated ? normal : {
+      ...normal, caughtCount: 0, fishes: normal.fishes.map((fish) => ({ ...fish, caught: false })),
+    };
+    return new Response(JSON.stringify({ success: status === 200, data }), { status });
+  };
+  try {
+    for (const read of [api.createApiDexDataSource('expired').getMyDex, home.createApiFishLogDataSource('expired').getCollectionProgress]) {
+      for (canRefresh of [true, false]) {
+        token = 'expired';
+        refreshes = 0;
+        calls.length = 0;
+        if (canRefresh) {
+          const actual = await read();
+          assert.equal(actual.caughtCount, normal.caughtCount, 'an expired session must not relock the normal dex after refresh');
+          assert.deepEqual(actual.fishes, normal.fishes, 'caught names and locked species must keep their server state');
+          assert.ok(calls.find((call) => call.route === '/api/collections/dex').authenticated, 'load the personalized dex after the protected read refreshed the session');
+        } else {
+          await assert.rejects(read, (error) => error.reason === 'unauthorized');
+          assert.ok(calls.every((call) => call.route !== '/api/collections/dex'), 'failed refresh must not silently report guest progress');
+        }
+        assert.equal(refreshes, 1);
+      }
+    }
+  } finally {
+    globalThis.fetch = previousFetch;
+    uninstall();
+  }
+}
+
 async function main() {
   const dex = load('src/features/dex/dex-data.ts', {
     'expo-asset': { Asset: { fromModule: () => ({ uri: 'fixture-photo' }) } },
@@ -95,6 +152,7 @@ async function main() {
     })),
   };
   assert.equal(normal.fishes.length, 24);
+  await checkExpiredSession(normal);
   const normalFish = { ...await fixture.getFish(1), imageUrl: normal.fishes[0].imageUrl };
   const normalRecord = await fixture.getCatchRecord(1);
   const customImageUrl = 'https://example.test/custom/default.png?rev=7';
