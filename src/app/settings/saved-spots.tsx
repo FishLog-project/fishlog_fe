@@ -1,11 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Screen, ScreenHeader, ScreenState } from '@/components/common';
 import { Brand, Components, Fonts, Layout } from '@/constants/theme';
 import { useAuth } from '@/features/auth';
+import { setSpotFavorite } from '@/features/map/spot-list-store';
 import { createApiSpotDataSource } from '@/features/map/spot-api';
 import { createFixtureSpotDataSource, type SpotDataSource } from '@/features/map/spot-data';
 import {
@@ -30,12 +31,16 @@ const LIST = Components.profile.savedList;
  * 낚시터 사진이 제공되기 전까지 썸네일 없이 텍스트 목록으로 표시한다.
  */
 export default function SavedSpotsScreen() {
-  const { token } = useAuth();
+  const { token, sessionId } = useAuth();
+  const sessionKey = USE_FIXTURE ? 'fixture' : `session-${sessionId}`;
+  const rememberFavorite = useCallback((spotId: number, isFavorite: boolean) => {
+    setSpotFavorite(sessionKey, spotId, isFavorite);
+  }, [sessionKey]);
   const dataSource = useMemo(
     () => (USE_FIXTURE ? createFixtureSpotDataSource() : createApiSpotDataSource(token)),
     [token],
   );
-  const [state, retry] = useSavedSpotsViewModel(dataSource);
+  const [state, retry] = useSavedSpotsViewModel(dataSource, sessionKey);
 
   return (
     <Screen
@@ -45,7 +50,7 @@ export default function SavedSpotsScreen() {
       {state.status === 'ready' ? (
         <View style={styles.list}>
           {state.data.map((spot) => (
-            <SavedSpotRow key={spot.id} spot={spot} dataSource={dataSource} />
+            <SavedSpotRow key={`${sessionKey}-${spot.id}`} spot={spot} dataSource={dataSource} onFavoriteChange={rememberFavorite} />
           ))}
         </View>
       ) : (
@@ -71,12 +76,14 @@ export default function SavedSpotsScreen() {
 function SavedSpotRow({
   spot,
   dataSource,
+  onFavoriteChange,
 }: {
   spot: SpotMarkerViewModel;
   dataSource: SpotDataSource;
+  onFavoriteChange: (spotId: number, isFavorite: boolean) => void;
 }) {
   const router = useRouter();
-  const favorite = useSpotFavorite(dataSource, spot.id, spot.isFavorite);
+  const favorite = useSpotFavorite(dataSource, spot.id, spot.isFavorite, onFavoriteChange);
   const extras = useSavedSpotExtras(dataSource, spot);
   // 시안은 태그 두 개까지 보여준다 (837:2484)
   const tags = extras.fishes.slice(0, 2);
@@ -157,7 +164,6 @@ const styles = StyleSheet.create({
   titleBlock: { flex: 1, gap: LIST.titleGap },
   name: {
     fontFamily: Fonts.semiBold,
-    fontWeight: '600',
     fontSize: 16,
     lineHeight: 24,
     letterSpacing: 0,
@@ -165,7 +171,6 @@ const styles = StyleSheet.create({
   },
   address: {
     fontFamily: Fonts.regular,
-    fontWeight: '400',
     fontSize: 13,
     lineHeight: 20,
     letterSpacing: -0.325,
@@ -180,7 +185,6 @@ const styles = StyleSheet.create({
   },
   tagLabel: {
     fontFamily: Fonts.medium,
-    fontWeight: '500',
     fontSize: 11,
     lineHeight: 16,
     letterSpacing: -0.22,
@@ -188,7 +192,6 @@ const styles = StyleSheet.create({
   },
   failure: {
     fontFamily: Fonts.regular,
-    fontWeight: '400',
     fontSize: 13,
     lineHeight: 20,
     letterSpacing: -0.325,

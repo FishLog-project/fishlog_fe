@@ -18,6 +18,9 @@ type ErrorStep = {
   reason: 'empty' | 'failed';
 };
 
+/** 분석 화면(애니메이션)을 최소 이만큼은 보여 준다 */
+const MIN_ANALYZING_MS = 1500;
+
 export type CatchStep =
   | { step: 'capture' }
   | { step: 'analyzing'; photoUri: string }
@@ -39,7 +42,11 @@ export type CatchStep =
       detail: DexSpeciesDetailViewModel;
     };
 
-export function useCatchFlow(dataSource: CatchDataSource) {
+export function useCatchFlow(
+  dataSource: CatchDataSource,
+  /** 분석 화면 최소 노출 시간. 검사에서는 0 으로 두고 기다리지 않는다 */
+  minAnalyzingMs: number = MIN_ANALYZING_MS,
+) {
   const [state, setState] = useState<CatchStep>({ step: 'capture' });
   const [registering, setRegistering] = useState(false);
   const [registrationError, setRegistrationError] = useState<string | null>(null);
@@ -55,9 +62,20 @@ export function useCatchFlow(dataSource: CatchDataSource) {
   const analyze = useCallback(
     async (photoUri: string) => {
       const run = ++analysisRun.current;
+      const startedAt = Date.now();
       setState({ step: 'analyzing', photoUri });
+      /**
+       * 분석이 곧바로 끝나면 분석 화면이 한 프레임만 스쳐 지나가 애니메이션이 보이지 않는다.
+       * 응답이 빨라도 최소 시간만큼은 분석 화면을 유지한다.
+       */
+      const holdAnimation = async () => {
+        const left = minAnalyzingMs - (Date.now() - startedAt);
+        if (left > 0) await new Promise((resolve) => setTimeout(resolve, left));
+      };
       try {
         const result = await dataSource.classify(photoUri);
+        if (run !== analysisRun.current) return;
+        await holdAnimation();
         if (run !== analysisRun.current) return;
         setState(
           result.candidates.length > 0
@@ -66,10 +84,12 @@ export function useCatchFlow(dataSource: CatchDataSource) {
         );
       } catch {
         if (run !== analysisRun.current) return;
+        await holdAnimation();
+        if (run !== analysisRun.current) return;
         setState({ step: 'error', photoUri, reason: 'failed' });
       }
     },
-    [dataSource],
+    [dataSource, minAnalyzingMs],
   );
 
   const selectCandidate = useCallback((fishId: number) => {

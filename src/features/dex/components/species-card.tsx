@@ -11,24 +11,22 @@ const DEX = Components.dex;
  * 도감 격자 한 칸 (Figma Collection/MiniCard 978:3090 · 미획득 978:3089).
  *
  * 획득 카드는 물색 그라데이션 칸에 어종 그림 + 이름,
- * 미획득 카드는 서버가 내려준 그림자를 표시하고 이름을 "???"로 가린다.
+ * 미획득 카드는 서버가 내려준 그림자를 표시하되 어종명은 그대로 보여 준다.
  */
 export function SpeciesCard({
   species,
   onPress,
 }: {
   species: DexSpeciesViewModel;
-  /** 획득한 어종만 상세가 열린다. 잠금 카드는 눌러도 아무 일이 없다 */
+  /** 카드를 누르면 획득 여부와 관계없이 어종 상세가 열린다. */
   onPress: (species: DexSpeciesViewModel) => void;
 }) {
   return (
     <Pressable
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-      // 잠금 카드는 버튼이 아니다 — 스크린리더에도 누를 수 있는 것처럼 읽히면 안 된다
-      accessibilityRole={species.caught ? 'button' : undefined}
+      accessibilityRole="button"
       accessible
       accessibilityLabel={species.accessibilityLabel}
-      disabled={!species.caught}
       onPress={() => onPress(species)}>
       <LinearGradient
         colors={[...DEX.tileFill]}
@@ -44,7 +42,7 @@ export function SpeciesCard({
           contentFit="contain"
         />
       </LinearGradient>
-      <Text numberOfLines={1} style={styles.name}>
+      <Text style={styles.name}>
         {species.label}
       </Text>
     </Pressable>
@@ -53,14 +51,15 @@ export function SpeciesCard({
 
 const styles = StyleSheet.create({
   card: {
-    // 폭은 3열 격자가 남는 자리를 나눠 정한다 (Figma 108 @390pt)
+    // 화면 폭·글자 크기에 맞춘 격자가 남는 자리를 나눠 정한다.
     flex: 1,
-    height: DEX.cardHeight,
+    minHeight: DEX.cardHeight,
     borderRadius: DEX.cardRadius,
     backgroundColor: DEX.cardBg,
     alignItems: 'center',
     // Figma 108 카드에서 그림 칸이 좌우로 10씩 물러난 만큼
     paddingHorizontal: DEX.tileInset,
+    paddingBottom: 8,
     // Figma의 바깥 그림자. RN 0.76+ 새 아키텍처에서 지원한다.
     boxShadow: `0px 0px 4.9px -1px ${DEX.cardShadow}`,
   },
@@ -69,6 +68,7 @@ const styles = StyleSheet.create({
   tile: {
     width: '100%',
     maxWidth: DEX.tileSize,
+    maxHeight: DEX.tileSize,
     // 카드 폭이 기기마다 달라도 그림 칸은 정사각을 유지한다 (Figma 88x88)
     aspectRatio: 1,
     marginTop: 12,
@@ -83,6 +83,8 @@ const styles = StyleSheet.create({
   name: {
     ...Typography.cardTitle,
     marginTop: 6,
+    textAlign: 'center',
+    alignSelf: 'stretch',
     color: Brand.textAccent,
   },
 });

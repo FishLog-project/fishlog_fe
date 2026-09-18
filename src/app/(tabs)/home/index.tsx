@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useMemo, useRef } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { Screen, ScreenHeader, ScreenState, SectionTitle } from '@/components/common';
 import { Brand, Components, Typography } from '@/constants/theme';
@@ -21,6 +21,7 @@ const PROGRESS_FALLBACK = {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { fontScale } = useWindowDimensions();
   const { token } = useAuth();
   // 렌더마다 새로 만들면 useSection 의존성이 흔들려 무한 재요청이 된다.
   // fixture의 빈/오류 화면은 인자를 'empty' | 'partial-error'로 바꿔 확인한다.
@@ -69,7 +70,7 @@ export default function HomeScreen() {
         />
       </View>
 
-      <View style={styles.statRow}>
+      <View style={[styles.statRow, fontScale > 1.2 && styles.statRowStacked]}>
         <StatCard
           title="도감 진행도"
           accessibilityLabel={progressMessage ?? '도감 진행도, 도감 화면으로 이동'}
@@ -254,12 +255,13 @@ const styles = StyleSheet.create({
 
   // 통계 카드
   statRow: { flexDirection: 'row', gap: HOME.cardGap, marginTop: HOME.blockGap },
+  statRowStacked: { flexDirection: 'column' },
   /** flex는 바깥 Pressable이 갖고, 그라데이션은 그 안을 채운다 */
   statCardPress: { flex: 1 },
   pressed: { opacity: 0.85 },
   statCard: {
     flex: 1,
-    height: CARD.height,
+    minHeight: CARD.height,
     borderRadius: CARD.radius,
     padding: CARD.padding,
     // Figma의 inset shadow. RN 0.76+ 새 아키텍처에서 지원한다.
@@ -270,12 +272,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  statTitle: { ...Typography.cardTitle, color: Brand.primaryDark },
+  statTitle: { flexShrink: 1, ...Typography.cardTitle, color: Brand.primaryDark },
   statChevron: { width: 20, height: 20 },
 
   progressNumWrap: {
     flexDirection: 'row',
     alignItems: 'baseline',
+    flexWrap: 'wrap',
     marginTop: CARD.valueTop,
   },
   progressNum: { ...Typography.statNumber, color: Brand.primary },
@@ -303,6 +306,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: HOME.sectionTitleGap,
+    flexWrap: 'wrap',
     marginTop: HOME.blockGap,
     marginBottom: HOME.sectionBottom,
   },

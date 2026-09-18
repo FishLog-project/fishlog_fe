@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Screen, ScreenHeader, ScreenState, SettingsListItem } from '@/components/common';
@@ -15,9 +16,10 @@ const RECORDS = Components.profile.records;
  * 낚시 인증 기록 조회 (Figma 634:3205).
  *
  * 마이페이지 "기타"에서 들어온다. 날짜별로 묶어 최신 날짜를 위에 두고,
- * 한 줄에 "어종 (크기)"만 보여준다 — 시안에 화살표가 없어 항목은 누를 수 없다.
+ * 한 줄에 "어종 (크기)"를 보여주고 누르면 해당 도감 상세로 이동한다.
  */
 export default function CatchRecordsScreen() {
+  const router = useRouter();
   const { token } = useAuth();
   const dataSource = useMemo(
     () =>
@@ -33,7 +35,15 @@ export default function CatchRecordsScreen() {
       scroll
       contentPadding={Layout.profilePadding}
       header={<ScreenHeader title="낚시 인증 기록 조회" showBack />}>
-      {state.status === 'ready' ? (
+      {!USE_FIXTURE && token === null ? (
+        <ScreenState
+          variant="empty"
+          title="로그인하면 인증 기록을 볼 수 있어요"
+          description="내가 잡은 물고기의 크기와 인증 날짜를 모아 볼 수 있어요."
+          actionLabel="로그인하기"
+          onAction={() => router.push('/auth/login')}
+        />
+      ) : state.status === 'ready' ? (
         <View style={styles.groups}>
           {state.data.map((group) => (
             <View key={group.date} style={styles.group}>
@@ -44,6 +54,14 @@ export default function CatchRecordsScreen() {
                     key={`${item.recordType}-${item.recordId}`}
                     label={item.label}
                     showChevron={false}
+                    onPress={() => router.push({
+                      pathname: '/dex',
+                      params: {
+                        fishId: String(item.fishId),
+                        fishType: item.recordType,
+                        openRequest: `${item.recordId}-${Date.now()}`,
+                      },
+                    })}
                   />
                 ))}
               </View>

@@ -1,3 +1,4 @@
+/* global __dirname */
 // Run with: node scripts/check-tour-data.cjs
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -60,7 +61,14 @@ function hook(file, name, mocks = {}) {
       }
     },
   };
-  const run = load(file, { ...mocks, react })[name];
+  const loaded = load(file, { ...mocks, react });
+  const run = name === 'TourFacilities'
+    ? (props = {}) => {
+      const facilities = loaded.useTourFacilities(props.getSearchOrigin);
+      props.capture?.(facilities);
+      return loaded.TourFacilities({ facilities });
+    }
+    : loaded[name];
   return {
     render(...args) {
       cursor = 0;
@@ -102,15 +110,44 @@ function nodes(tree) {
 
 async function checkFacilities() {
   const requests = [];
+  const opened = [];
+  const lookups = [];
+  const sheetValue = {};
+  const placeUrl = 'https://place.map.kakao.com/13569455';
+  void opened; void lookups;
   const positions = [];
+  let backHandler;
   const mocks = {
     'react-native': {
       ...Object.fromEntries(['ActivityIndicator', 'Modal', 'Pressable', 'ScrollView', 'Text', 'View'].map((name) => [name, name])),
       StyleSheet: { create: (styles) => styles, absoluteFill: {} },
+      useWindowDimensions: () => ({ width: 390, height: 844 }),
+      BackHandler: { addEventListener: (_event, handler) => {
+        backHandler = handler;
+        return { remove() { backHandler = undefined; } };
+      } },
+    },
+    'react-native-reanimated': {
+      default: { View: 'AnimatedView' },
+      ReduceMotion: { System: 'system' },
+      SlideInDown: { duration: () => ({ reduceMotion: (mode) => ({ mode }) }) },
+      // 드래그로 높이를 바꾸는 부분은 값만 흉내 낸다 (실제 애니메이션은 기기에서 확인한다).
+      // 렌더마다 새 객체를 주면 스냅한 높이가 사라지므로 하나를 계속 돌려준다.
+      useSharedValue: (value) => { if (!('value' in sheetValue)) sheetValue.value = value; return sheetValue; },
+      useAnimatedStyle: (build) => build(),
+      withTiming: (value) => value,
+      runOnJS: (fn) => fn,
+    },
+    'react-native-gesture-handler': {
+      GestureHandlerRootView: 'GestureHandlerRootView',
+      GestureDetector: 'GestureDetector',
+      Gesture: { Pan: () => { const chain = { onChange: (fn) => { chain.change = fn; return chain; }, onEnd: (fn) => { chain.end = fn; return chain; } }; return chain; } },
     },
     'expo-image': { Image: 'Image' },
     '@expo/vector-icons': { Ionicons: 'Ionicons' },
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ bottom: 0 }) },
+    'expo-web-browser': { openBrowserAsync: (url) => { opened.push(url); return Promise.resolve(); } },
+    '@/features/map/kakao-place': { lookupPlaceUrl: (name, coords) => { lookups.push({ name, coords }); return Promise.resolve(placeUrl); } },
     'expo-location': {
       Accuracy: { Balanced: 3 },
       requestForegroundPermissionsAsync: async () => ({ granted: true }),
@@ -128,13 +165,18 @@ async function checkFacilities() {
   // Load the real UI leaf without importing unrelated components from its barrel.
   mocks['@/components/common'] = load('src/components/common/screen-state.tsx', mocks);
   const ui = hook('src/features/map/tour-facilities.tsx', 'TourFacilities', mocks);
-  let tree = ui.render();
-  const render = () => { tree = ui.render(); };
+  let facilities;
+  const props = { capture: (value) => { facilities = value; } };
+  let tree = ui.render(props);
+  const render = () => { tree = ui.render(props); };
+  // 시트 높이는 지도 영역을 잰 뒤 정해진다. 기기에서 오는 onLayout 을 흉내 낸다 (지도 영역 800)
+  nodes(tree).find((node) => node.props?.onLayout).props.onLayout({ nativeEvent: { layout: { height: 800 } } });
+  render();
   const button = (label) => nodes(tree).find((node) => node.props?.accessibilityLabel === label);
   const rows = () => nodes(tree).filter((node) => node.props?.accessibilityLabel?.endsWith('시설 상세 보기'));
-  const detail = () => nodes(tree).find((node) => node.type === 'Modal');
+  const detail = () => nodes(tree).find((node) => node.props?.testID === 'tour-facility-detail');
   const screenState = () => nodes(tree).find((node) => node.type?.name === 'ScreenState');
-  const assertHidden = () => { assert.equal(rows().length, 0); assert.equal(detail(), undefined); };
+  const assertHidden = () => { assert.equal(rows().length, 0); assert.equal(detail(), undefined); assert.deepEqual(facilities.markers, []); };
   assert.equal(requests.length, 0);
   assert.equal(positions.length, 0, 'opening the facility layer must not request GPS');
   button('음식점 시설 보기').props.onPress();
@@ -164,12 +206,67 @@ async function checkFacilities() {
   render();
   assert.equal(rows().length, 1);
   assert.equal(rows()[0].props.accessibilityLabel, '시설, 인천, 0m. 시설 상세 보기');
+  assert.deepEqual(facilities.markers, [{ id: facilities.state.places[0].id, name: '시설', lat: origin.lat, lng: origin.lng }]);
+  const loadedMarkers = facilities.markers;
+  const loadedRequests = requests.length;
+  rows()[0].props.onPress(); render();
+  assert.equal(backHandler(), true, 'Android back closes facility detail before leaving the map');
+  render();
+  assert.equal(detail(), undefined);
+  assert.equal(rows().length, 1, 'first back returns to the same facility list');
+  assert.equal(backHandler(), true, 'second back hides the list');
+  render();
+  assert.equal(facilities.sheetOpen, false);
+  assert.equal(facilities.markers, loadedMarkers, 'Android back preserves marker identity and loaded results');
+  assert.equal(backHandler, undefined, 'hidden facilities must not trap later Android back presses');
+  facilities.selectPlace(loadedMarkers[0].id); render();
+  assert.ok(detail(), 'the retained marker must reopen detail after Android back');
+  button('시설 목록으로 돌아가기').props.onPress(); render();
+  button('시설 목록 닫기').props.onPress(); render();
+  assert.equal(nodes(tree).some((node) => node.props?.testID === 'tour-facility-sheet'), false);
+  assert.deepEqual(facilities.markers, loadedMarkers, 'hiding the sheet keeps the loaded markers');
+  assert.equal(facilities.category, '음식점');
+  button('음식점 시설 보기').props.onPress(); render();
+  assert.equal(rows().length, 1, 'selected category reopens a hidden list');
+  assert.equal(requests.length, loadedRequests, 'reopening must reuse the same result');
+  facilities.hide(); render();
+  facilities.selectPlace(facilities.markers[0].id); render();
+  assert.ok(detail(), 'map marker and list must open the same place');
+  assert.equal(facilities.selected, facilities.state.places[0]);
+  assert.equal(tree.type, 'View', 'the full map overlay must not be a gesture-handler root');
+  assert.equal(tree.props.pointerEvents, 'box-none');
+  assert.equal(nodes(tree).find((node) => node.props?.testID === 'tour-facility-dim').props.pointerEvents, 'none', 'detail dim must pass touches through to the map');
+  assert.equal(nodes(tree).some((node) => node.props?.accessibilityLabel === '시설 상세 닫기'), false, 'no full-map pressable may block map gestures or other markers');
+  const renderedSheet = nodes(tree).find((node) => node.props?.testID === 'tour-facility-sheet');
+  assert.equal(nodes(renderedSheet).filter((node) => node.type === 'GestureHandlerRootView').length, 1, 'gesture root stays inside the sheet');
+  button('시설 목록으로 돌아가기').props.onPress(); render();
   rows()[0].props.onPress();
   render();
   assert.ok(detail());
-  assert.ok(nodes(detail()).some((node) => node.type === 'Text' && node.props.children === '시설'));
+  assert.ok(nodes(tree).some((node) => node.type === 'Text' && node.props.children === '시설'));
+  assert.equal(nodes(tree).filter((node) => node.props?.testID === 'tour-facility-sheet').length, 1);
+  // 카카오 장소 링크는 상세에만 두고 선택한 시설을 그대로 넘긴다 (링크 탐색은 checkPlaceLookup 에서 확인)
+  const placeLink = nodes(tree).find((node) => node.type?.name === 'PlaceLink');
+  assert.ok(placeLink, 'detail must render the kakao place link');
+  assert.equal(placeLink.props.place, facilities.state.places[0]);
+  assert.equal(nodes(tree).some((node) => node.type === 'Modal'), false, 'detail must stay in the same sheet');
+  button('시설 목록으로 돌아가기').props.onPress();
+  render();
+  assert.equal(rows().length, 1);
+  assert.equal(detail(), undefined);
+  const drag = nodes(tree).find((node) => node.type === 'GestureDetector').props.gesture;
+  drag.change({ changeY: 350 });
+  drag.end(); render();
+  assert.equal(nodes(tree).some((node) => node.props?.testID === 'tour-facility-sheet'), false, 'dragging below the collapsed snap hides the sheet');
+  assert.deepEqual(facilities.markers, loadedMarkers, 'drag dismissal keeps the same markers');
+  button('음식점 시설 보기').props.onPress(); render(); render();
+  assert.equal(rows().length, 1);
+  assert.equal(requests.length, loadedRequests);
+  rows()[0].props.onPress();
+  render();
   assert.ok(nodes(detail()).some((node) => node.props?.large && node.props.uri === item.firstImage));
 
+  const staleMarker = facilities.markers[0].id;
   button('숙박 시설 보기').props.onPress();
   render();
   assertHidden();
@@ -187,9 +284,13 @@ async function checkFacilities() {
   await flush();
   render();
   assert.equal(rows()[0].props.accessibilityLabel, '숙박 시설, 인천, 0m. 시설 상세 보기');
+  facilities.selectPlace(staleMarker); render();
+  assert.equal(detail(), undefined, 'late marker tap from previous category must not choose a new place');
   rows()[0].props.onPress();
   render();
   assert.ok(detail());
+  button('시설 목록으로 돌아가기').props.onPress();
+  render();
   button('현재 위치로 시설 다시 조회').props.onPress();
   render();
   assertHidden();
@@ -223,15 +324,40 @@ async function checkFacilities() {
 // 지도가 중심 좌표를 주면 GPS 없이 그 좌표로 찾고, 다시 조회할 때 그 순간의 중심을 다시 읽는다.
 async function checkFacilitiesByMapCenter() {
   const requests = [];
+  const opened = [];
+  const lookups = [];
+  const sheetValue = {};
+  const placeUrl = null;
+  void opened; void lookups;
   let gpsCalls = 0;
   const mocks = {
     'react-native': {
       ...Object.fromEntries(['ActivityIndicator', 'Modal', 'Pressable', 'ScrollView', 'Text', 'View'].map((name) => [name, name])),
       StyleSheet: { create: (styles) => styles, absoluteFill: {} },
+      useWindowDimensions: () => ({ width: 390, height: 844 }),
+      BackHandler: { addEventListener: () => ({ remove() {} }) },
+    },
+    'react-native-reanimated': {
+      default: { View: 'AnimatedView' },
+      ReduceMotion: { System: 'system' },
+      SlideInDown: { duration: () => ({ reduceMotion: (mode) => ({ mode }) }) },
+      // 드래그로 높이를 바꾸는 부분은 값만 흉내 낸다 (실제 애니메이션은 기기에서 확인한다).
+      // 렌더마다 새 객체를 주면 스냅한 높이가 사라지므로 하나를 계속 돌려준다.
+      useSharedValue: (value) => { if (!('value' in sheetValue)) sheetValue.value = value; return sheetValue; },
+      useAnimatedStyle: (build) => build(),
+      withTiming: (value) => value,
+      runOnJS: (fn) => fn,
+    },
+    'react-native-gesture-handler': {
+      GestureHandlerRootView: 'GestureHandlerRootView',
+      GestureDetector: 'GestureDetector',
+      Gesture: { Pan: () => { const chain = { onChange: (fn) => { chain.change = fn; return chain; }, onEnd: (fn) => { chain.end = fn; return chain; } }; return chain; } },
     },
     'expo-image': { Image: 'Image' },
     '@expo/vector-icons': { Ionicons: 'Ionicons' },
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ bottom: 0 }) },
+    'expo-web-browser': { openBrowserAsync: (url) => { opened.push(url); return Promise.resolve(); } },
+    '@/features/map/kakao-place': { lookupPlaceUrl: (name, coords) => { lookups.push({ name, coords }); return Promise.resolve(placeUrl); } },
     'expo-location': {
       Accuracy: { Balanced: 3 },
       requestForegroundPermissionsAsync: async () => { gpsCalls++; return { granted: true }; },
@@ -249,8 +375,12 @@ async function checkFacilitiesByMapCenter() {
   const props = { getSearchOrigin: () => center };
   let tree = ui.render(props);
   const render = () => { tree = ui.render(props); };
+  // 시트 높이는 지도 영역을 잰 뒤 정해진다. 기기에서 오는 onLayout 을 흉내 낸다 (지도 영역 800)
+  nodes(tree).find((node) => node.props?.onLayout).props.onLayout({ nativeEvent: { layout: { height: 800 } } });
+  render();
   const button = (label) => nodes(tree).find((node) => node.props?.accessibilityLabel === label);
   const heading = () => nodes(tree).find((node) => node.props?.accessibilityRole === 'header');
+  const sheet = () => nodes(tree).find((node) => node.props?.testID === 'tour-facility-sheet');
 
   button('음식점 시설 보기').props.onPress();
   render();
@@ -258,6 +388,13 @@ async function checkFacilitiesByMapCenter() {
   assert.equal(gpsCalls, 0, 'map center search must not wait for GPS');
   assert.deepEqual(Object.fromEntries(requests.at(-1).url.searchParams), { type: '음식점', lat: '35.1', lng: '129' });
   assert.equal(heading().props.children, '지도 중심 주변 음식점');
+  // 처음엔 화면 절반, 펼치면 88% 높이로 스냅한다 (드래그도 같은 두 지점 사이를 오간다)
+  assert.equal(sheet().props.style[1].height, 800 * 0.5, 'first-open sheet leaves half the map visible');
+  assert.equal(sheet().props.entering.mode, 'system', 'sheet animation respects reduced motion');
+  button('시설 시트 펼치기').props.onPress(); render();
+  assert.equal(sheet().props.style[1].height, 800 * 0.85);
+  button('시설 시트 접기').props.onPress(); render();
+  assert.equal(sheet().props.style[1].height, 800 * 0.5);
 
   const countBefore = requests.length;
   button('지도 중심으로 시설 다시 조회').props.onPress();
@@ -269,9 +406,69 @@ async function checkFacilitiesByMapCenter() {
   button('지도 중심으로 시설 다시 조회').props.onPress();
   render();
   await flush();
+  assert.equal(requests.length, countBefore + 2, 'moving the map must issue only one request for the new center');
   assert.deepEqual(Object.fromEntries(requests.at(-1).url.searchParams), { type: '음식점', lat: '37.56', lng: '126.97' });
   assert.equal(gpsCalls, 0);
+  assert.equal(nodes(tree).some((node) => node.type?.name === 'PlaceLink'), false, 'list rows have no place link');
   ui.unmount();
+}
+
+// 카카오 장소 링크 탐색: 좌표로 같은 장소를 고르고, 멀거나 모호하면 링크를 만들지 않는다.
+async function checkPlaceLookup() {
+  const calls = [];
+  let reply = { documents: [] };
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    calls.push({ url: new URL(url), options });
+    return { ok: true, json: async () => reply };
+  };
+
+  try {
+    const place = load('src/features/map/kakao-place.ts', {
+      'expo-constants': { __esModule: true, default: { expoConfig: { extra: { kakaoRestApiKey: 'rest-key' } } } },
+    });
+
+    const near = { id: '1', place_name: '시설', place_url: 'http://place.map.kakao.com/13569455', x: '126.6', y: '37.4' };
+    const far = { id: '2', place_name: '시설', place_url: 'http://place.map.kakao.com/999', x: '126.7', y: '37.5' };
+
+    // 가까운 후보를 고르고, http 링크는 https 로 올린다
+    reply = { documents: [far, near] };
+    assert.equal(await place.lookupPlaceUrl('시설', origin), 'https://place.map.kakao.com/13569455');
+    assert.equal(calls.at(-1).options.headers.Authorization, 'KakaoAK rest-key');
+    assert.deepEqual(Object.fromEntries(calls.at(-1).url.searchParams), {
+      query: '시설', size: '5', x: String(origin.lng), y: String(origin.lat), radius: '300', sort: 'distance',
+    });
+
+    // 같은 시설은 다시 묻지 않는다
+    const countAfterFirst = calls.length;
+    assert.equal(await place.lookupPlaceUrl('시설', origin), 'https://place.map.kakao.com/13569455');
+    assert.equal(calls.length, countAfterFirst, 'second lookup must use the cache');
+
+    // 좌표에서 멀면 동명이인으로 보고 버린다
+    reply = { documents: [far] };
+    assert.equal(await place.lookupPlaceUrl('먼 시설', origin), null);
+
+    // 좌표를 모르면 결과가 하나일 때만 쓴다
+    reply = { documents: [near] };
+    assert.equal(await place.lookupPlaceUrl('좌표없음', null), 'https://place.map.kakao.com/13569455');
+    reply = { documents: [near, far] };
+    assert.equal(await place.lookupPlaceUrl('모호한 이름', null), null);
+
+    // 응답 실패·빈 결과는 링크 없음
+    reply = { documents: [] };
+    assert.equal(await place.lookupPlaceUrl('없는 시설', origin), null);
+
+    // REST 키가 없으면 아예 부르지 않는다
+    const noKey = load('src/features/map/kakao-place.ts', {
+      'expo-constants': { __esModule: true, default: { expoConfig: { extra: {} } } },
+    });
+    assert.equal(noKey.canLookupPlaceUrl(), false);
+    const countBeforeNoKey = calls.length;
+    assert.equal(await noKey.lookupPlaceUrl('시설', origin), null);
+    assert.equal(calls.length, countBeforeNoKey, 'no request without a REST key');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 }
 
 async function check() {
@@ -443,7 +640,8 @@ async function check() {
   ]);
   await checkFacilities();
   await checkFacilitiesByMapCenter();
-  console.log('Tour query, coordinate/image validation, request/location races, fixtures and facility UI flow passed.');
+  await checkPlaceLookup();
+  console.log('Tour query, coordinate/image validation, request/location races, fixtures, facility UI flow and kakao place links passed.');
 }
 
 check().catch((error) => { console.error(error); process.exitCode = 1; });

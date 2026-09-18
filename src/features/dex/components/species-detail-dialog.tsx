@@ -39,18 +39,24 @@ const VIEWER = {
 /**
  * 어종 상세 모달 (Figma 카드 선택 시 978:3165).
  *
- * 획득한 어종만 열린다. 닫기 버튼이 디자인에 없어 배경(막)이나 안드로이드 뒤로가기로 닫는다.
+ * 획득 여부와 관계없이 열린다. 닫기 버튼이 디자인에 없어 배경(막)이나 안드로이드 뒤로가기로 닫는다.
  * 상세는 열릴 때마다 새로 받는다 — fishId를 key로 써서 어종이 바뀌면 로더가 새로 올라간다.
  */
 export function SpeciesDetailDialog({
   dataSource,
   fishId,
   custom = false,
+  caught = true,
+  lockedImageUrl,
+  onAuthenticate,
   onClose,
 }: {
   dataSource: DexDataSource;
   fishId: number | null;
   custom?: boolean;
+  caught?: boolean;
+  lockedImageUrl?: string | null;
+  onAuthenticate?: () => void;
   onClose: () => void;
 }) {
   return (
@@ -67,7 +73,15 @@ export function SpeciesDetailDialog({
           onPress={onClose}
         />
         {fishId !== null ? (
-          <SpeciesDetailLoader key={`${custom}:${fishId}`} dataSource={dataSource} fishId={fishId} custom={custom} />
+          <SpeciesDetailLoader
+            key={`${custom}:${fishId}:${caught}`}
+            dataSource={dataSource}
+            fishId={fishId}
+            custom={custom}
+            caught={caught}
+            lockedImageUrl={lockedImageUrl}
+            onAuthenticate={onAuthenticate}
+          />
         ) : null}
       </View>
     </Modal>
@@ -78,17 +92,27 @@ function SpeciesDetailLoader({
   dataSource,
   fishId,
   custom,
+  caught,
+  lockedImageUrl,
+  onAuthenticate,
 }: {
   dataSource: DexDataSource;
   fishId: number;
   custom: boolean;
+  caught: boolean;
+  lockedImageUrl?: string | null;
+  onAuthenticate?: () => void;
 }) {
-  const [state, retry] = useDexDetailViewModel(dataSource, fishId, custom);
+  const [state, retry] = useDexDetailViewModel(dataSource, fishId, custom, caught);
 
   return (
     <View accessibilityViewIsModal>
       {state.status === 'ready' ? (
-        <SpeciesDetailCard species={state.data} />
+        <SpeciesDetailCard
+          species={caught ? state.data : { ...state.data, imageUrl: lockedImageUrl ?? null }}
+          locked={!caught}
+          onAuthenticate={onAuthenticate}
+        />
       ) : (
         <View style={styles.stateWrap}>
           <ScreenState
@@ -105,7 +129,15 @@ function SpeciesDetailLoader({
  * 어종 상세 카드 본문 (Figma Collection/Card 665:3472).
  * 모달과 분리해 두어 다른 화면(낚시 인증 완료)에서도 같은 카드를 그릴 수 있다.
  */
-export function SpeciesDetailCard({ species }: { species: DexSpeciesDetailViewModel }) {
+export function SpeciesDetailCard({
+  species,
+  locked = false,
+  onAuthenticate,
+}: {
+  species: DexSpeciesDetailViewModel;
+  locked?: boolean;
+  onAuthenticate?: () => void;
+}) {
   const [viewing, setViewing] = useState<RecentCatch | null>(null);
 
   return (
@@ -122,10 +154,15 @@ export function SpeciesDetailCard({ species }: { species: DexSpeciesDetailViewMo
         {/* Figma는 120 높이 칸 위에 140 그림을 가운데 얹는다 (899:2555) */}
         <FishArtwork
           imageUrl={species.imageUrl}
+          locked={locked}
           style={styles.art}
           contentFit="contain"
         />
       </View>
+
+      {locked ? (
+        <Text style={styles.lockedHint}>낚시 인증을 하면 이 어종이 열려요.</Text>
+      ) : null}
 
       <View style={styles.content}>
         {species.description ? <Text style={styles.description}>{species.description}</Text> : null}
@@ -143,25 +180,35 @@ export function SpeciesDetailCard({ species }: { species: DexSpeciesDetailViewMo
           ) : null}
         </View>
 
-        <View
-          style={styles.photoRow}
-          accessible={species.photos.length === 0}
-          accessibilityLabel={species.photos.length === 0 ? '인증 사진 없음' : undefined}>
-          {Array.from({ length: D.photoCount }, (_, i) => {
-            const photo = species.photos[i];
-            return photo ? (
-              <Pressable
-                key={photo.catchRecordId}
-                accessibilityRole="button"
-                accessibilityLabel={`인증 사진 ${i + 1} 크게 보기`}
-                onPress={() => setViewing(photo)}>
-                <Image source={photo.imageUrl} style={styles.photo} contentFit="cover" />
-              </Pressable>
-            ) : (
-              <View key={i} style={styles.photo} />
-            );
-          })}
-        </View>
+        {locked ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="이 어종 인증하러 가기"
+            onPress={onAuthenticate}
+            style={({ pressed }) => [styles.authenticateButton, pressed && styles.authenticateButtonPressed]}>
+            <Text style={styles.authenticateButtonLabel}>인증하러 가기</Text>
+          </Pressable>
+        ) : (
+          <View
+            style={styles.photoRow}
+            accessible={species.photos.length === 0}
+            accessibilityLabel={species.photos.length === 0 ? '인증 사진 없음' : undefined}>
+            {Array.from({ length: D.photoCount }, (_, i) => {
+              const photo = species.photos[i];
+              return photo ? (
+                <Pressable
+                  key={`${photo.catchRecordId}-${i}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`인증 사진 ${i + 1} 크게 보기`}
+                  onPress={() => setViewing(photo)}>
+                  <Image source={photo.imageUrl} style={styles.photo} contentFit="cover" />
+                </Pressable>
+              ) : (
+                <View key={i} style={styles.photo} />
+              );
+            })}
+          </View>
+        )}
       </View>
 
       <PhotoViewer photo={viewing} onClose={() => setViewing(null)} />
@@ -238,6 +285,7 @@ const styles = StyleSheet.create({
   heading: { maxWidth: '100%', gap: 4, alignItems: 'center' },
   title: { ...Typography.detailTitle, color: Brand.textAccent, textAlign: 'center' },
   meta: { ...Typography.detailBody, color: Brand.textMuted, textAlign: 'center' },
+  lockedHint: { ...Typography.detailBody, color: Brand.textError, textAlign: 'center' },
 
   tile: {
     width: D.tileWidth,
@@ -264,6 +312,16 @@ const styles = StyleSheet.create({
 
   chipRowSingle: { justifyContent: 'flex-start' },
   photoRow: { flexDirection: 'row', gap: D.photoGap },
+  authenticateButton: {
+    width: '100%',
+    minHeight: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Brand.primary,
+  },
+  authenticateButtonPressed: { opacity: 0.72 },
+  authenticateButtonLabel: { ...Typography.button, color: Brand.onPrimary },
 
   viewer: {
     width: VIEWER.width,

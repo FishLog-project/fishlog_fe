@@ -82,6 +82,63 @@ function viewModels(react) {
   });
 }
 
+async function checkExpiredSession(normal) {
+  const client = load('src/lib/api/client.ts', { 'expo/fetch': {} });
+  const api = load('src/features/dex/dex-api.ts', {
+    '@/lib/api/client': client,
+    '@/lib/api/result': load('src/lib/api/result.ts', { './client': client }),
+  });
+  const home = load('src/features/home/home-api.ts', {
+    '@/lib/api/client': client,
+    '@/features/dex/dex-api': api,
+  });
+  let token = 'expired';
+  let refreshes = 0;
+  let canRefresh = true;
+  const uninstall = client.installApiSessionResolver(() => ({
+    token,
+    isCurrent: () => true,
+    refresh: async () => { refreshes++; if (!canRefresh) return null; token = 'fresh'; return token; },
+    expire: () => assert.fail('a valid refresh must keep the session'),
+  }));
+  const previousFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, options) => {
+    const route = new URL(url).pathname;
+    const authenticated = options.headers.Authorization === 'Bearer fresh';
+    calls.push({ route, authenticated });
+    // The public dex returns 200 + locked entries even with an expired token.
+    // Only the protected custom dex returns 401 and triggers the real client refresh.
+    const status = route === '/api/collections/custom/dex' && !authenticated ? 401 : 200;
+    const data = route === '/api/collections/custom/dex' ? { fishes: [] } : authenticated ? normal : {
+      ...normal, caughtCount: 0, fishes: normal.fishes.map((fish) => ({ ...fish, caught: false })),
+    };
+    return new Response(JSON.stringify({ success: status === 200, data }), { status });
+  };
+  try {
+    for (const read of [api.createApiDexDataSource('expired').getMyDex, home.createApiFishLogDataSource('expired').getCollectionProgress]) {
+      for (canRefresh of [true, false]) {
+        token = 'expired';
+        refreshes = 0;
+        calls.length = 0;
+        if (canRefresh) {
+          const actual = await read();
+          assert.equal(actual.caughtCount, normal.caughtCount, 'an expired session must not relock the normal dex after refresh');
+          assert.deepEqual(actual.fishes, normal.fishes, 'caught names and locked species must keep their server state');
+          assert.ok(calls.find((call) => call.route === '/api/collections/dex').authenticated, 'load the personalized dex after the protected read refreshed the session');
+        } else {
+          await assert.rejects(read, (error) => error.reason === 'unauthorized');
+          assert.ok(calls.every((call) => call.route !== '/api/collections/dex'), 'failed refresh must not silently report guest progress');
+        }
+        assert.equal(refreshes, 1);
+      }
+    }
+  } finally {
+    globalThis.fetch = previousFetch;
+    uninstall();
+  }
+}
+
 async function main() {
   const dex = load('src/features/dex/dex-data.ts', {
     'expo-asset': { Asset: { fromModule: () => ({ uri: 'fixture-photo' }) } },
@@ -95,6 +152,7 @@ async function main() {
     })),
   };
   assert.equal(normal.fishes.length, 24);
+  await checkExpiredSession(normal);
   const normalFish = { ...await fixture.getFish(1), imageUrl: normal.fishes[0].imageUrl };
   const normalRecord = await fixture.getCatchRecord(1);
   const customImageUrl = 'https://example.test/custom/default.png?rev=7';
@@ -108,13 +166,14 @@ async function main() {
   const requests = [];
   let failurePath = null;
   let waitingFish = null;
+  let waitingDex = null;
   const { ApiError } = load('src/lib/api/client.ts', { 'expo/fetch': {} });
   const apiModule = load('src/features/dex/dex-api.ts', {
     '@/lib/api/client': { apiRequest: async (route, options) => {
       requests.push({ route, ...options });
       if (route === failurePath) throw new ApiError(401, 'expired');
       switch (route) {
-        case '/api/collections/dex': return options.token ? normal : {
+        case '/api/collections/dex': return options.token ? waitingDex ?? normal : {
           ...normal, caughtCount: 0, fishes: normal.fishes.map((fish) => ({ ...fish, caught: false })),
         };
         case '/api/collections/custom/dex': return { fishes: [
@@ -198,7 +257,9 @@ async function main() {
   assert.equal(list.results.length, 1);
   assert.equal(list.results[0].custom, true);
   list.setQuery('돌돔');
-  assert.equal(vmHost.render(models.useDexViewModel, api).results.length, 0, 'locked species must not leak through search');
+  const lockedSearchResult = vmHost.render(models.useDexViewModel, api).results;
+  assert.equal(lockedSearchResult.length, 1, 'uncaught species must remain searchable by their public name');
+  assert.equal(lockedSearchResult[0].caught, false);
   vmHost.unmount();
 
   const detailHost = host();
@@ -211,6 +272,13 @@ async function main() {
   const normalDetail = detailHost.render(detailModels.useDexDetailViewModel, api, 1, false)[0].data;
   assert.equal(normalDetail.custom, undefined);
   assert.equal(normalDetail.imageUrl, normalFish.imageUrl);
+  requests.length = 0;
+  assert.equal(detailHost.render(detailModels.useDexDetailViewModel, api, 1, false, false)[0].status, 'loading');
+  await flush();
+  const lockedDetail = detailHost.render(detailModels.useDexDetailViewModel, api, 1, false, false)[0].data;
+  assert.deepEqual(requests.map((request) => request.route), ['/api/fish/1'], 'uncaught detail must only request public species information');
+  assert.equal(lockedDetail.catchLabel, '잡은 횟수: 0회');
+  assert.deepEqual(lockedDetail.photos, []);
   requests.length = 0;
   assert.equal(detailHost.render(detailModels.useDexDetailViewModel, api, 1, true)[0].status, 'loading');
   await flush();
@@ -276,10 +344,12 @@ async function main() {
   assert.equal(image.props.source, customImageUrl, 'custom artwork must not be replaced by a name-based asset');
   assert.equal(image.props.tintColor, null);
   imageHost.unmount();
+  let fontScale = 1;
   const uiImports = {
     react: uiHost.react,
     'react-native': {
       ...Object.fromEntries(['FlatList', 'Image', 'Modal', 'Pressable', 'Text', 'View'].map((name) => [name, name])),
+      useWindowDimensions: () => ({ fontScale, width: 390, height: 844 }),
       StyleSheet: { create: (styles) => styles, absoluteFill: {} },
     },
     'expo-image': { Image: 'Image' },
@@ -292,9 +362,15 @@ async function main() {
   const cards = load('src/features/dex/components/species-card.tsx', uiImports);
   const dialogs = load('src/features/dex/components/species-detail-dialog.tsx', uiImports);
   let uiToken = 'test-token';
+  let routeParams = {};
+  let onFocus;
   const screen = load('src/app/(tabs)/dex/index.tsx', {
     ...uiImports,
-    'expo-router': { useRouter: () => ({}), useFocusEffect: () => {} },
+    'expo-router': {
+      useRouter: () => ({}),
+      useLocalSearchParams: () => routeParams,
+      useFocusEffect: (effect) => { onFocus = effect; },
+    },
     '@/features/auth': { useAuth: () => ({ token: uiToken }) },
     '@/features/dex/dex-api': apiModule,
     '@/features/dex/dex-data': dex,
@@ -303,9 +379,24 @@ async function main() {
     '@/lib/data-source-mode': { USE_FIXTURE: false },
   }).default;
   uiHost.render(screen);
+  onFocus();
   await flush();
   let tree = uiHost.render(screen);
   const grid = nodes(tree).find((node) => node.type === 'FlatList').props;
+  for (const [width, scale, columns] of [[375, 1, 3], [320, 1, 2], [768, 1, 6], [800, 1, 7], [375, 2, 1]]) {
+    fontScale = scale;
+    nodes(tree).find((node) => node.props?.onLayout).props.onLayout({ nativeEvent: { layout: { width } } });
+    tree = uiHost.render(screen);
+    const responsiveGrid = nodes(tree).find((node) => node.type === 'FlatList');
+    assert.equal(responsiveGrid.props.numColumns, columns, `${width}px / font scale ${scale}`);
+    if (columns === 1) {
+      assert.equal(responsiveGrid.props.columnWrapperStyle, undefined, 'native FlatList rejects columnWrapperStyle for a single column');
+    }
+    assert.equal(responsiveGrid.key, String(columns), 'changing columns must remount the native list');
+    assert.equal(responsiveGrid.props.data.length % columns, 0, 'pad the last row for the current column count');
+  }
+  fontScale = 1;
+  tree = uiHost.render(screen);
   const normalEntry = grid.data.find((fish) => fish?.id === 1 && !fish.custom);
   const customEntry = grid.data.find((fish) => fish?.id === 1 && fish.custom);
   assert.equal(grid.keyExtractor(normalEntry), 'fish-1');
@@ -320,8 +411,9 @@ async function main() {
     assert.equal(artwork.props.locked, !species.caught);
     assert.equal(artwork.props.tintColor, undefined);
     assert.equal(flatten(artwork.props.style).opacity, undefined);
-    assert.equal(card.props.disabled, !species.caught);
-    if (species.caught) { card.props.onPress(); assert.equal(pressed, species); }
+    assert.equal(card.props.disabled, undefined);
+    card.props.onPress();
+    assert.equal(pressed, species, 'caught and uncaught species cards must both open details');
   }
   const dialogKeys = [];
   for (const species of [normalEntry, customEntry]) {
@@ -330,11 +422,66 @@ async function main() {
     const dialog = nodes(tree).find((node) => node.type === dialogs.SpeciesDetailDialog);
     assert.equal(dialog.props.fishId, 1);
     assert.equal(dialog.props.custom, species.custom);
+    assert.equal(dialog.props.caught, true);
     const loader = nodes(dialogs.SpeciesDetailDialog(dialog.props)).find((node) => node.type?.name === 'SpeciesDetailLoader');
     dialogKeys.push(loader.key);
     assert.equal(loader.props.custom, !!species.custom);
   }
   assert.notEqual(...dialogKeys, 'switching same-ID species kinds must remount their detail loader');
+
+  const lockedEntry = grid.data.find((fish) => fish && !fish.caught);
+  grid.renderItem({ item: lockedEntry }).props.onPress(lockedEntry);
+  tree = uiHost.render(screen);
+  const lockedDialog = nodes(tree).find((node) => node.type === dialogs.SpeciesDetailDialog);
+  assert.equal(lockedDialog.props.fishId, lockedEntry.id);
+  assert.equal(lockedDialog.props.caught, false);
+  assert.equal(lockedDialog.props.lockedImageUrl, lockedEntry.imageUrl);
+  let authenticationStarted = false;
+  const lockedCard = dialogs.SpeciesDetailCard({
+    species: lockedDetail,
+    locked: true,
+    onAuthenticate: () => { authenticationStarted = true; },
+  });
+  assert.equal(nodes(lockedCard).find((node) => node.type === art.FishArtwork).props.locked, true);
+  assert.ok(nodes(lockedCard).some((node) => node.type === 'Text' && node.props.children === '낚시 인증을 하면 이 어종이 열려요.'));
+  const authenticate = nodes(lockedCard).find((node) => node.props?.accessibilityLabel === '이 어종 인증하러 가기');
+  assert.ok(authenticate);
+  authenticate.props.onPress();
+  assert.equal(authenticationStarted, true);
+  assert.equal(nodes(lockedCard).some((node) => node.props?.accessibilityLabel === '인증 사진 없음'), false);
+
+  lockedDialog.props.onClose();
+  tree = uiHost.render(screen);
+  routeParams = { fishId: '1', fishType: 'DEX', openRequest: 'record-1' };
+  tree = uiHost.render(screen);
+  let routedDialog = nodes(tree).find((node) => node.type === dialogs.SpeciesDetailDialog);
+  assert.equal(routedDialog.props.fishId, normalEntry.id, 'history route must open the normal dex detail');
+  assert.equal(routedDialog.props.custom, undefined);
+  routedDialog.props.onClose();
+  tree = uiHost.render(screen);
+  routeParams = { fishId: '1', fishType: 'CUSTOM', openRequest: 'record-2' };
+  tree = uiHost.render(screen);
+  routedDialog = nodes(tree).find((node) => node.type === dialogs.SpeciesDetailDialog);
+  assert.equal(routedDialog.props.fishId, customEntry.id, 'history route must open the custom dex detail');
+  assert.equal(routedDialog.props.custom, true);
+
+  const newlyCaught = normal.fishes.find((fish) => !fish.caught);
+  assert.equal(grid.data.find((fish) => fish?.id === newlyCaught.id && !fish.custom).label, newlyCaught.name);
+  // Model a successful registration reflected by the next authenticated dex response.
+  normal.fishes = normal.fishes.map((fish) => fish.id === newlyCaught.id ? { ...fish, caught: true } : fish);
+  normal.caughtCount++;
+  onFocus();
+  uiHost.render(screen);
+  await flush();
+  tree = uiHost.render(screen);
+  const refreshed = nodes(tree).find((node) => node.type === 'FlatList').props.data;
+  assert.equal(refreshed.find((fish) => fish?.id === newlyCaught.id && !fish.custom).label, newlyCaught.name, 'returning after registration must reveal the caught name');
+  assert.ok(refreshed.filter((fish) => fish && !fish.caught).every((fish) => fish.label === fish.name), 'uncaught species keep their public names');
+
+  let finishOldDex;
+  waitingDex = new Promise((resolve) => { finishOldDex = resolve; });
+  onFocus();
+  uiHost.render(screen);
   uiToken = null;
   uiHost.render(screen);
   await flush();
@@ -342,10 +489,43 @@ async function main() {
   const guestGrid = nodes(tree).find((node) => node.type === 'FlatList');
   assert.ok(guestGrid, 'guest screen must render the public dex instead of a login gate');
   assert.equal(guestGrid.props.data.length, 24);
-  assert.ok(guestGrid.props.data.every((fish) => !fish.caught && fish.label === '???' && !fish.custom));
+  assert.ok(guestGrid.props.data.every((fish) => !fish.caught && fish.label === fish.name && !fish.custom));
   assert.equal(guestGrid.props.ListHeaderComponent.props.collected, 0);
+  finishOldDex(normal);
+  await flush();
+  tree = uiHost.render(screen);
+  assert.ok(nodes(tree).find((node) => node.type === 'FlatList').props.data.every((fish) => fish.label === fish.name), 'a late authenticated response must keep public names after logout');
+  waitingDex = null;
+  uiToken = 'test-token';
+  uiHost.render(screen);
+  await flush();
+  tree = uiHost.render(screen);
+  assert.equal(nodes(tree).find((node) => node.type === 'FlatList').props.data.find((fish) => fish?.id === newlyCaught.id && !fish.custom).label, newlyCaught.name, 'logging back in must restore caught names');
+  const summary = nodes(tree).find((node) => node.type === 'FlatList').props.ListHeaderComponent;
   uiHost.unmount();
-  console.log('dex checks passed: server artwork/fallback, custom DTO/photos, ID/detail separation, completion/search, guest/errors, stale responses and route keys');
+  // Exercise measured track widths after unmounting the screen; native screenshots still verify glyph bounds.
+  for (const [width, scale, percent, centeredOnTrack] of [
+    [96, 1, 15, true],
+    [200, 1, 54, false],
+    [96, 3.12, 54, true],
+    [540, 3.12, 54, false],
+    [140, 3.12, 100, false],
+  ]) {
+    fontScale = scale;
+    const renderSummary = () => uiHost.render(summary.type, { ...summary.props, percent });
+    nodes(renderSummary()).find((node) => node.props?.onLayout).props.onLayout({ nativeEvent: { layout: { width } } });
+    const rendered = nodes(renderSummary());
+    const track = flatten(rendered.find((node) => node.props?.onLayout).props.style);
+    const fill = flatten(rendered.find((node) => node.type === 'LinearGradient').props.style);
+    const value = flatten(rendered.find((node) => node.type === 'Text' && flatten(node.props.style).position === 'absolute').props.style);
+    const padding = (theme.Components.dex.barInset + 1) * 2;
+    assert.ok(track.height >= theme.Typography.microLabel.lineHeight * scale + padding, 'track must contain scaled percent text');
+    assert.equal(fill.height + padding, track.height, 'fill must grow with its track');
+    assert.ok(track.minWidth >= `${percent}%`.length * theme.Typography.microLabel.fontSize * scale + padding, '100% must fit even in the narrowest large-text track');
+    if (scale === 1) assert.equal(track.height, 22, 'default bar height stays unchanged');
+    assert.equal(value.right === 0, centeredOnTrack, 'place the label using available pixels, not a fixed percent threshold');
+  }
+  console.log('dex checks passed: registration focus refresh, public names and locked artwork, login/logout races, server artwork/fallback, custom DTO/photos, ID separation, completion/search and route keys');
 }
 
 module.exports = { load, host, flush, nodes };

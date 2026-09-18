@@ -2,9 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { Brand, Typography } from '@/constants/theme';
 
-type FishlogKakaoMapProps = {
-  recenterSignal: number;
-};
+import type { FishlogKakaoMapProps } from './kakao-map';
 
 export function FishlogKakaoMap({ recenterSignal: _recenterSignal }: FishlogKakaoMapProps) {
   return (

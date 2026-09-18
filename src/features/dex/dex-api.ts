@@ -21,12 +21,10 @@ export function createApiDexDataSource(token: string | null): DexDataSource {
 
   return {
     getMyDex: async () => {
-      const [dex, custom] = await Promise.all([
-        // 비회원도 그림자 도감을 본다. 토큰이 있으면 획득 여부가 함께 온다.
-        get<MyDex>('/api/collections/dex', token || undefined),
-        // 수기 어종은 인증이 필요하므로 비회원에게는 묻지 않는다.
-        token ? authed<CustomDex>('/api/collections/custom/dex') : Promise.resolve<CustomDex>({ fishes: [] }),
-      ]);
+      // 공개 도감은 만료 토큰에도 200 + 미획득으로 응답한다. 보호 조회의 401 갱신을
+      // 먼저 마쳐야 일반 도감도 최신 토큰으로 조회한다. 비회원은 보호 API를 부르지 않는다.
+      const custom = token ? await authed<CustomDex>('/api/collections/custom/dex') : { fishes: [] };
+      const dex = await get<MyDex>('/api/collections/dex', token || undefined);
       return {
         ...dex,
         // 수기 어종은 함께 보여 주되 완성도·랭킹은 기본 도감 집계를 유지한다.

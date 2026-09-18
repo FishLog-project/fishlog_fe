@@ -45,7 +45,7 @@ export function SegmentControl<T extends string>({ options, value, onChange }: P
 const styles = StyleSheet.create({
   track: {
     flexDirection: 'row',
-    height: SEGMENT.height,
+    minHeight: SEGMENT.height,
     borderRadius: SEGMENT.radius,
     backgroundColor: SEGMENT.track,
     padding: SEGMENT.padding,
