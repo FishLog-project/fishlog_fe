@@ -121,6 +121,7 @@ async function check() {
     hide() { this.hidden = (this.hidden ?? 0) + 1; this.selected = null; },
     refreshLocation() { this.refreshed = (this.refreshed ?? 0) + 1; },
     selectPlace(id) { this.selected = id; },
+    openAt(category, target) { this.opened = { category, ...target }; },
   };
   const Screen = load('src/app/(tabs)/map/index.tsx', {
     react,
@@ -142,6 +143,7 @@ async function check() {
     '@/features/map/spot-list-store': store,
     // 구역 자료는 실제 파일을 그대로 읽어, 번들된 좌표까지 함께 검증한다
     '@/features/map/prohibited-zones': require('./check-zone-data.cjs').zoneModule(),
+    '@/features/map/tour-data': { TOUR_CATEGORIES: ['음식점', '관광지', '숙박'] },
     '@/features/map/tour-facilities': { TourFacilities: 'TourFacilities', useTourFacilities: () => facilities },
     '@/features/map/use-spot-view-model': vm,
     '@/lib/data-source-mode': { USE_FIXTURE: false },
@@ -262,8 +264,33 @@ async function check() {
   tree = render(coldMap, Screen);
   assert.deepEqual(node(tree, 'FishlogKakaoMap').props.focus, { lat: 0, lng: 0, nonce: 2 }, 'zero is a valid coordinate, not a missing value');
 
+  // 검색에서 고른 관광지·음식점·숙박: 그 장소로 옮기고, 같은 분류의 목록을 그 좌표로 연다.
+  node(tree, 'SpotDetailSheet').props.onClose();
+  facilities.opened = null;
+  routeParams = { tourCategory: '관광지', tourLat: '37.5112', tourLng: '127.0981', tourName: '롯데월드', tourAddress: '서울 송파구 올림픽로 240', searchRequest: 'tour-1' };
+  tree = render(coldMap, Screen);
+  assert.deepEqual(facilities.opened, { category: '관광지', coords: { lat: 37.5112, lng: 127.0981 }, name: '롯데월드', address: '서울 송파구 올림픽로 240' },
+    'a searched facility opens its category around the picked coordinates');
+  const tourFocus = node(tree, 'FishlogKakaoMap').props.focus;
+  assert.equal(tourFocus.lat, 37.5112);
+  assert.equal(tourFocus.zoomLevel, 16, 'zoom in far enough that facility names show');
+  assert.equal(node(tree, 'SpotDetailSheet').props.spotId, null, 'a facility search closes any open spot');
+  assert.equal(node(tree, 'TourFacilities').props.facilities, facilities, 'the facility sheet is shown');
+  facilities.opened = null;
+  tree = render(coldMap, Screen);
+  assert.equal(facilities.opened, null, 'the same search request is handled once');
+  for (const bad of [
+    { tourCategory: '카페', tourLat: '37.5', tourLng: '127.0' },
+    { tourCategory: '음식점', tourLat: 'x', tourLng: '127.0' },
+    { tourCategory: '숙박', tourLat: '37.5', tourLng: '' },
+  ]) {
+    routeParams = { ...bad, tourName: 'x', searchRequest: `bad-${bad.tourCategory}-${bad.tourLat}-${bad.tourLng}` };
+    tree = render(coldMap, Screen);
+    assert.equal(facilities.opened, null, `invalid facility request must not move the map: ${JSON.stringify(bad)}`);
+  }
+
   [map, mapHeart, savedHeart, savedList, failedHeart, session2, coldMap].forEach((h) => h.unmount());
-  console.log('Map checks passed: shared favorites, stale refresh/session protection, duplicate taps/rollback, forecast grades, marker wiring and cold/repeated spot navigation.');
+  console.log('Map checks passed: shared favorites, stale refresh/session protection, duplicate taps/rollback, forecast grades, marker wiring, cold/repeated spot navigation and facility search.');
 }
 
 check().catch((error) => { console.error(error); process.exitCode = 1; });

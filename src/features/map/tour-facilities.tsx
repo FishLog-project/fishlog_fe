@@ -17,6 +17,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { ScreenState } from '@/components/common';
 import { Brand, Components, Fonts, Layout, Typography } from '@/constants/theme';
 import { lookupPlaceUrl } from '@/features/map/kakao-place';
+import { matchSearchedPlace } from '@/features/map/place-match';
 import { createApiTourDataSource } from '@/features/map/tour-api';
 import { type Coords, TOUR_CATEGORIES, type TourCategory } from '@/features/map/tour-data';
 import { useCurrentLocation } from '@/features/map/use-current-location';
@@ -56,6 +57,21 @@ export function useTourFacilities(getSearchOrigin?: () => Coords | null) {
   const selected = state.status === 'ready' && selectedPlace && state.places.includes(selectedPlace)
     ? selectedPlace : null;
 
+  /** 검색에서 고른 장소. 그 좌표 주변 목록이 오면 같은 장소를 찾아 상세를 연다 */
+  const [pendingTarget, setPendingTarget] = useState<SearchedPlace | null>(null);
+  /**
+   * 관광공사 목록에서 못 찾은 검색 장소. 목록 위에 따로 보여 준다.
+   * 음식점은 관광공사 자료에 실린 곳이 적어 대부분 여기로 온다 — 안 보여 주면 검색이 고장난 줄 안다.
+   */
+  const [searchedPlace, setSearchedPlace] = useState<SearchedPlace | null>(null);
+  useEffect(() => {
+    if (!pendingTarget || state.status === 'loading' || state.status === 'idle') return;
+    setPendingTarget(null);
+    const match = state.status === 'ready' ? matchSearchedPlace(state.places, pendingTarget) : null;
+    if (match) setSelectedPlace(match);
+    else setSearchedPlace(pendingTarget);
+  }, [pendingTarget, state]);
+
   /** 지금 지도 중심을 조회 기준으로 잡는다. 중심을 모르면 false */
   const pinMapOrigin = () => {
     const center = getSearchOrigin?.() ?? null;
@@ -64,6 +80,7 @@ export function useTourFacilities(getSearchOrigin?: () => Coords | null) {
   };
   const selectCategory = (next: TourCategory) => {
     setSelectedPlace(null);
+    setSearchedPlace(null);
     if (next === category) {
       // 숨긴 목록은 같은 칩으로 다시 연다. 열린 상태에서 다시 누르면 필터를 해제한다.
       setSheetOpen(!sheetOpen);
@@ -76,6 +93,7 @@ export function useTourFacilities(getSearchOrigin?: () => Coords | null) {
   };
   const refreshLocation = () => {
     setSelectedPlace(null);
+    setSearchedPlace(null);
     // 현재 지도 중심을 새 조회 기준으로 고정한다.
     const center = getSearchOrigin?.() ?? null;
     if (!center) {
@@ -91,8 +109,20 @@ export function useTourFacilities(getSearchOrigin?: () => Coords | null) {
   };
   // 시트 표시와 조회 수명을 분리한다. 숨겨도 분류·응답·마커는 유지한다.
   const hide = () => { setSelectedPlace(null); setSheetOpen(false); };
-  const close = () => { hide(); setCategory(null); };
+  const close = () => { hide(); setCategory(null); setSearchedPlace(null); };
   const back = () => setSelectedPlace(null);
+  /**
+   * 검색에서 고른 장소로 연다. 그 좌표를 조회 기준으로 고정하고, 목록이 오면 상세까지 연다.
+   * 이름 검색(카카오)과 목록(관광공사)이 다른 데이터라 좌표로 다시 맞춘다.
+   */
+  const openAt = (next: TourCategory, target: SearchedPlace) => {
+    setSelectedPlace(null);
+    setSearchedPlace(null);
+    setCategory(next);
+    setSheetOpen(true);
+    setMapOrigin(target.coords);
+    setPendingTarget(target);
+  };
   const selectPlace = (id: string) => {
     const place = state.status === 'ready' ? state.places.find((item) => item.id === id) : null;
     if (place) { setSelectedPlace(place); setSheetOpen(true); }
@@ -101,13 +131,21 @@ export function useTourFacilities(getSearchOrigin?: () => Coords | null) {
     ? state.places.flatMap((place) => place.coords ? [{ id: place.id, name: place.name, ...place.coords }] : [])
     : [], [state]);
 
-  return { category, sheetOpen, location, origin, state, selected, markers, byMapCenter: mapOrigin !== null,
-    selectCategory, refreshLocation, retry, selectPlace, back, hide, close };
+  return { category, sheetOpen, location, origin, state, selected, searchedPlace, markers, byMapCenter: mapOrigin !== null,
+    selectCategory, refreshLocation, retry, selectPlace, back, hide, close, openAt };
 }
+
+/** 검색에서 고른 장소 (카카오 결과) */
+export interface SearchedPlace {
+  name: string;
+  address: string | null;
+  coords: Coords;
+}
+
 
 /** 지도 마커·목록·상세가 같은 요청 결과와 선택 상태를 쓴다. */
 export function TourFacilities({ facilities }: { facilities: ReturnType<typeof useTourFacilities> }) {
-  const { category, sheetOpen, location, origin, state, selected, byMapCenter,
+  const { category, sheetOpen, location, origin, state, selected, searchedPlace, byMapCenter,
     selectCategory, refreshLocation, retry, selectPlace, back, hide } = facilities;
   const [expanded, setExpanded] = useState(false);
 
@@ -269,7 +307,9 @@ export function TourFacilities({ facilities }: { facilities: ReturnType<typeof u
                 onRetry={refreshLocation}
               />
             ) : state.status === 'ready' ? (
-              state.places.map((place) => (
+              <>
+              {searchedPlace ? <SearchedPlaceCard place={searchedPlace} category={category} /> : null}
+              {state.places.map((place) => (
                 <Pressable
                   key={place.id}
                   accessibilityRole="button"
@@ -283,8 +323,13 @@ export function TourFacilities({ facilities }: { facilities: ReturnType<typeof u
                     <Text style={styles.distance}>{place.distanceLabel ?? '거리 정보 없음'}</Text>
                   </View>
                 </Pressable>
-              ))
+              ))}
+              </>
             ) : (
+              <>
+              {/* 주변 목록이 비어도 검색한 곳은 보여 준다 */}
+              {searchedPlace && state.status === 'empty'
+                ? <SearchedPlaceCard place={searchedPlace} category={category} /> : null}
               <ScreenState
                 variant={state.status === 'idle' ? 'loading' : state.status}
                 title={state.status === 'empty' ? `주변에 ${category} 시설이 없어요`
@@ -293,6 +338,7 @@ export function TourFacilities({ facilities }: { facilities: ReturnType<typeof u
                   : state.status === 'error' ? '잠시 후 다시 시도해 주세요.' : undefined}
                 onRetry={retry}
               />
+              </>
             )}
           </ScrollView>
           </GestureHandlerRootView>
@@ -369,6 +415,37 @@ function CongestionChip({ congestion }: { congestion: TourCongestionViewModel })
   );
 }
 
+/**
+ * 검색한 곳이 관광공사 목록에 없을 때 목록 위에 붙이는 카드.
+ * 관광공사 자료가 없으니 사진·혼잡도는 없고, 카카오맵으로 넘기는 링크만 준다.
+ */
+function SearchedPlaceCard({ place, category }: { place: SearchedPlace; category: TourCategory | null }) {
+  // PlaceLink 는 이름·좌표만 쓴다. 나머지 필드는 목록 항목과 모양을 맞추려고 비워 둔다
+  const linkTarget: TourPlaceViewModel = {
+    id: `searched:${place.name}`,
+    name: place.name,
+    address: place.address,
+    distanceLabel: null,
+    thumbnailUrl: null,
+    photos: [],
+    coords: place.coords,
+    congestion: null,
+  };
+  return (
+    <View testID="tour-searched-place" style={styles.searched}>
+      <Text style={styles.searchedLabel}>검색한 곳</Text>
+      <Text numberOfLines={2} style={styles.name}>{place.name}</Text>
+      {place.address ? <Text numberOfLines={2} style={styles.address}>{place.address}</Text> : null}
+      <Text style={styles.searchedNotice}>
+        관광 정보에 없는 곳이라 주변 {category ?? '시설'}을 함께 보여 드려요.
+      </Text>
+      <View style={styles.detailActions}>
+        <PlaceLink place={linkTarget} />
+      </View>
+    </View>
+  );
+}
+
 function PlaceImage({ uri, large = false }: { uri: string | null; large?: boolean }) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const style = [styles.photo, large && styles.detailPhoto];
@@ -423,6 +500,16 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.72 },
   detailContent: { paddingBottom: 12 },
   backdrop: { backgroundColor: Brand.scrim },
+  searched: {
+    marginTop: 8,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: Brand.surfaceSoft,
+    borderWidth: 1,
+    borderColor: Brand.primary,
+  },
+  searchedLabel: { ...Typography.caption, color: Brand.primaryDark, marginBottom: 4 },
+  searchedNotice: { ...Typography.caption, color: Brand.textMuted, lineHeight: 20, marginTop: 8 },
   detailActions: { marginTop: 12, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
   placeLink: {
     minHeight: 44,

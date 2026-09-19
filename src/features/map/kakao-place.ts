@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 
-import { distanceMeters } from '@/features/map/geo';
-import type { Coords } from '@/features/map/tour-data';
+import { distanceMeters, formatDistance } from '@/features/map/geo';
+import type { Coords, TourCategory } from '@/features/map/tour-data';
 
 /**
  * 시설 → 카카오맵 장소 페이지 링크 (카카오 Local 키워드 검색).
@@ -25,6 +25,8 @@ interface KeywordDocument {
   id?: string;
   place_name?: string;
   place_url?: string;
+  road_address_name?: string;
+  address_name?: string;
   x?: string;
   y?: string;
 }
@@ -111,4 +113,78 @@ export async function lookupPlaceUrl(name: string, coords: Coords | null): Promi
     // 네트워크 실패는 링크만 비우고 상세는 그대로 보여 준다
     return null;
   }
+}
+
+/**
+ * 관광지·음식점·숙박 이름 검색 (카카오 Local 키워드 검색 + 카테고리 필터).
+ *
+ * 서버의 /api/tours/nearby 는 좌표로만 찾고 이름으로는 못 찾는다. 이름 검색은 카카오로 하고,
+ * 고른 장소의 좌표로 다시 /api/tours/nearby 를 불러 혼잡도·사진이 담긴 상세를 연다.
+ *
+ * 카카오 카테고리 코드: 관광명소 AT4, 음식점 FD6, 숙박 AD5.
+ */
+const CATEGORY_GROUP: Readonly<Record<TourCategory, string>> = {
+  관광지: 'AT4',
+  음식점: 'FD6',
+  숙박: 'AD5',
+};
+
+/** 한 번에 보여 줄 결과 수 (카카오 최대 15) */
+const PLACE_SEARCH_SIZE = 15;
+
+export interface PlaceSearchResult {
+  /** 카카오 장소 id */
+  id: string;
+  name: string;
+  address: string | null;
+  category: TourCategory;
+  coords: Coords;
+  /** 기준 좌표를 알 때만 "1.2km" */
+  distanceLabel: string | null;
+}
+
+/**
+ * near 를 주면 거리를 함께 계산한다. 정렬은 정확도순 그대로 둔다 —
+ * "롯데월드"처럼 이름으로 찾을 때 가까운 엉뚱한 곳이 먼저 나오지 않게 하기 위해서다.
+ * "짬뽕"처럼 흔한 말은 전국에서 섞여 나오므로 거리로 구분할 수 있게 보여 준다.
+ */
+export async function searchPlaces(
+  keyword: string,
+  category: TourCategory,
+  near: Coords | null,
+  signal?: AbortSignal,
+): Promise<PlaceSearchResult[]> {
+  const apiKey = restApiKey();
+  const trimmed = keyword.trim();
+  if (!apiKey || !trimmed) return [];
+
+  const query = new URLSearchParams({
+    query: trimmed,
+    category_group_code: CATEGORY_GROUP[category],
+    size: String(PLACE_SEARCH_SIZE),
+  });
+  if (near) {
+    query.set('x', String(near.lng));
+    query.set('y', String(near.lat));
+  }
+
+  const response = await fetch(`${ENDPOINT}?${query.toString()}`, {
+    headers: { Authorization: `KakaoAK ${apiKey}` },
+    signal,
+  });
+  if (!response.ok) throw new Error(`place search failed: ${response.status}`);
+
+  const body = (await response.json()) as { documents?: readonly KeywordDocument[] };
+  return (body.documents ?? []).flatMap((document) => {
+    const coords = toCoords(document);
+    if (!coords || !document.id || !document.place_name) return [];
+    return [{
+      id: document.id,
+      name: document.place_name,
+      address: document.road_address_name || document.address_name || null,
+      category,
+      coords,
+      distanceLabel: near ? formatDistance(distanceMeters(near, coords)) : null,
+    }];
+  });
 }
