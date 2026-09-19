@@ -2,7 +2,7 @@
   "expo": {
     "name": "fishlog",
     "slug": "fishlog_fe",
-    "version": "2.0.0",
+    "version": "3.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "fishlogfe",
@@ -27,7 +27,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "xyz.fishlog.app",
-      "versionCode": 2,
+      "versionCode": 3,
       "blockedPermissions": [
         "android.permission.SYSTEM_ALERT_WINDOW",
         "android.permission.WRITE_EXTERNAL_STORAGE"
