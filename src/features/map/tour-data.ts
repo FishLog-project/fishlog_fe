@@ -12,6 +12,24 @@ export interface Coords {
   lng: number;
 }
 
+/** 관광지 집중률 기반 당일 혼잡도 등급 */
+export const CONGESTION_LEVELS = ['여유', '보통', '혼잡'] as const;
+export type CongestionLevel = (typeof CONGESTION_LEVELS)[number];
+
+/**
+ * 당일 예상 혼잡도 (한국관광공사 관광지 집중률).
+ *
+ * rate 는 0~100 지수이지 퍼센트가 아니다 — 화면에 %로 보여 주면 안 된다.
+ * 관광지 이름이 두 데이터셋에서 달라(서울 롯데월드 / 잠실 롯데월드) 서버가 이름이
+ * 일치하는 곳만 채운다. 관광지 중 절반 정도만 값이 있다.
+ */
+export interface TourCongestion {
+  rate: number;
+  level: CongestionLevel;
+  /** 예측 기준일 "YYYY-MM-DD" (조회 당일) */
+  baseDate: string;
+}
+
 /** 이미지·상세 주소·좌표가 없는 장소는 null이다 */
 export interface TourSpot {
   title: string;
@@ -25,6 +43,11 @@ export interface TourSpot {
   mapX: number | null;
   /** 위도 */
   mapY: number | null;
+  /**
+   * 당일 혼잡도. 숙박·음식점, 집중률 자료에 없는 장소, 자료가 없는 지역(전남),
+   * 집중률 API 장애 때는 null 이다. 이 경우 화면은 혼잡도를 숨긴다.
+   */
+  congestion?: TourCongestion | null;
 }
 
 export interface NearbyTours {
@@ -69,6 +92,18 @@ const FIXTURE: Record<TourCategory, readonly (readonly [string, string, number, 
 
 const FIXTURE_DELAY_MS = 400;
 
+/** 관광지 fixture 의 혼잡도. 서버처럼 일부 장소는 비워 둔다 */
+const FIXTURE_CONGESTION: Readonly<Record<string, Omit<TourCongestion, 'baseDate'>>> = {
+  센트럴파크: { rate: 72.4, level: '혼잡' },
+  '송도 해변공원': { rate: 39.6, level: '여유' },
+};
+
+function fixtureToday(): string {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
 export function createFixtureTourDataSource(
   scenario: TourFixtureScenario = 'ready',
 ): TourDataSource {
@@ -89,6 +124,9 @@ export function createFixtureTourDataSource(
                   addr2: null,
                   mapX: lng + dLng,
                   mapY: lat + dLat,
+                  congestion: FIXTURE_CONGESTION[title]
+                    ? { ...FIXTURE_CONGESTION[title], baseDate: fixtureToday() }
+                    : null,
                 }));
           resolve({ type, page: 1, numOfRows: 30, totalCount: items.length, hasNext: false, items });
         }, FIXTURE_DELAY_MS);

@@ -15,12 +15,16 @@ import Animated, {
 import * as WebBrowser from 'expo-web-browser';
 
 import { ScreenState } from '@/components/common';
-import { Brand, Components, Layout, Typography } from '@/constants/theme';
+import { Brand, Components, Fonts, Layout, Typography } from '@/constants/theme';
 import { lookupPlaceUrl } from '@/features/map/kakao-place';
 import { createApiTourDataSource } from '@/features/map/tour-api';
 import { type Coords, TOUR_CATEGORIES, type TourCategory } from '@/features/map/tour-data';
 import { useCurrentLocation } from '@/features/map/use-current-location';
-import { useNearbyTours, type TourPlaceViewModel } from '@/features/map/use-nearby-tours';
+import {
+  useNearbyTours,
+  type TourCongestionViewModel,
+  type TourPlaceViewModel,
+} from '@/features/map/use-nearby-tours';
 
 const source = createApiTourDataSource();
 /** 시트 높이 — 지도 영역 기준. 절반/확장 사이로 조절하고 아래로 더 끌면 숨긴다. */
@@ -247,7 +251,11 @@ export function TourFacilities({ facilities }: { facilities: ReturnType<typeof u
               <View testID="tour-facility-detail" style={styles.detailContent}>
                 <Text style={styles.address}>{selected.address ?? '주소 정보가 없어요'}</Text>
                 <Text style={styles.distance}>{selected.distanceLabel ?? '거리 정보 없음'}</Text>
-                <PlaceLink place={selected} />
+                {/* 카카오 링크를 못 찾아도 혼잡도는 따로 보인다. 둘 다 없으면 줄이 비어 자리를 차지하지 않는다 */}
+                <View style={styles.detailActions}>
+                  <PlaceLink place={selected} />
+                  {selected.congestion ? <CongestionChip congestion={selected.congestion} /> : null}
+                </View>
                 <PlaceImage uri={selected.photos[0] ?? null} large />
               </View>
             ) : !origin ? (
@@ -337,6 +345,30 @@ function PlaceLink({ place }: { place: TourPlaceViewModel }) {
   );
 }
 
+/**
+ * 당일 예상 혼잡도. 낚시 지수 등급과 같은 색 체계를 쓴다 (좋음=초록, 보통=파랑, 나쁨=주황).
+ * 서버 rate 는 퍼센트가 아닌 지수라 숫자는 보여 주지 않고 등급만 보인다.
+ */
+const CONGESTION_COLOR: Readonly<Record<TourCongestionViewModel['level'], string>> = {
+  여유: '#0E9F6E',
+  보통: '#0079CA',
+  혼잡: '#FF4312',
+};
+
+function CongestionChip({ congestion }: { congestion: TourCongestionViewModel }) {
+  const color = CONGESTION_COLOR[congestion.level];
+  return (
+    <View
+      accessible
+      accessibilityLabel={`${congestion.dayLabel} 예상 혼잡도 ${congestion.level}`}
+      style={[styles.congestion, { borderColor: color }]}>
+      <View style={[styles.congestionDot, { backgroundColor: color }]} />
+      <Text style={styles.congestionLabel}>{congestion.dayLabel} 예상 혼잡도</Text>
+      <Text style={[styles.congestionLevel, { color }]}>{congestion.level}</Text>
+    </View>
+  );
+}
+
 function PlaceImage({ uri, large = false }: { uri: string | null; large?: boolean }) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const style = [styles.photo, large && styles.detailPhoto];
@@ -391,8 +423,8 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.72 },
   detailContent: { paddingBottom: 12 },
   backdrop: { backgroundColor: Brand.scrim },
+  detailActions: { marginTop: 12, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
   placeLink: {
-    marginTop: 12,
     minHeight: 44,
     alignSelf: 'flex-start',
     flexDirection: 'row',
@@ -404,5 +436,19 @@ const styles = StyleSheet.create({
     borderColor: Brand.primary,
   },
   placeLinkLabel: { ...Typography.caption, color: Brand.primaryDark },
+  // 상세 정보 보기 버튼과 나란히 두므로 높이와 모서리를 맞춘다
+  congestion: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  congestionDot: { width: 8, height: 8, borderRadius: 4 },
+  congestionLabel: { ...Typography.caption, color: Brand.textWeak },
+  // fontWeight 대신 굵은 서체 파일을 지정한다 — SUITE 에 bold 를 얹으면 시스템 폰트로 바뀐다
+  congestionLevel: { ...Typography.caption, fontFamily: Fonts.bold },
   detailPhoto: { width: '100%', height: 200, marginTop: 16 },
 });

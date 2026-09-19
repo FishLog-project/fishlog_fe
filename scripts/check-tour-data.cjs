@@ -641,7 +641,21 @@ async function check() {
   await checkFacilities();
   await checkFacilitiesByMapCenter();
   await checkPlaceLookup();
-  console.log('Tour query, coordinate/image validation, request/location races, fixtures, facility UI flow and kakao place links passed.');
+  // 혼잡도: 서버가 절반 정도만 채운다. 없거나 이상한 값은 숨기고, 지수를 %로 보여 주지 않는다.
+  const { toCongestion } = load('src/features/map/use-nearby-tours.ts', { react: { useEffect() {}, useMemo: (f) => f(), useState: (v) => [v, () => {}] } });
+  const today = new Date(2026, 8, 19);
+  assert.deepEqual(toCongestion({ rate: 39.6, level: '여유', baseDate: '2026-09-19' }, today), { level: '여유', dayLabel: '오늘' });
+  assert.deepEqual(toCongestion({ rate: 80, level: '혼잡', baseDate: '2026-09-18' }, today), { level: '혼잡', dayLabel: '9/18' },
+    'a stale base date must say which day it is, not "오늘"');
+  assert.equal(toCongestion(null, today), null, 'restaurants, lodging and unmatched spots come back null');
+  assert.equal(toCongestion(undefined, today), null, 'older servers omit the field');
+  assert.equal(toCongestion({ rate: 50, level: '매우혼잡', baseDate: '2026-09-19' }, today), null, 'unknown levels stay hidden');
+  assert.equal(toCongestion({ rate: 50, level: '보통', baseDate: 'today' }, today), null, 'a broken date stays hidden');
+  const chipSource = fs.readFileSync(path.join(root, 'src/features/map/tour-facilities.tsx'), 'utf8');
+  assert.ok(!/rate\s*}?\s*%|\$\{[^}]*rate[^}]*\}%/.test(chipSource), 'rate is an index, never render it as a percentage');
+  assert.match(chipSource, /selected\.congestion \? <CongestionChip/, 'the chip only renders when congestion exists');
+
+  console.log('Tour query, coordinate/image validation, request/location races, fixtures, facility UI flow, kakao place links and congestion passed.');
 }
 
 check().catch((error) => { console.error(error); process.exitCode = 1; });
