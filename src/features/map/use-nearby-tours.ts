@@ -1,12 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { distanceMeters, formatDistance, isValidCoords } from '@/features/map/geo';
-import type {
-  Coords,
-  TourCategory,
-  TourDataSource,
-  TourSpot,
+import {
+  CONGESTION_LEVELS,
+  type CongestionLevel,
+  type Coords,
+  type TourCategory,
+  type TourCongestion,
+  type TourDataSource,
+  type TourSpot,
 } from '@/features/map/tour-data';
+
+export interface TourCongestionViewModel {
+  level: CongestionLevel;
+  /** "오늘" 또는 기준일이 오늘이 아니면 "9/19" */
+  dayLabel: string;
+}
 
 export interface TourPlaceViewModel {
   /** BE에 id가 없어 요청 키와 순번으로 만든다. 오래된 마커 이벤트는 새 결과를 고르지 못한다 */
@@ -19,6 +28,8 @@ export interface TourPlaceViewModel {
   thumbnailUrl: string | null;
   photos: readonly string[];
   coords: Coords | null;
+  /** 당일 예상 혼잡도. 없으면 화면에서 숨긴다 */
+  congestion: TourCongestionViewModel | null;
 }
 
 export type NearbyToursState =
@@ -43,6 +54,27 @@ function imageUrl(value: string | null): string | null {
   }
 }
 
+function localDate(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/**
+ * 서버 혼잡도를 화면용으로 바꾼다. 모르는 등급이나 깨진 날짜는 숨긴다 —
+ * 틀린 등급을 보여 주느니 안 보여 주는 편이 낫다.
+ */
+export function toCongestion(
+  value: TourCongestion | null | undefined,
+  today: Date = new Date(),
+): TourCongestionViewModel | null {
+  if (!value || !CONGESTION_LEVELS.includes(value.level)) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.baseDate ?? '');
+  if (!match) return null;
+  const dayLabel =
+    value.baseDate === localDate(today) ? '오늘' : `${Number(match[2])}/${Number(match[3])}`;
+  return { level: value.level, dayLabel };
+}
+
 function toPlace(spot: TourSpot, index: number, origin: Coords, requestKey: string): TourPlaceViewModel {
   const position = { lat: spot.mapY, lng: spot.mapX };
   const coords = isValidCoords(position) ? position : null;
@@ -57,6 +89,7 @@ function toPlace(spot: TourSpot, index: number, origin: Coords, requestKey: stri
     thumbnailUrl: thumbnail || image,
     photos: image ? [image] : [],
     coords,
+    congestion: toCongestion(spot.congestion),
   };
 }
 

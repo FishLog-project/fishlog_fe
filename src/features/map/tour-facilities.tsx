@@ -15,12 +15,17 @@ import Animated, {
 import * as WebBrowser from 'expo-web-browser';
 
 import { ScreenState } from '@/components/common';
-import { Brand, Components, Layout, Typography } from '@/constants/theme';
+import { Brand, Components, Fonts, Layout, Typography } from '@/constants/theme';
 import { lookupPlaceUrl } from '@/features/map/kakao-place';
+import { matchSearchedPlace } from '@/features/map/place-match';
 import { createApiTourDataSource } from '@/features/map/tour-api';
 import { type Coords, TOUR_CATEGORIES, type TourCategory } from '@/features/map/tour-data';
 import { useCurrentLocation } from '@/features/map/use-current-location';
-import { useNearbyTours, type TourPlaceViewModel } from '@/features/map/use-nearby-tours';
+import {
+  useNearbyTours,
+  type TourCongestionViewModel,
+  type TourPlaceViewModel,
+} from '@/features/map/use-nearby-tours';
 
 const source = createApiTourDataSource();
 /** 시트 높이 — 지도 영역 기준. 절반/확장 사이로 조절하고 아래로 더 끌면 숨긴다. */
@@ -52,6 +57,21 @@ export function useTourFacilities(getSearchOrigin?: () => Coords | null) {
   const selected = state.status === 'ready' && selectedPlace && state.places.includes(selectedPlace)
     ? selectedPlace : null;
 
+  /** 검색에서 고른 장소. 그 좌표 주변 목록이 오면 같은 장소를 찾아 상세를 연다 */
+  const [pendingTarget, setPendingTarget] = useState<SearchedPlace | null>(null);
+  /**
+   * 관광공사 목록에서 못 찾은 검색 장소. 목록 위에 따로 보여 준다.
+   * 음식점은 관광공사 자료에 실린 곳이 적어 대부분 여기로 온다 — 안 보여 주면 검색이 고장난 줄 안다.
+   */
+  const [searchedPlace, setSearchedPlace] = useState<SearchedPlace | null>(null);
+  useEffect(() => {
+    if (!pendingTarget || state.status === 'loading' || state.status === 'idle') return;
+    setPendingTarget(null);
+    const match = state.status === 'ready' ? matchSearchedPlace(state.places, pendingTarget) : null;
+    if (match) setSelectedPlace(match);
+    else setSearchedPlace(pendingTarget);
+  }, [pendingTarget, state]);
+
   /** 지금 지도 중심을 조회 기준으로 잡는다. 중심을 모르면 false */
   const pinMapOrigin = () => {
     const center = getSearchOrigin?.() ?? null;
@@ -60,6 +80,7 @@ export function useTourFacilities(getSearchOrigin?: () => Coords | null) {
   };
   const selectCategory = (next: TourCategory) => {
     setSelectedPlace(null);
+    setSearchedPlace(null);
     if (next === category) {
       // 숨긴 목록은 같은 칩으로 다시 연다. 열린 상태에서 다시 누르면 필터를 해제한다.
       setSheetOpen(!sheetOpen);
@@ -72,6 +93,7 @@ export function useTourFacilities(getSearchOrigin?: () => Coords | null) {
   };
   const refreshLocation = () => {
     setSelectedPlace(null);
+    setSearchedPlace(null);
     // 현재 지도 중심을 새 조회 기준으로 고정한다.
     const center = getSearchOrigin?.() ?? null;
     if (!center) {
@@ -87,8 +109,20 @@ export function useTourFacilities(getSearchOrigin?: () => Coords | null) {
   };
   // 시트 표시와 조회 수명을 분리한다. 숨겨도 분류·응답·마커는 유지한다.
   const hide = () => { setSelectedPlace(null); setSheetOpen(false); };
-  const close = () => { hide(); setCategory(null); };
+  const close = () => { hide(); setCategory(null); setSearchedPlace(null); };
   const back = () => setSelectedPlace(null);
+  /**
+   * 검색에서 고른 장소로 연다. 그 좌표를 조회 기준으로 고정하고, 목록이 오면 상세까지 연다.
+   * 이름 검색(카카오)과 목록(관광공사)이 다른 데이터라 좌표로 다시 맞춘다.
+   */
+  const openAt = (next: TourCategory, target: SearchedPlace) => {
+    setSelectedPlace(null);
+    setSearchedPlace(null);
+    setCategory(next);
+    setSheetOpen(true);
+    setMapOrigin(target.coords);
+    setPendingTarget(target);
+  };
   const selectPlace = (id: string) => {
     const place = state.status === 'ready' ? state.places.find((item) => item.id === id) : null;
     if (place) { setSelectedPlace(place); setSheetOpen(true); }
@@ -97,13 +131,21 @@ export function useTourFacilities(getSearchOrigin?: () => Coords | null) {
     ? state.places.flatMap((place) => place.coords ? [{ id: place.id, name: place.name, ...place.coords }] : [])
     : [], [state]);
 
-  return { category, sheetOpen, location, origin, state, selected, markers, byMapCenter: mapOrigin !== null,
-    selectCategory, refreshLocation, retry, selectPlace, back, hide, close };
+  return { category, sheetOpen, location, origin, state, selected, searchedPlace, markers, byMapCenter: mapOrigin !== null,
+    selectCategory, refreshLocation, retry, selectPlace, back, hide, close, openAt };
 }
+
+/** 검색에서 고른 장소 (카카오 결과) */
+export interface SearchedPlace {
+  name: string;
+  address: string | null;
+  coords: Coords;
+}
+
 
 /** 지도 마커·목록·상세가 같은 요청 결과와 선택 상태를 쓴다. */
 export function TourFacilities({ facilities }: { facilities: ReturnType<typeof useTourFacilities> }) {
-  const { category, sheetOpen, location, origin, state, selected, byMapCenter,
+  const { category, sheetOpen, location, origin, state, selected, searchedPlace, byMapCenter,
     selectCategory, refreshLocation, retry, selectPlace, back, hide } = facilities;
   const [expanded, setExpanded] = useState(false);
 
@@ -247,7 +289,11 @@ export function TourFacilities({ facilities }: { facilities: ReturnType<typeof u
               <View testID="tour-facility-detail" style={styles.detailContent}>
                 <Text style={styles.address}>{selected.address ?? '주소 정보가 없어요'}</Text>
                 <Text style={styles.distance}>{selected.distanceLabel ?? '거리 정보 없음'}</Text>
-                <PlaceLink place={selected} />
+                {/* 카카오 링크를 못 찾아도 혼잡도는 따로 보인다. 둘 다 없으면 줄이 비어 자리를 차지하지 않는다 */}
+                <View style={styles.detailActions}>
+                  <PlaceLink place={selected} />
+                  {selected.congestion ? <CongestionChip congestion={selected.congestion} /> : null}
+                </View>
                 <PlaceImage uri={selected.photos[0] ?? null} large />
               </View>
             ) : !origin ? (
@@ -261,7 +307,9 @@ export function TourFacilities({ facilities }: { facilities: ReturnType<typeof u
                 onRetry={refreshLocation}
               />
             ) : state.status === 'ready' ? (
-              state.places.map((place) => (
+              <>
+              {searchedPlace ? <SearchedPlaceCard place={searchedPlace} category={category} /> : null}
+              {state.places.map((place) => (
                 <Pressable
                   key={place.id}
                   accessibilityRole="button"
@@ -275,8 +323,13 @@ export function TourFacilities({ facilities }: { facilities: ReturnType<typeof u
                     <Text style={styles.distance}>{place.distanceLabel ?? '거리 정보 없음'}</Text>
                   </View>
                 </Pressable>
-              ))
+              ))}
+              </>
             ) : (
+              <>
+              {/* 주변 목록이 비어도 검색한 곳은 보여 준다 */}
+              {searchedPlace && state.status === 'empty'
+                ? <SearchedPlaceCard place={searchedPlace} category={category} /> : null}
               <ScreenState
                 variant={state.status === 'idle' ? 'loading' : state.status}
                 title={state.status === 'empty' ? `주변에 ${category} 시설이 없어요`
@@ -285,6 +338,7 @@ export function TourFacilities({ facilities }: { facilities: ReturnType<typeof u
                   : state.status === 'error' ? '잠시 후 다시 시도해 주세요.' : undefined}
                 onRetry={retry}
               />
+              </>
             )}
           </ScrollView>
           </GestureHandlerRootView>
@@ -334,6 +388,61 @@ function PlaceLink({ place }: { place: TourPlaceViewModel }) {
       <Text style={styles.placeLinkLabel}>상세 정보 보기</Text>
       <Ionicons name="open-outline" size={16} color={Brand.primaryDark} />
     </Pressable>
+  );
+}
+
+/**
+ * 당일 예상 혼잡도. 낚시 지수 등급과 같은 색 체계를 쓴다 (좋음=초록, 보통=파랑, 나쁨=주황).
+ * 서버 rate 는 퍼센트가 아닌 지수라 숫자는 보여 주지 않고 등급만 보인다.
+ */
+const CONGESTION_COLOR: Readonly<Record<TourCongestionViewModel['level'], string>> = {
+  여유: '#0E9F6E',
+  보통: '#0079CA',
+  혼잡: '#FF4312',
+};
+
+function CongestionChip({ congestion }: { congestion: TourCongestionViewModel }) {
+  const color = CONGESTION_COLOR[congestion.level];
+  return (
+    <View
+      accessible
+      accessibilityLabel={`${congestion.dayLabel} 예상 혼잡도 ${congestion.level}`}
+      style={[styles.congestion, { borderColor: color }]}>
+      <View style={[styles.congestionDot, { backgroundColor: color }]} />
+      <Text style={styles.congestionLabel}>{congestion.dayLabel} 예상 혼잡도</Text>
+      <Text style={[styles.congestionLevel, { color }]}>{congestion.level}</Text>
+    </View>
+  );
+}
+
+/**
+ * 검색한 곳이 관광공사 목록에 없을 때 목록 위에 붙이는 카드.
+ * 관광공사 자료가 없으니 사진·혼잡도는 없고, 카카오맵으로 넘기는 링크만 준다.
+ */
+function SearchedPlaceCard({ place, category }: { place: SearchedPlace; category: TourCategory | null }) {
+  // PlaceLink 는 이름·좌표만 쓴다. 나머지 필드는 목록 항목과 모양을 맞추려고 비워 둔다
+  const linkTarget: TourPlaceViewModel = {
+    id: `searched:${place.name}`,
+    name: place.name,
+    address: place.address,
+    distanceLabel: null,
+    thumbnailUrl: null,
+    photos: [],
+    coords: place.coords,
+    congestion: null,
+  };
+  return (
+    <View testID="tour-searched-place" style={styles.searched}>
+      <Text style={styles.searchedLabel}>검색한 곳</Text>
+      <Text numberOfLines={2} style={styles.name}>{place.name}</Text>
+      {place.address ? <Text numberOfLines={2} style={styles.address}>{place.address}</Text> : null}
+      <Text style={styles.searchedNotice}>
+        관광 정보에 없는 곳이라 주변 {category ?? '시설'}을 함께 보여 드려요.
+      </Text>
+      <View style={styles.detailActions}>
+        <PlaceLink place={linkTarget} />
+      </View>
+    </View>
   );
 }
 
@@ -391,8 +500,18 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.72 },
   detailContent: { paddingBottom: 12 },
   backdrop: { backgroundColor: Brand.scrim },
+  searched: {
+    marginTop: 8,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: Brand.surfaceSoft,
+    borderWidth: 1,
+    borderColor: Brand.primary,
+  },
+  searchedLabel: { ...Typography.caption, color: Brand.primaryDark, marginBottom: 4 },
+  searchedNotice: { ...Typography.caption, color: Brand.textMuted, lineHeight: 20, marginTop: 8 },
+  detailActions: { marginTop: 12, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
   placeLink: {
-    marginTop: 12,
     minHeight: 44,
     alignSelf: 'flex-start',
     flexDirection: 'row',
@@ -404,5 +523,19 @@ const styles = StyleSheet.create({
     borderColor: Brand.primary,
   },
   placeLinkLabel: { ...Typography.caption, color: Brand.primaryDark },
+  // 상세 정보 보기 버튼과 나란히 두므로 높이와 모서리를 맞춘다
+  congestion: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  congestionDot: { width: 8, height: 8, borderRadius: 4 },
+  congestionLabel: { ...Typography.caption, color: Brand.textWeak },
+  // fontWeight 대신 굵은 서체 파일을 지정한다 — SUITE 에 bold 를 얹으면 시스템 폰트로 바뀐다
+  congestionLevel: { ...Typography.caption, fontFamily: Fonts.bold },
   detailPhoto: { width: '100%', height: 200, marginTop: 16 },
 });

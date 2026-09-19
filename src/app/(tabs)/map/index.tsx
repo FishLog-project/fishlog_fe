@@ -13,7 +13,7 @@ import { isValidCoords } from '@/features/map/geo';
 import { FishlogKakaoMap } from '@/features/map/kakao-map';
 import { createApiSpotDataSource } from '@/features/map/spot-api';
 import { createFixtureSpotDataSource } from '@/features/map/spot-data';
-import type { Coords } from '@/features/map/tour-data';
+import { TOUR_CATEGORIES, type Coords, type TourCategory } from '@/features/map/tour-data';
 import { allZones, toZonePolygons } from '@/features/map/prohibited-zones';
 import { TourFacilities, useTourFacilities } from '@/features/map/tour-facilities';
 import { setSpotFavorite } from '@/features/map/spot-list-store';
@@ -30,6 +30,18 @@ const MAP = Components.map;
  * 남은 3곳은 북한·러시아 근해라 이 화면 밖이지만 실제로 갈 수 있는 곳이 아니다.
  */
 const ZONE_OVERVIEW = { lat: 35.137, lng: 129.051, zoomLevel: 10 };
+
+/** 검색에서 고른 시설로 옮길 때의 줌. 시설 이름이 보이는 TOUR_LABEL_MIN_ZOOM 과 같다 */
+const TOUR_SEARCH_ZOOM = 16;
+
+/** 빈 문자열을 0 으로 읽지 않는다 — Number('') 는 0 이라 경도 0 으로 지도가 날아간다 */
+function parseCoordParam(value: string | undefined): number {
+  return value === undefined || value.trim() === '' ? NaN : Number(value);
+}
+
+function isTourCategory(value: string | undefined): value is TourCategory {
+  return value !== undefined && (TOUR_CATEGORIES as readonly string[]).includes(value);
+}
 
 /** 주변 시설·해양 정보는 토글이다 (Figma 634:1495) — 금지 구역은 아직 동작이 정해지지 않았다 */
 const MAP_ACTIONS: readonly { key: string; icon: number; label: string }[] = [
@@ -102,8 +114,26 @@ export default function MapScreen() {
    *
    * 같은 spotId 로 목록이 다시 들어와도 시트를 또 열지 않도록 처리한 값을 기억한다.
    */
-  const { spotId: requestedSpotId, searchRequest } = useLocalSearchParams<{ spotId?: string; searchRequest?: string }>();
+  const {
+    spotId: requestedSpotId,
+    searchRequest,
+    tourCategory: requestedTourCategory,
+    tourLat,
+    tourLng,
+    tourName,
+    tourAddress,
+  } = useLocalSearchParams<{
+    spotId?: string;
+    searchRequest?: string;
+    tourCategory?: string;
+    tourLat?: string;
+    tourLng?: string;
+    tourName?: string;
+    tourAddress?: string;
+  }>();
   const requestKey = requestedSpotId ? `${requestedSpotId}:${searchRequest ?? ''}` : null;
+  const tourRequestKey = requestedTourCategory ? `${requestedTourCategory}:${searchRequest ?? ''}` : null;
+  const handledTourRequest = useRef<string | null>(null);
   const handledSpotRequest = useRef<string | null>(null);
   const focusNonce = useRef(0);
   const [focus, setFocus] = useState<
@@ -146,6 +176,32 @@ export default function MapScreen() {
     if (mapFocused.current) applySpotRequest();
   }, [applySpotRequest]);
 
+  /**
+   * 검색에서 고른 관광지·음식점·숙박을 연다.
+   * 그 장소로 지도를 옮기고, 같은 분류의 주변 목록을 연 뒤 목록에서 같은 장소의 상세까지 연다.
+   */
+  const applyTourRequest = useCallback(() => {
+    if (!tourRequestKey || tourRequestKey === handledTourRequest.current) return;
+    if (!isTourCategory(requestedTourCategory)) return;
+    const coords = { lat: parseCoordParam(tourLat), lng: parseCoordParam(tourLng) };
+    if (!isValidCoords(coords)) return;
+
+    handledTourRequest.current = tourRequestKey;
+    setSelectedSpotId(null);
+    setFacilitiesOpen(true);
+    facilitiesRef.current.openAt(requestedTourCategory, {
+      name: tourName ?? '',
+      address: tourAddress?.trim() ? tourAddress : null,
+      coords,
+    });
+    setFocus({ ...coords, zoomLevel: TOUR_SEARCH_ZOOM, nonce: ++focusNonce.current });
+  }, [tourRequestKey, requestedTourCategory, tourLat, tourLng, tourName, tourAddress]);
+  const tourRequestRef = useRef(applyTourRequest);
+  useEffect(() => {
+    tourRequestRef.current = applyTourRequest;
+    if (mapFocused.current) applyTourRequest();
+  }, [applyTourRequest]);
+
   // 초기화와 선택은 같은 focus callback에서 순서대로 실행한다.
   // 별도 focus effects는 파라미터 렌더와 navigation 이벤트 순서에 따라 선택을 다시 지울 수 있다.
   useFocusEffect(useCallback(() => {
@@ -160,6 +216,7 @@ export default function MapScreen() {
     }
     returned.current = true;
     spotRequestRef.current();
+    tourRequestRef.current();
     return () => { mapFocused.current = false; };
   }, []));
 
@@ -168,11 +225,17 @@ export default function MapScreen() {
       {/* 검색은 별도 화면에서 한다 — 여기서는 들어가는 입구 역할만 */}
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="낚시터 검색"
-        onPress={() => router.push('/search')}
+        accessibilityLabel="낚시터·관광지·음식점·숙박 검색"
+        onPress={() => {
+          // 시설 검색 결과에 거리를 보이도록 지금 지도 중심을 넘긴다
+          const center = mapCenter.current;
+          router.push(center
+            ? { pathname: '/search', params: { lat: String(center.lat), lng: String(center.lng) } }
+            : '/search');
+        }}
         style={styles.searchArea}>
         <View pointerEvents="none">
-          <SearchBar value={selectedSpot?.name ?? ''} placeholder="낚시터 검색" />
+          <SearchBar value={selectedSpot?.name ?? ''} placeholder="낚시터·관광지·음식점·숙박 검색" />
         </View>
       </Pressable>
 

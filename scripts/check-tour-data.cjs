@@ -641,7 +641,43 @@ async function check() {
   await checkFacilities();
   await checkFacilitiesByMapCenter();
   await checkPlaceLookup();
-  console.log('Tour query, coordinate/image validation, request/location races, fixtures, facility UI flow and kakao place links passed.');
+  // 혼잡도: 서버가 절반 정도만 채운다. 없거나 이상한 값은 숨기고, 지수를 %로 보여 주지 않는다.
+  const { toCongestion } = load('src/features/map/use-nearby-tours.ts', { react: { useEffect() {}, useMemo: (f) => f(), useState: (v) => [v, () => {}] } });
+  const today = new Date(2026, 8, 19);
+  assert.deepEqual(toCongestion({ rate: 39.6, level: '여유', baseDate: '2026-09-19' }, today), { level: '여유', dayLabel: '오늘' });
+  assert.deepEqual(toCongestion({ rate: 80, level: '혼잡', baseDate: '2026-09-18' }, today), { level: '혼잡', dayLabel: '9/18' },
+    'a stale base date must say which day it is, not "오늘"');
+  assert.equal(toCongestion(null, today), null, 'restaurants, lodging and unmatched spots come back null');
+  assert.equal(toCongestion(undefined, today), null, 'older servers omit the field');
+  assert.equal(toCongestion({ rate: 50, level: '매우혼잡', baseDate: '2026-09-19' }, today), null, 'unknown levels stay hidden');
+  assert.equal(toCongestion({ rate: 50, level: '보통', baseDate: 'today' }, today), null, 'a broken date stays hidden');
+  const chipSource = fs.readFileSync(path.join(root, 'src/features/map/tour-facilities.tsx'), 'utf8');
+  assert.ok(!/rate\s*}?\s*%|\$\{[^}]*rate[^}]*\}%/.test(chipSource), 'rate is an index, never render it as a percentage');
+  assert.match(chipSource, /selected\.congestion \? <CongestionChip/, 'the chip only renders when congestion exists');
+
+  // 검색 → 목록 매칭: 카카오(이름 검색)와 관광공사(목록)는 이름·좌표가 조금씩 다르다.
+  const { matchSearchedPlace } = load('src/features/map/place-match.ts');
+  const at = (name, lat, lng) => ({ id: name, name, coords: { lat, lng } });
+  const list = [
+    at('롯데월드 아쿠아리움', 37.51301, 127.10252),
+    at('롯데월드', 37.51110, 127.09806),
+    at('석촌호수', 37.50950, 127.10080),
+  ];
+  assert.equal(matchSearchedPlace(list, { name: '롯데월드 어드벤처', coords: { lat: 37.51115, lng: 127.09810 } })?.name, '롯데월드',
+    'a name contained in the other matches even when the nearest item is a different place');
+  assert.equal(matchSearchedPlace(list, { name: '석촌호수 동호', coords: { lat: 37.50952, lng: 127.10082 } })?.name, '석촌호수');
+  assert.equal(matchSearchedPlace(list, { name: '전혀 다른 이름', coords: { lat: 37.51300, lng: 127.10250 } })?.name, '롯데월드 아쿠아리움',
+    'with no name match, the nearest place within range is used');
+  // 실기기에서 잡힌 버그: 목록에 없는 "롯데월드 어드벤처"를 고르면 225m 떨어진 삼전도비가 열렸다.
+  const jamsil = [at('서울 삼전도비', 37.50912, 127.09788), at('롯데월드타워&롯데월드몰', 37.51417, 127.10407)];
+  assert.equal(matchSearchedPlace(jamsil, { name: '롯데월드 어드벤처', coords: { lat: 37.51104, lng: 127.09815 } }), null,
+    'an unrelated place 225m away must not open just because it is the nearest');
+  assert.equal(matchSearchedPlace(list, { name: '롯데월드', coords: { lat: 35.1587, lng: 129.1604 } }), null,
+    'a same-named place far away is a different branch, not a match');
+  assert.equal(matchSearchedPlace([{ id: 'x', name: '좌표없음', coords: null }], { name: '좌표없음', coords: { lat: 37.5, lng: 127 } }), null,
+    'places without coordinates cannot be confirmed');
+
+  console.log('Tour query, coordinate/image validation, request/location races, fixtures, facility UI flow, kakao place links, congestion and search matching passed.');
 }
 
 check().catch((error) => { console.error(error); process.exitCode = 1; });
