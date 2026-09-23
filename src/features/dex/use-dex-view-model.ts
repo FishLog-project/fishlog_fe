@@ -1,0 +1,189 @@
+import { useMemo, useState } from 'react';
+
+import type {
+  CatchRecord,
+  CustomCatchRecord,
+  DexDataSource,
+  DexEntry,
+  FishDetail,
+  MyDex,
+  RecentCatch,
+} from '@/features/dex/dex-data';
+import { useSection } from '@/lib/use-section';
+
+export interface DexSpeciesViewModel {
+  id: number;
+  name: string;
+  custom?: boolean;
+  /** 카드에 표시할 어종명 */
+  label: string;
+  /** null이면 화면이 기본 그림을 쓴다 */
+  imageUrl: string | null;
+  caught: boolean;
+  accessibilityLabel: string;
+  /**
+   * 검색이 훑는 텍스트 ("어종명 서식지").
+   * 획득 여부와 관계없이 공개된 어종명과 서식지로 검색한다.
+   */
+  searchText: string;
+}
+
+export interface DexSpeciesDetailViewModel {
+  name: string;
+  custom?: boolean;
+  /** "최대 크기 300cm". 서버가 값을 안 주면 null이고 그 줄을 그리지 않는다 */
+  maxSizeLabel: string | null;
+  /** null이면 화면이 기본 그림을 쓴다 */
+  imageUrl: string | null;
+  description: string;
+  /** 기타어종은 서식지가 없어 null */
+  habitatLabel: string | null;
+  /** "잡은 횟수: 3회" */
+  catchLabel: string | null;
+  photos: readonly RecentCatch[];
+}
+
+export interface DexViewModel {
+  species: readonly DexSpeciesViewModel[];
+  collected: number;
+  total: number;
+  /** 0–100. 막대 폭은 이 값에서 유도한다 (숫자와 막대가 어긋나지 않게) */
+  progressPercent: number;
+}
+
+// 로더·매퍼는 모듈 레벨 상수라 참조가 안정적이다.
+// (useSection 의존성에 들어가므로 렌더마다 새로 만들면 무한 재요청이 된다)
+
+function loadMyDex(dataSource: DexDataSource) {
+  return dataSource.getMyDex();
+}
+
+function toDexSpecies(entry: DexEntry): DexSpeciesViewModel {
+  const habitat = entry.habitat ?? '';
+
+  return {
+    id: entry.id,
+    name: entry.name,
+    custom: entry.custom,
+    label: entry.name,
+    imageUrl: entry.imageUrl,
+    caught: entry.caught,
+    accessibilityLabel: `${entry.name}${habitat ? `, 서식지 ${habitat}` : ''}${entry.caught ? '' : ', 아직 잡지 못한 어종'}`,
+    searchText: `${entry.name} ${habitat}`.trim(),
+  };
+}
+
+function toDexViewModel(dex: MyDex): DexViewModel | null {
+  if (dex.fishes.length === 0) return null;
+
+  // 서버 값이 어긋나도(음수·초과) 화면이 깨지지 않게 범위를 눌러 둔다
+  const total = Math.max(0, dex.totalCount);
+  const collected = Math.min(Math.max(0, dex.caughtCount), total);
+
+  return {
+    // 채운 칸을 앞으로 당겨 내가 모은 어종부터 보이게 한다.
+    // 같은 그룹 안에서는 서버가 준 순서를 그대로 둔다 (sort 는 안정 정렬이다).
+    species: dex.fishes
+      .map(toDexSpecies)
+      .sort((a, b) => Number(b.caught) - Number(a.caught)),
+    collected,
+    total,
+    progressPercent: total === 0 ? 0 : Math.round((collected / total) * 100),
+  };
+}
+
+export function useDexViewModel(dataSource: DexDataSource) {
+  const [query, setQuery] = useState('');
+  const [state, retry] = useSection(dataSource, loadMyDex, toDexViewModel);
+
+  const trimmedQuery = query.trim();
+
+  /**
+   * 검색은 이미 받아 둔 목록을 걸러 내기만 한다 (서버 왕복 없음).
+   * 도감은 24종 규모라 클라이언트 필터로 충분하다.
+   * 아직 목록을 못 받았으면 null — 화면이 로딩·오류를 그대로 보여준다.
+   */
+  const results = useMemo(() => {
+    if (state.status !== 'ready') return null;
+    if (trimmedQuery === '') return state.data.species;
+
+    return state.data.species.filter((s) => s.searchText.includes(trimmedQuery));
+  }, [state, trimmedQuery]);
+
+  return {
+    state,
+    results,
+    query,
+    setQuery,
+    retry,
+    /** 검색 중에는 완성도 카드를 감춘다 (Figma "도감 검색" 634:1359) */
+    isSearching: trimmedQuery !== '',
+  };
+}
+
+/** 어종 정보와 내 인증 기록을 상세 카드 한 장으로 합친다 */
+export function toDexSpeciesDetail(
+  fish: FishDetail,
+  record: CatchRecord,
+): DexSpeciesDetailViewModel {
+  return {
+    name: fish.name,
+    maxSizeLabel: fish.maxSizeCm === undefined ? null : `최대 크기 ${fish.maxSizeCm}cm`,
+    imageUrl: fish.imageUrl,
+    description: fish.description,
+    habitatLabel: fish.habitat ? `주요 서식지: ${fish.habitat}` : null,
+    catchLabel: `잡은 횟수: ${record.catchCount}회`,
+    photos: record.recentCatches,
+  };
+}
+
+/** 수기 어종에는 종 설명·최대 크기가 없다. 사진과 사용자 기록만 합친다. */
+export function toCustomSpeciesDetail(record: CustomCatchRecord): DexSpeciesDetailViewModel {
+  return {
+    name: record.name,
+    custom: true,
+    maxSizeLabel: null,
+    imageUrl: record.imageUrl ?? null,
+    description: '',
+    habitatLabel: record.habitat ? `주요 서식지: ${record.habitat}` : null,
+    catchLabel: `잡은 횟수: ${record.catchCount}회`,
+    photos: record.recentCatches,
+  };
+}
+
+interface DetailSource {
+  dataSource: DexDataSource;
+  fishId: number;
+  custom: boolean;
+  caught: boolean;
+}
+
+async function loadDetail({ dataSource, fishId, custom, caught }: DetailSource) {
+  if (custom) return toCustomSpeciesDetail(await dataSource.getCustomFish(fishId));
+  if (!caught) {
+    const fish = await dataSource.getFish(fishId);
+    return toDexSpeciesDetail(fish, { habitat: fish.habitat, catchCount: 0, recentCatches: [] });
+  }
+  const [fish, record] = await Promise.all([dataSource.getFish(fishId), dataSource.getCatchRecord(fishId)]);
+  return toDexSpeciesDetail(fish, record);
+}
+
+function toDetail(detail: DexSpeciesDetailViewModel) {
+  return detail;
+}
+
+/**
+ * 어종 상세 — 어종 정보(GET /api/fish/{id})와 내 인증 기록(GET /api/collections?fishId=)을
+ * 함께 받아 합친다. 둘 중 하나만 실패해도 오류다.
+ *
+ * fishId나 로그인 세션이 바뀌면 이전 응답을 버리고 다시 받는다.
+ */
+export function useDexDetailViewModel(
+  dataSource: DexDataSource,
+  fishId: number,
+  custom = false,
+  caught = true,
+) {
+  const source = useMemo(() => ({ dataSource, fishId, custom, caught }), [dataSource, fishId, custom, caught]);
+  return useSection(source, loadDetail, toDetail);
+}
